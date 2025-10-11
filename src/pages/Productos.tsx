@@ -26,7 +26,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { createProducto } from "@/integrations/api";
+import { createProducto, updateProducto } from "@/integrations/api";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 // Los productos se obtienen desde la API en `useEffect` usando getProductos()
 
@@ -35,6 +44,9 @@ export default function Productos() {
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [alertOpen, setAlertOpen] = useState(false);
   const form = useForm({
     defaultValues: {
       nombre: "",
@@ -83,10 +95,17 @@ export default function Productos() {
         precio_venta: Number.isNaN(precio_venta) ? null : precio_venta,
         proveedor_id: Number.isNaN(proveedor_id) ? null : proveedor_id,
       };
-      console.log("Creando producto, payload:", payload);
-      const newProd = await createProducto(payload);
-      setProductos((prev) => [newProd, ...prev]);
-      toast.success("Producto creado");
+      console.log("Creando/actualizando producto, payload:", payload);
+      if (editingProduct) {
+        const updated = await updateProducto(editingProduct.id, payload);
+        setProductos((prev) => prev.map((p) => (p.id === editingProduct.id ? updated : p)));
+        toast.success("Producto actualizado");
+        setEditingProduct(null);
+      } else {
+        const newProd = await createProducto(payload);
+        setProductos((prev) => [newProd, ...prev]);
+        toast.success("Producto creado");
+      }
       setIsOpen(false);
       form.reset();
     } catch (err) {
@@ -258,21 +277,33 @@ export default function Productos() {
                       <TableCell>{product.proveedor_id ?? "-"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon">
+                         
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              // abrir modal en modo edición
+                              setEditingProduct(product);
+                              form.reset({
+                                nombre: product.nombre,
+                                tipo: product.tipo,
+                                unidad: product.unidad,
+                                stock: product.stock,
+                                costo: product.costo,
+                                precio_venta: product.precio_venta,
+                                proveedor_id: product.proveedor_id,
+                              });
+                              setIsOpen(true);
+                            }}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={async () => {
-                              try {
-                                await deleteProducto(product.id);
-                                setProductos((prev) => prev.filter((p) => p.id !== product.id));
-                                toast.success("Producto eliminado");
-                              } catch (err) {
-                                console.error(err);
-                                toast.error("Error al eliminar producto");
-                              }
+                            onClick={() => {
+                              setDeleteTarget(product);
+                              setAlertOpen(true);
                             }}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -286,6 +317,38 @@ export default function Productos() {
             )}
           </CardContent>
         </Card>
+        {/* Confirmación de borrado */}
+        <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Estás seguro que quieres eliminar el producto {deleteTarget?.nombre} ? Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex justify-end gap-2">
+              <AlertDialogCancel onClick={() => setAlertOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!deleteTarget) return;
+                  try {
+                    await deleteProducto(deleteTarget.id);
+                    setProductos((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+                    toast.success("Producto eliminado");
+                  } catch (err) {
+                    console.error(err);
+                    toast.error("Error al eliminar producto");
+                  } finally {
+                    setDeleteTarget(null);
+                    setAlertOpen(false);
+                  }
+                }}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
