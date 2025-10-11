@@ -3,6 +3,17 @@ import { Layout } from "@/components/Layout";
 import { getProductos, deleteProducto } from "@/integrations/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Edit, Trash2, Package } from "lucide-react";
@@ -15,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { createProducto } from "@/integrations/api";
 
 // Los productos se obtienen desde la API en `useEffect` usando getProductos()
 
@@ -22,6 +34,18 @@ export default function Productos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const form = useForm({
+    defaultValues: {
+      nombre: "",
+      tipo: "MateriaPrima",
+      unidad: "unidad",
+      stock: 0,
+      costo: 0,
+      precio_venta: 0,
+      proveedor_id: null,
+    },
+  });
 
   useEffect(() => {
     getProductos()
@@ -38,18 +62,139 @@ export default function Productos() {
     );
   });
 
+  async function onSubmit(values: any) {
+    try {
+      // Normalizar 'tipo' a los valores que suele aceptar la API
+      let tipo = (values.tipo || "").toString().trim();
+      if (/materia/i.test(tipo)) tipo = "MateriaPrima";
+      else if (/producto/i.test(tipo)) tipo = "ProductoTerminado";
+
+      const stock = Number(values.stock);
+      const costo = values.costo !== undefined && values.costo !== null && values.costo !== "" ? Number(values.costo) : null;
+      const precio_venta = values.precio_venta !== undefined && values.precio_venta !== null && values.precio_venta !== "" ? Number(values.precio_venta) : null;
+      const proveedor_id = values.proveedor_id !== undefined && values.proveedor_id !== null && values.proveedor_id !== "" ? Number(values.proveedor_id) : null;
+
+      const payload = {
+        nombre: (values.nombre || "").toString(),
+        tipo,
+        unidad: (values.unidad || "").toString(),
+        stock: Number.isNaN(stock) ? 0 : stock,
+        costo: Number.isNaN(costo) ? null : costo,
+        precio_venta: Number.isNaN(precio_venta) ? null : precio_venta,
+        proveedor_id: Number.isNaN(proveedor_id) ? null : proveedor_id,
+      };
+      console.log("Creando producto, payload:", payload);
+      const newProd = await createProducto(payload);
+      setProductos((prev) => [newProd, ...prev]);
+      toast.success("Producto creado");
+      setIsOpen(false);
+      form.reset();
+    } catch (err) {
+      console.error(err);
+      // Intentar mostrar mensaje de error del backend si viene en formato JSON
+      let message = "Error al crear producto";
+      try {
+        if (err instanceof Error) {
+          const parsed = JSON.parse(err.message);
+          if (parsed && parsed.error) message = parsed.error;
+          else if (parsed && parsed.message) message = parsed.message;
+        }
+      } catch (e) {
+        // no-op
+      }
+      toast.error(message);
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Productos</h2>
             <p className="text-muted-foreground">Gestión completa del catálogo de productos</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Producto
-          </Button>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nuevo Producto
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nuevo Producto</DialogTitle>
+                <DialogDescription>Completa los datos para crear un producto</DialogDescription>
+              </DialogHeader>
+
+              <div>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormItem>
+                      <FormLabel>Nombre</FormLabel>
+                      <FormControl>
+                        <Input {...form.register("nombre", { required: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Tipo</FormLabel>
+                      <FormControl>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
+                          {...form.register("tipo", { required: true })}
+                        >
+                          <option value="MateriaPrima">MateriaPrima</option>
+                          <option value="ProductoTerminado">ProductoTerminado</option>
+                        </select>
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Unidad</FormLabel>
+                      <FormControl>
+                        <Input {...form.register("unidad", { required: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Stock</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...form.register("stock", { valueAsNumber: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Costo</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...form.register("costo", { valueAsNumber: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Precio venta</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...form.register("precio_venta", { valueAsNumber: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <FormItem>
+                      <FormLabel>Proveedor ID</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...form.register("proveedor_id", { valueAsNumber: true })} />
+                      </FormControl>
+                    </FormItem>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
+                      <Button type="submit">Crear</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Search and Filters */}
