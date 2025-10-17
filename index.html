@@ -19,6 +19,25 @@
 
   <body>
     <div id="root"></div>
+    <!-- Inline fallback to ensure _jsxDEV exists before any bundle code runs -->
+    <script>
+      (function () {
+        try {
+          if (typeof window !== 'undefined' && typeof window._jsxDEV !== 'function') {
+            window._jsxDEV = function (type, props) {
+              // minimal fallback: delegate to React.createElement if available later
+              if (typeof window.React !== 'undefined' && typeof window.React.createElement === 'function') {
+                return window.React.createElement(type, props);
+              }
+              // store a minimal placeholder object so calls don't throw
+              return { __jsx_fallback: true, type: type, props: props };
+            };
+          }
+        } catch (e) {
+          console.warn('Failed to install _jsxDEV fallback', e);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
