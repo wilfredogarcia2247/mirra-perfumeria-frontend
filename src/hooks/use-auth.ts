@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { getToken } from "@/integrations/api";
 
+// Lightweight auth hook: reads token synchronously from localStorage so
+// ProtectedRoute can check authentication immediately on mount.
 export function useAuth() {
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    setToken(getToken());
-  }, []);
+  // Initialize from localStorage synchronously to avoid a false negative
+  // during the first render (which caused immediate redirects back to /login).
+  const [token, setToken] = useState<string | null>(() => getToken());
 
   const isAuthenticated = !!token;
 

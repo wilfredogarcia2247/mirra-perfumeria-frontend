@@ -6,7 +6,7 @@ import { getCatalogoPaginated } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { toast } from 'sonner';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, Search } from 'lucide-react';
 
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
@@ -16,14 +16,16 @@ export default function Hero() {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [search, setSearch] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
 
+  // Load full catalog once on mount
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getCatalogoPaginated(page, 200) // fetch lots of items; we paginate client-side when API returns array
+    getCatalogoPaginated(1, 1000)
       .then((res: any) => {
         const items = Array.isArray(res) ? res : res?.data ?? [];
 
@@ -41,29 +43,46 @@ export default function Hero() {
 
         if (!mounted) return;
         const normalized = items.map(normalize);
-        // store full set for category extraction & client pagination
         setFullProducts(normalized);
-
-        // apply category filter
-        const filtered = selectedCategory === 'all' ? normalized : normalized.filter((p) => (p.category || '').toLowerCase() === selectedCategory.toLowerCase());
-        const totalCount = filtered.length;
-        const start = (page - 1) * perPage;
-        const pageItems = filtered.slice(start, start + perPage);
-        setProducts(pageItems);
-        setTotal(totalCount);
       })
       .catch((err) => {
         console.error('Error cargando catálogo:', err);
         toast.error('Error al cargar catálogo');
-        setProducts([]);
-        setTotal(0);
+        setFullProducts([]);
       })
       .finally(() => mounted && setLoading(false));
 
     return () => {
       mounted = false;
     };
-  }, [page, perPage, selectedCategory]);
+  }, []);
+
+  // Compute filtered + paginated products whenever source or filters change
+  useEffect(() => {
+    if (!fullProducts) return;
+
+    const categoryFiltered = selectedCategory === 'all'
+      ? fullProducts
+      : fullProducts.filter((p) => (p.category || '').toLowerCase() === selectedCategory.toLowerCase());
+
+    const q = search.trim().toLowerCase();
+    const searched = q
+      ? categoryFiltered.filter((p) => {
+          return (
+            (p.name || '').toLowerCase().includes(q) ||
+            (p.brand || '').toLowerCase().includes(q) ||
+            (p.description || '').toLowerCase().includes(q) ||
+            (p.category || '').toLowerCase().includes(q)
+          );
+        })
+      : categoryFiltered;
+
+    const totalCount = searched.length;
+    const start = (page - 1) * perPage;
+    const pageItems = searched.slice(start, start + perPage);
+    setProducts(pageItems);
+    setTotal(totalCount);
+  }, [fullProducts, page, perPage, selectedCategory, search]);
 
   const categories = Array.from(new Set((fullProducts ?? []).map((p) => (p.category || '').trim()).filter(Boolean)));
 
@@ -100,8 +119,23 @@ export default function Hero() {
       </section>
 
       <div className="max-w-7xl mx-auto px-6">
-        <div className="mb-6">
-          <CategoryFilter categories={categories} selectedCategory={selectedCategory} onSelectCategory={(c) => { setSelectedCategory(c === 'all' ? 'all' : c); setPage(1); }} />
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="w-full md:w-1/2">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-copper-400" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Buscar por nombre, marca o descripción..."
+                className="w-full pl-10 pr-4 py-3 rounded-lg bg-cream-50 border border-cream-200 text-copper-800 placeholder:text-copper-500 focus:outline-none focus:ring-2 focus:ring-copper-300"
+              />
+            </div>
+          </div>
+
+          <div className="w-full md:w-auto">
+            <CategoryFilter categories={categories} selectedCategory={selectedCategory} onSelectCategory={(c) => { setSelectedCategory(c === 'all' ? 'all' : c); setPage(1); }} />
+          </div>
         </div>
 
         {loading ? (
