@@ -38,12 +38,12 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <FlaskConical className="h-6 w-6 text-primary-foreground" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg">
+            <img src="/logo.png" alt="Mirra" className="h-8 w-8 object-contain" />
           </div>
           {open && (
             <div>
-              <h2 className="text-lg font-bold text-sidebar-foreground">Aromas</h2>
+              <h2 className="text-lg font-bold text-sidebar-foreground">Mirra</h2>
               <p className="text-xs text-sidebar-foreground/60">Gestión de Perfumería</p>
             </div>
           )}

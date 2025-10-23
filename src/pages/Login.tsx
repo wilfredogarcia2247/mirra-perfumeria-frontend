@@ -41,8 +41,8 @@ export default function Login() {
             <FlaskConical className="h-8 w-8 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-2xl">Aromas</CardTitle>
-            <CardDescription>Sistema de Gestión de Perfumería</CardDescription>
+            <CardTitle className="text-2xl">Mirra Perfumería</CardTitle>
+            <CardDescription>Sistema de Gestión — Mirra Perfumería</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Sparkles } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -13,11 +13,11 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
         <div className="flex justify-between items-center h-20">
           <div className="flex items-center space-x-3">
             <div className="bg-gradient-to-br from-copper-500 to-copper-700 p-2.5 rounded-lg shadow-md">
-              <Sparkles className="w-7 h-7 text-cream-50" strokeWidth={2.5} />
+              <img src="/logo.png" alt="Mirra Perfumería" className="w-10 h-10 rounded" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-copper-800 tracking-tight">Esencia Luxury</h1>
-              <p className="text-sm text-copper-700 font-medium">Perfumería Exclusiva</p>
+              <h1 className="text-2xl font-bold text-copper-800 tracking-tight">Mirra Perfumería</h1>
+              <p className="text-sm text-copper-700 font-medium">Fragancias selectas</p>
             </div>
           </div>
 
