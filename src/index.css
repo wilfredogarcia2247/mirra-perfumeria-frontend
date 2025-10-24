@@ -145,3 +145,57 @@ All colors MUST be HSL.
     font-family: 'Playfair Display', serif;
   }
 }
+
+/* Animaciones personalizadas para entradas y formularios */
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpFade 260ms cubic-bezier(.2,.9,.3,1) both;
+}
+
+.input-focus-ring:focus-within {
+  box-shadow: 0 6px 18px rgba(20,20,20,0.04), 0 0 0 4px rgba(194,125,77,0.10);
+}
+
+.btn-cta {
+  background: linear-gradient(90deg, hsl(20 35% 40%), hsl(20 45% 55%));
+  color: hsl(0 0% 100%);
+}
+
+/* staggered fields animation */
+@keyframes fieldEntrance {
+  from { opacity: 0; transform: translateY(10px) translateZ(0); }
+  to { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+.field-animate { animation: fieldEntrance 340ms cubic-bezier(.2,.9,.3,1) both; }
+.field-animate:nth-child(1) { animation-delay: 0ms; }
+.field-animate:nth-child(2) { animation-delay: 80ms; }
+.field-animate:nth-child(3) { animation-delay: 160ms; }
+
+/* success check animation */
+@keyframes drawCheck {
+  0% { stroke-dashoffset: 22; }
+  100% { stroke-dashoffset: 0; }
+}
+.success-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, hsl(120 60% 30%), hsl(150 60% 40%));
+  box-shadow: 0 8px 20px rgba(20,20,20,0.12);
+}
+.success-badge svg { width: 22px; height: 22px; }
+.success-check { stroke: white; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke-dasharray: 22; stroke-dashoffset: 22; animation: drawCheck 420ms ease-out forwards; }
+
+

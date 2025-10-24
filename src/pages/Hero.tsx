@@ -6,7 +6,8 @@ import { getCatalogoPaginated } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { toast } from 'sonner';
-import { Loader2, X, Search } from 'lucide-react';
+import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
+import { createPedidoVentaPublic } from '@/integrations/api';
 
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
@@ -18,6 +19,12 @@ export default function Hero() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [nombreCliente, setNombreCliente] = useState('');
+  const [telefonoCliente, setTelefonoCliente] = useState('');
+  const [cedulaCliente, setCedulaCliente] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
 
@@ -92,15 +99,11 @@ export default function Hero() {
   }
 
   function handleCheckout() {
-    // placeholder: implement checkout flow
-    // For now, just clear and show toast
     if (cartItems.length === 0) {
       toast('El carrito está vacío');
       return;
     }
-    toast.success('Pedido preparado (simulado). Se limpiará el carrito.');
-    clear();
-    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
   }
 
   return (
@@ -190,15 +193,96 @@ export default function Hero() {
                   <div className="text-lg font-bold text-copper-800">${cartItems.reduce((s, it) => s + (it.product.price || 0) * it.qty, 0).toLocaleString('es-AR')}</div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <button className="px-4 py-2 rounded-md border" onClick={() => { clear(); toast('Carrito limpiado'); }}>Vaciar</button>
-                  <button className="px-4 py-2 rounded-md bg-copper-600 text-cream-50" onClick={handleCheckout}>Finalizar</button>
-                </div>
+                {!isCheckoutOpen ? (
+                  <div className="flex justify-end gap-2">
+                    <button className="px-4 py-2 rounded-md border" onClick={() => { clear(); toast('Carrito limpiado'); }}>Vaciar</button>
+                    <button className="px-4 py-2 rounded-md bg-copper-600 text-cream-50" onClick={() => setIsCheckoutOpen(true)}>Finalizar</button>
+                  </div>
+                ) : (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
+                    if (!nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
+                    if (!telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
+                    const payload = {
+                      nombre_cliente: nombreCliente.trim(),
+                      telefono: telefonoCliente.trim(),
+                      cedula: cedulaCliente.trim() || undefined,
+                      productos: cartItems.map((it) => ({ producto_id: it.product.id, cantidad: it.qty })),
+                    } as any;
+                    try {
+                      setCheckoutLoading(true);
+                      await createPedidoVentaPublic(payload);
+                      toast.success('Pedido creado correctamente');
+                      setCheckoutSuccess(true);
+                      // show success badge briefly
+                      setTimeout(() => setCheckoutSuccess(false), 1600);
+                      clear();
+                      setIsCartOpen(false);
+                      setIsCheckoutOpen(false);
+                      setNombreCliente(''); setTelefonoCliente(''); setCedulaCliente('');
+                    } catch (err: any) {
+                      console.error('Error creando pedido:', err);
+                      toast.error(err?.message || 'Error al crear pedido');
+                    } finally {
+                      setCheckoutLoading(false);
+                    }
+                  }} className="space-y-3">
+                    <div className="p-4 bg-cream-50 rounded-lg shadow-elegant input-focus-ring animate-slide-up">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="field-animate">
+                          <label className="text-sm text-copper-700 font-medium">Nombre del cliente</label>
+                          <div className="flex items-center gap-2 p-2 border rounded-md bg-white">
+                            <User className="w-5 h-5 text-copper-500" />
+                            <input type="text" placeholder="Ej: Cliente Publico Demo" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} className="flex-1 bg-transparent outline-none text-copper-800" />
+                          </div>
+                        </div>
+
+                        <div className="field-animate">
+                          <label className="text-sm text-copper-700 font-medium">Cédula / RIF (opcional)</label>
+                          <div className="flex items-center gap-2 p-2 border rounded-md bg-white">
+                            <FileText className="w-5 h-5 text-copper-500" />
+                            <input type="text" placeholder="Ej: V55555555" value={cedulaCliente} onChange={(e) => setCedulaCliente(e.target.value)} className="flex-1 bg-transparent outline-none text-copper-800" />
+                          </div>
+                        </div>
+
+                        <div className="field-animate">
+                          <label className="text-sm text-copper-700 font-medium">Teléfono</label>
+                          <div className="flex items-center gap-2 p-2 border rounded-md bg-white">
+                            <Phone className="w-5 h-5 text-copper-500" />
+                            <input type="tel" placeholder="Ej: 04140000001" value={telefonoCliente} onChange={(e) => setTelefonoCliente(e.target.value)} className="flex-1 bg-transparent outline-none text-copper-800" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 items-center">
+                      <button type="button" className="px-4 py-2 rounded-md border bg-white hover:bg-cream-50 transition-smooth" onClick={() => setIsCheckoutOpen(false)}>Cancelar</button>
+                      <div className="relative">
+                        <button type="submit" className="px-4 py-2 rounded-md btn-cta shadow-md hover:scale-105 transform transition-smooth flex items-center gap-2 disabled:opacity-60" disabled={checkoutLoading || checkoutSuccess}>
+                          {checkoutLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          <span>{checkoutLoading ? 'Enviando...' : (checkoutSuccess ? 'Listo' : 'Confirmar pedido')}</span>
+                        </button>
+                        {checkoutSuccess && (
+                          <div className="absolute -right-12 -top-3">
+                            <div className="success-badge">
+                              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path className="success-check" d="M20 6L9 17l-5-5" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
+      
+      
     </div>
   );
 }

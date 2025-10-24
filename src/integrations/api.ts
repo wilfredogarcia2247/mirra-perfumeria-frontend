@@ -108,6 +108,22 @@ export async function getPagos() {
 export async function createPago(data: any) {
   return apiFetch("/pagos", { method: "POST", body: JSON.stringify(data) });
 }
+// Pedidos de venta
+export async function createPedidoVenta(data: any) {
+  return apiFetch(`/pedidos-venta`, { method: "POST", body: JSON.stringify(data) });
+}
+
+// Envío público de pedido (sin Authorization). Útil para checkout público que no requiere token.
+export async function createPedidoVentaPublic(data: any) {
+  const url = `${API_URL}/pedidos-venta`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 // src/integrations/api.ts
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
