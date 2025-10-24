@@ -22,10 +22,11 @@ export default function Login() {
     try {
       await login(email, password);
       toast.success("Inicio de sesión exitoso");
-      // Si venimos de una ruta protegida, redirigir allí; si no, al dashboard
-      const state: any = (location as any).state;
-      const redirectTo = state?.from?.pathname || "/dashboard";
-      navigate(redirectTo, { replace: true });
+  // Si venimos de una ruta protegida, redirigir allí (pathname + search + hash preserved); si no, al dashboard
+  const state: any = (location as any).state;
+  const from = state?.from;
+  const redirectTo = from ? `${from.pathname || ''}${from.search || ''}${from.hash || ''}` : '/dashboard';
+  navigate(redirectTo || '/dashboard', { replace: true });
     } catch (err: any) {
       toast.error(err.message || "Error de autenticación");
     } finally {
