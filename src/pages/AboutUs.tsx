@@ -1,7 +1,9 @@
 import React from 'react';
 import { MapPin, Instagram, Phone, Calendar } from 'lucide-react';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
+
 
 export default function AboutUs() {
   const { count } = useCart();
@@ -153,6 +155,7 @@ export default function AboutUs() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
