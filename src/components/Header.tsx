@@ -21,18 +21,26 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </div>
           </div>
 
-          <button
-            onClick={onCartClick}
-            className="relative bg-cream-50 hover:bg-cream-100 text-copper-700 px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 shadow-md hover:shadow-lg flex items-center space-x-2 border border-copper-200"
-          >
-            <ShoppingCart className="w-5 h-5" />
-            <span className="hidden sm:inline">Carrito</span>
-            {cartItemsCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-gradient-to-br from-copper-500 to-copper-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
-                {cartItemsCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center space-x-4">
+            <a 
+              href="/"
+              className="bg-gradient-to-br from-copper-600 to-copper-700 hover:from-copper-600 hover:to-copper-800 text-white px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
+            >
+              Comprar Ahora
+            </a>
+            <button
+              onClick={onCartClick}
+              className="relative bg-cream-50 hover:bg-cream-100 text-copper-700 px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 shadow-md hover:shadow-lg flex items-center space-x-2 border border-copper-200"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              <span className="hidden sm:inline">Carrito</span>
+              {cartItemsCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-gradient-to-br from-copper-500 to-copper-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
+                  {cartItemsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </header>

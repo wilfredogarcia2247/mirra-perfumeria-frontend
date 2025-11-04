@@ -1,13 +1,23 @@
 import React from 'react';
 import { MapPin, Instagram, Phone, Calendar } from 'lucide-react';
 import Header from '@/components/Header';
-
+import useCart from '@/hooks/use-cart';
 
 export default function AboutUs() {
+  const { count } = useCart();
+  const [isCartOpen, setIsCartOpen] = React.useState(false);
+
+  const handleCartClick = () => {
+    // You can add navigation to cart page or open a cart drawer here
+    // For now, we'll just log it since the cart functionality is in the Hero component
+    console.log('Cart clicked from About Us page');
+    // If you want to navigate to the home page where the cart is functional:
+    // window.location.href = '/';
+  };
   return (
     
     <div className="min-h-screen bg-gradient-to-b from-cream-50 to-cream-100 ">
-      <Header cartItemsCount={0} onCartClick={() => {}} />
+      <Header cartItemsCount={count} onCartClick={handleCartClick} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold text-copper-800 font-playfair mb-4">Sobre Nosotros</h1>
