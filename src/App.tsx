@@ -8,12 +8,13 @@ import Hero from "./pages/Hero";
 import Dashboard from "./pages/Dashboard";
 import Productos from "./pages/Productos";
 import Proveedores from "./pages/Proveedores";
-import Almacenes from "./pages/Almacenes";
 import Formulas from "./pages/Formulas";
 import Pedidos from "./pages/Pedidos";
 import Contactos from "./pages/Contactos";
 import Bancos from "./pages/Bancos";
 import Pagos from "./pages/Pagos";
+import AboutUs from "./pages/AboutUs";
+import Almacenes from "./pages/Almacenes";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -28,6 +29,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Hero />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/about" element={<AboutUs />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
           <Route path="/proveedores" element={<ProtectedRoute><Proveedores /></ProtectedRoute>} />

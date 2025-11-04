@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
 import CategoryFilter from '@/components/CategoryFilter';
@@ -8,6 +9,7 @@ import { Product } from '@/lib/types';
 import { toast } from 'sonner';
 import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
 import { createPedidoVentaPublic } from '@/integrations/api';
+import ProductCarousel from '@/components/SocialMediaCarousel';
 
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
@@ -116,11 +118,14 @@ export default function Hero() {
           <p className="mt-3 text-copper-700 max-w-2xl mx-auto">Explora nuestra colección exclusiva de perfumes de las mejores marcas del mundo</p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <a href="#catalog" className="px-6 py-3 rounded-lg bg-copper-600 text-cream-50 font-semibold shadow-md hover:scale-105 transition">Ver catálogo</a>
-            <a href="#about" className="px-5 py-3 rounded-lg border border-cream-200 bg-cream-50 text-copper-700 font-medium hover:bg-cream-100 transition">Conócenos</a>
+            <Link to="/about" className="px-5 py-3 rounded-lg border border-cream-200 bg-cream-50 text-copper-700 font-medium hover:bg-cream-100 transition">Conócenos</Link>
           </div>
         </div>
       </section>
 
+      {/* Featured Products Carousel */}
+      {products.length > 0 && <ProductCarousel products={products} />}
+      
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="w-full md:w-1/2">
@@ -255,7 +260,7 @@ export default function Hero() {
                         </div>
                       </div>
                     </div>
-
+                    {/*prueba de PR */}
                     <div className="flex justify-end gap-2 items-center">
                       <button type="button" className="px-4 py-2 rounded-md border bg-white hover:bg-cream-50 transition-smooth" onClick={() => setIsCheckoutOpen(false)}>Cancelar</button>
                       <div className="relative">
