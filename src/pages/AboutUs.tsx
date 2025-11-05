@@ -142,7 +142,7 @@ export default function AboutUs() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-copper-600 to-amber-800 p-6 rounded-lg text-white">
+            <div className="bg-gradient-to-r from-copper-600 to-amber-800 p-6 rounded-lg text-black">
               <h2 className="text-2xl font-bold mb-3">¿Por qué elegirnos?</h2>
               <ul className="space-y-2">
                 <li className="flex items-start">
