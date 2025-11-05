@@ -40,7 +40,7 @@ export default function AboutUs() {
                 Urbanización Raúl Leoni. Centro Comercial Aviur local #4. Diagonal al Restaurant Yangtze.              </p>
               <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3923.131235191911!2d-71.670243!3d10.659922!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e8998c0f5a1c6b5%3A0x8f8b9b7d8e8e8e8e!2s10%C2%B039&#39;35.8%22N%2071%C2%B040&#39;01.7%22W!5e0!3m2!1sen!2sve!4v1635960000000!5m2!1sen!2sve"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d627.490112045992!2d-71.670243!3d10.659922!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e8998c0f5a1c6b5%3A0x8f8b9b7d8e8e8e8e!2s10%C2%B039&#39;35.8%22N%2071%C2%B040&#39;01.7%22W!5e0!3m2!1sen!2sve!4v1635960000000!5m2!1sen!2sve&z=20&maptype=satellite&center=10.659922,-71.670243"
                   width="100%"
                   height="300"
                   style={{ border: 0 }}
