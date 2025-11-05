@@ -120,27 +120,27 @@ export default function Hero() {
 
       <Header cartItemsCount={count} onCartClick={() => setIsCartOpen(true)} />
 
-      <section className="relative z-10">
-        <div className="max-w-7xl mx-auto px-6 py-20 md:py-28 text-center">
-          <div className="inline-block px-4 py-2 mb-4 bg-primary-50 text-primary-700 text-sm font-medium rounded-full border border-primary-100">
-            Colección 2024
+      <section className="relative z-10 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto py-12 sm:py-20 md:py-28 text-center">
+          <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 mb-3 sm:mb-4 bg-primary-50 text-primary-700 text-xs sm:text-sm font-medium rounded-full border border-primary-100">
+            Colección 2025
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 font-bell-mt leading-tight mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-bell-mt leading-tight mb-4 sm:mb-6">
             Descubre la Esencia de la <span className="text-primary-600">Elegancia</span>
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed px-2 sm:px-0">
             Sumérgete en nuestra exclusiva colección de fragancias que capturan la esencia del lujo y la sofisticación.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <a 
               href="#catalog" 
-              className="px-8 py-4 bg-gradient-to-r from-primary-500 to-amber-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary-500 to-amber-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
             >
               Explorar Colección
             </a>
             <Link 
               to="/about" 
-              className="px-8 py-4 border-2 border-gray-200 bg-white/80 text-gray-700 font-medium rounded-lg hover:bg-white hover:border-primary-200 transition-all duration-300 backdrop-blur-sm"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 border-2 border-gray-200 bg-white/80 text-gray-700 font-medium rounded-lg hover:bg-white hover:border-primary-200 transition-all duration-300 backdrop-blur-sm text-sm sm:text-base text-center"
             >
               Nuestra Historia
             </Link>
@@ -149,26 +149,26 @@ export default function Hero() {
       </section>
 
       {/* Featured Products Carousel */}
-      <div className="relative z-10 py-12 bg-gradient-to-b from-white/80 to-transparent">
+      <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
         {products.length > 0 && <ProductCarousel products={products} />}
       </div>
       
-      <div id="catalog" className="max-w-7xl mx-auto px-6 py-12 relative z-10">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bell-mt font-bold text-gray-800 mb-3">Nuestros Productos</h2>
-          <div className="w-24 h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-6"></div>
-          <p className="text-gray-600 max-w-2xl mx-auto">Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.</p>
+      <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
+        <div className="text-center mb-8 sm:mb-12 px-2">
+          <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3">Nuestros Productos</h2>
+          <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
+          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.</p>
         </div>
-        <div className="mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-white/50 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="mb-8 sm:mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
           <div className="w-full md:w-2/3">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Buscar por nombre, marca o descripción..."
-                className="w-full pl-12 pr-6 py-3.5 rounded-xl bg-white border border-gray-200 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
+                className="w-full pl-9 sm:pl-12 pr-4 sm:pr-6 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-sm sm:text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
               />
             </div>
           </div>
@@ -179,20 +179,34 @@ export default function Hero() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64"><Loader2 className="w-12 h-12 text-copper-600 animate-spin" /></div>
+          <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {products.map((p) => (
               <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} />
             ))}
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-8">
-          <div className="text-sm text-copper-600">{total !== null ? `Mostrando página ${page} de ${Math.max(1, Math.ceil((total || 0) / perPage))} — ${total} productos` : ''}</div>
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 sm:mt-8 gap-4">
+          <div className="text-xs sm:text-sm text-copper-600 text-center sm:text-left">
+            {total !== null ? `Mostrando página ${page} de ${Math.max(1, Math.ceil((total || 0) / perPage))} — ${total} productos` : ''}
+          </div>
           <div className="flex items-center gap-2">
-            <button className="px-3 py-1 rounded-md border" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
-            <button className="px-3 py-1 rounded-md border" onClick={() => setPage((p) => p + 1)} disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}>Siguiente</button>
+            <button 
+              className="px-3 py-1.5 sm:py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50" 
+              onClick={() => setPage((p) => Math.max(1, p - 1))} 
+              disabled={page === 1}
+            >
+              Anterior
+            </button>
+            <button 
+              className="px-3 py-1.5 sm:py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50" 
+              onClick={() => setPage((p) => p + 1)} 
+              disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}
+            >
+              Siguiente
+            </button>
           </div>
         </div>
       </div>
