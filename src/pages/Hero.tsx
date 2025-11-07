@@ -11,9 +11,11 @@ import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
 import Footer from '@/components/Footer';
 import { createPedidoVentaPublic } from '@/integrations/api';
 import ProductCarousel from '@/components/SocialMediaCarousel';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
+  const isMobile = useIsMobile();
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
   const [perPage] = useState(12);
@@ -150,7 +152,7 @@ export default function Hero() {
 
       {/* Featured Products Carousel */}
       <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
-        {products.length > 0 && <ProductCarousel products={products} />}
+        {products.length > 0 && <ProductCarousel products={products} isMobile={isMobile} />}
       </div>
       
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">

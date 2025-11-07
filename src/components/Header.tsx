@@ -1,6 +1,6 @@
-import React from 'react';
-import { ShoppingCart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { ShoppingCart, Menu, X } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -8,40 +8,144 @@ interface HeaderProps {
 }
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+
+  // Cerrar menú al cambiar de ruta
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location]);
+
+  // Efecto para el scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 10;
+      if (isScrolled !== scrolled) {
+        setScrolled(isScrolled);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrolled]);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
   return (
-    <header className="sticky top-0 z-50 bg-gradient-to-r from-[#707070]/80 via-[#878787]/80 to-[#a0a0a0]/80 backdrop-blur-sm bg-opacity-70 shadow-lg">
+    <header 
+      className={`sticky top-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${
+        scrolled ? 'py-1' : 'py-0'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+        <div className="flex justify-between items-center h-16 md:h-20">
+          {/* Logo y nombre */}
           <div className="flex items-center space-x-3">
-            <div className="p-1.5 bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm">
-              <img src="/logo.png" alt="Mirra Perfumería" className="w-12 h-12 rounded-full object-cover" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bell-mt font-bold text-[#ffffff] tracking-tight">Mirra Perfumería</h1>
-              <p className="text-sm text-[#ffffff] font-montserrat font-medium">Fragancias selectas</p>
-            </div>
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="p-1 bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm">
+                <img 
+                  src="/logo.png" 
+                  alt="Mirra Perfumería" 
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover" 
+                />
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-xl md:text-2xl font-bell-mt font-bold text-white tracking-tight">Mirra Perfumería</h1>
+                <p className="text-xs md:text-sm text-white/90 font-montserrat font-medium">Fragancias selectas</p>
+              </div>
+            </Link>
           </div>
 
-          <div className="flex items-center space-x-4">
+          {/* Menú de navegación */}
+          <nav className="hidden md:flex items-center space-x-1">
             <Link
               to="/"
-              className="bg-white/80 hover:bg-white/95 text-[#CA9E67] px-5 py-2.5 rounded-lg font-montserrat font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap hover:scale-105"
+              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+            >
+              Inicio
+            </Link>
+            <Link
+              to="/about"
+              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+            >
+              Nosotros
+            </Link>
+            <Link
+              to="#catalog"
+              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+            >
+              Productos
+            </Link>
+          </nav>
+
+          {/* Botones de acción */}
+          <div className="flex items-center space-x-2 md:space-x-4">
+            <Link
+              to="/"
+              className="hidden sm:inline-flex items-center justify-center bg-white/90 hover:bg-white text-[#CA9E67] px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 whitespace-nowrap text-sm md:text-base"
             >
               Comprar Ahora
             </Link>
+            
             <button 
               onClick={onCartClick}
               className="relative p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-all duration-300"
               aria-label="Carrito de compras"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
               {cartItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#CA9E67] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartItemsCount}
+                <span className="absolute -top-1 -right-1 bg-[#CA9E67] text-white text-[10px] md:text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center">
+                  {cartItemsCount > 9 ? '9+' : cartItemsCount}
                 </span>
               )}
             </button>
+
+            {/* Botón de menú móvil */}
+            <button 
+              onClick={toggleMenu}
+              className="md:hidden p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-colors"
+              aria-label="Menú"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Menú móvil */}
+      <div 
+        className={`md:hidden bg-white/95 backdrop-blur-sm transition-all duration-300 ease-in-out overflow-hidden ${
+          isMenuOpen ? 'max-h-96 py-4 border-t border-white/20' : 'max-h-0 py-0'
+        }`}
+      >
+        <div className="px-4 space-y-2">
+          <Link
+            to="/"
+            className="block px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+          >
+            Inicio
+          </Link>
+          <Link
+            to="/about"
+            className="block px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+          >
+            Sobre Nosotros
+          </Link>
+          <Link
+            to="#catalog"
+            className="block px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+          >
+            Nuestros Productos
+          </Link>
+          <Link
+            to="/"
+            className="block px-4 py-3 text-center bg-[#CA9E67] text-white rounded-lg font-medium hover:bg-[#b58a53] transition-colors mt-2"
+          >
+            Comprar Ahora
+          </Link>
         </div>
       </div>
     </header>

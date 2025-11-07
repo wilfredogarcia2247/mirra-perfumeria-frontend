@@ -8,10 +8,14 @@ import { toast } from 'sonner';
 
 interface ProductCarouselProps {
   products: Product[];
+  isMobile?: boolean;
 }
 
-const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
+const ProductCarousel: React.FC<ProductCarouselProps> = ({ products, isMobile = false }) => {
   const { addItem } = useCart();
+
+  // Si es móvil, no renderizamos el carrusel
+  if (isMobile) return null;
 
   // Get best selling products (for now, we'll use random products as placeholder)
   // In a real app, you would get this data from your API/backend
@@ -65,11 +69,11 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
   if (bestSellingProducts.length === 0) return null;
 
   return (
-    <div className="w-full bg-gradient-to-b from-cream-50 to-cream-100 py-12">
+    <div className="w-full bg-gradient-to-b from-cream-50 to-cream-100 py-6 md:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center text-copper-800 mb-12 font-playfair">Productos Destacados</h2>
+        <h2 className="text-2xl md:text-3xl font-bold text-center text-copper-800 mb-6 md:mb-12 font-playfair">Productos Destacados</h2>
         
-        <Slider {...settings} className="pb-12">
+        <Slider {...settings} className="pb-6 md:pb-12">
           {bestSellingProducts.map((product) => (
             <div key={product.id} className="px-2">
               <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-full flex flex-col">
