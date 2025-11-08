@@ -45,7 +45,7 @@ const App = () => (
             <Route path="/pagos" element={<Pagos />} />
           </Route>
           
-          {/* Ruta 404 */}
+          {/* Ruta 404 leo se perdio*/}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
