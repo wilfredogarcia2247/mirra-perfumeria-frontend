@@ -18,7 +18,7 @@ export default function AboutUs() {
   };
   return (
     
-    <div className="min-h-screen bg-gradient-to-b from-cream-50 to-cream-100 ">
+    <div className="min-h-screen bg-gradient-to-b from-cream-50 to-cream-100 pt-24">
       <Header cartItemsCount={count} onCartClick={handleCartClick} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">

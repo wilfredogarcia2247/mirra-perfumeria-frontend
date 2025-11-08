@@ -36,7 +36,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
 
   return (
     <header 
-      className={`sticky top-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${
+      className={`fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${
         scrolled ? 'py-1' : 'py-0'
       }`}
     >
