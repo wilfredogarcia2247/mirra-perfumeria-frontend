@@ -13,6 +13,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
+import useCart from "@/hooks/use-cart";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -28,10 +31,26 @@ const menuItems = [
 
 export function AppSidebar() {
   const { open } = useSidebar();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { clear: clearCart } = useCart();
 
   const handleLogout = () => {
-    // TODO: Implement logout logic
-    console.log("Logout");
+    // Ejecuta la limpieza local de sesión y redirige al login
+    try {
+      logout();
+      // Limpia el carrito local si existe
+      try {
+        clearCart();
+      } catch (e) {
+        // noop
+      }
+  navigate("/login", { replace: true });
+    } catch (e) {
+      // En caso de error, al menos asegurarnos de eliminar el token y redirigir
+      localStorage.removeItem("jwt_token");
+  navigate("/login", { replace: true });
+    }
   };
 
   return (
