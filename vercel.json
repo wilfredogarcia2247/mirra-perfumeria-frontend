@@ -4,36 +4,11 @@
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "config": { "distDir": "dist" }
     }
   ],
   "routes": [
-    {
-      "src": "^/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "^/favicon.ico",
-      "dest": "/favicon.ico"
-    },
-    {
-      "src": "^/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "^/logoColor.png",
-      "dest": "/logoColor.png"
-    },
-    {
-      "src": "^/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "rewrites": [
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/about", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }

@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    // allow render host for preview or forwarded requests
-    allowedHosts: ["aroma-zenith.onrender.com"],
+    // allow render host for preview or dev
+    allowedHosts: [ "mirra-perfumeria.vercel.app"],
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
@@ -17,4 +17,23 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Configuración para producción
+  base: "/",
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          vendor: ["@radix-ui/react-*"]
+        }
+      }
+    }
+  },
+  // Configuración para el servidor de desarrollo
+  preview: {
+    port: 8080,
+    strictPort: true,
+  }
 }));
