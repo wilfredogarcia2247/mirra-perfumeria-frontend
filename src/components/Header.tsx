@@ -52,9 +52,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                   className="w-14 h-14 md:w-14 md:h-14 rounded-full object-cover" 
                 />
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl md:text-2xl font-bell-mt font-bold text-white tracking-tight">Mirra Perfumería</h1>
-                <p className="text-xs md:text-sm text-white/90 font-montserrat font-medium">Fragancias selectas</p>
+              <div>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bell-mt font-bold text-white tracking-tight">Mirra Perfumería</h1>
+                <p className="hidden sm:block text-xs md:text-sm text-white/90 font-montserrat font-medium">Fragancias selectas</p>
               </div>
             </Link>
           </div>

@@ -122,8 +122,8 @@ export default function Hero() {
 
       <Header cartItemsCount={count} onCartClick={() => setIsCartOpen(true)} />
 
-      <section className="relative z-10 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto py-12 sm:py-20 md:py-28 text-center">
+      <section className="relative z-10 px-4 sm:px-6 pt-24 sm:pt-24">
+        <div className="max-w-7xl mx-auto pb-12 sm:pb-20 md:pb-28 text-center">
           <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 mb-3 sm:mb-4 bg-primary-50 text-primary-700 text-xs sm:text-sm font-medium rounded-full border border-primary-100">
             Colección 2025
           </div>
