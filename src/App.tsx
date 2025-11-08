@@ -27,18 +27,25 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Rutas públicas */}
           <Route path="/" element={<Hero />} />
           <Route path="/login" element={<Login />} />
           <Route path="/about" element={<AboutUs />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
-          <Route path="/proveedores" element={<ProtectedRoute><Proveedores /></ProtectedRoute>} />
-          <Route path="/almacenes" element={<ProtectedRoute><Almacenes /></ProtectedRoute>} />
-          <Route path="/formulas" element={<ProtectedRoute><Formulas /></ProtectedRoute>} />
-          <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
-          <Route path="/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
-          <Route path="/bancos" element={<ProtectedRoute><Bancos /></ProtectedRoute>} />
-          <Route path="/pagos" element={<ProtectedRoute><Pagos /></ProtectedRoute>} />
+          
+          {/* Rutas protegidas */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/productos" element={<Productos />} />
+            <Route path="/proveedores" element={<Proveedores />} />
+            <Route path="/almacenes" element={<Almacenes />} />
+            <Route path="/formulas" element={<Formulas />} />
+            <Route path="/pedidos" element={<Pedidos />} />
+            <Route path="/contactos" element={<Contactos />} />
+            <Route path="/bancos" element={<Bancos />} />
+            <Route path="/pagos" element={<Pagos />} />
+          </Route>
+          
+          {/* Ruta 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
