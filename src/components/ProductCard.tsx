@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { Product } from '@/lib/types';
+import { getImageUrl } from '@/lib/utils';
 import ProductModal from './ProductModal';
 
 interface ProductCardProps {
@@ -14,15 +15,17 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   return (
     <>
       <article className="bg-cream-100 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-cream-200">
-        <div className="relative overflow-hidden h-56 sm:h-48">
+            <div className="relative overflow-hidden h-56 sm:h-48">
           <button onClick={() => setOpen(true)} className="w-full h-full p-0 m-0 block">
             <img
-              src={product.image_url || '/placeholder-product.jpg'}
+              src={getImageUrl(product) || '/placeholder-product.jpg'}
               alt={product.name}
               loading="lazy"
+              onError={(e) => { const t = e.currentTarget as HTMLImageElement; t.onerror = null; t.src = '/placeholder-product.jpg'; console.error('[ProductCard] image load failed:', t.src); }}
               className="w-full h-full object-cover bg-neutral-100 transform group-hover:scale-105 transition-transform duration-700"
             />
           </button>
+          {/* badge de URL en dev removido - UI limpia */}
 
           {product.featured && (
             <span className="absolute top-3 right-3 bg-copper-600 text-cream-50 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 shadow">

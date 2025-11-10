@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getImageUrl } from '@/lib/utils';
 import { Layout } from "@/components/Layout";
 import { getProductos, deleteProducto } from "@/integrations/api";
 import { Button } from "@/components/ui/button";
@@ -71,9 +72,15 @@ export default function Productos() {
   // Initialize image state when dialog opens (create/edit)
   useEffect(() => {
     if (isOpen) {
-      setImageUrl(editingProduct?.image_url || null);
+      // Inicializar la URL de imagen con la existente del producto (si la tiene).
+      // Soportar ambas propiedades por si la API usa `image_url` o `imagen_url`.
+      setImageUrl(editingProduct?.imagen_url ?? editingProduct?.image_url ?? null);
     }
   }, [isOpen, editingProduct]);
+
+  // Imagen que debe mostrarse en la UI: priorizar la que está en el estado (nueva subida)
+  // y luego la que viene en el objeto del producto (normalizada con getImageUrl).
+  const currentImage = imageUrl ?? (editingProduct ? getImageUrl(editingProduct) ?? null : null);
 
   const filteredProducts = productos.filter((product) => {
     const term = searchTerm.toLowerCase();
@@ -136,8 +143,53 @@ export default function Productos() {
   }
 
   // Handle image upload from the ImageUpload component
-  const handleImageUpload = (url: string) => {
+  const handleImageUpload = async (url: string) => {
     setImageUrl(url);
+
+    // Si estamos en modo edición, construimos el mismo payload que onSubmit
+    // para llamar al endpoint de edición exactamente igual que al pulsar "Actualizar".
+    if (editingProduct && editingProduct.id) {
+      try {
+        const values = form.getValues();
+
+        // Reconstruir payload siguiendo la lógica de onSubmit
+        let tipo = (values.tipo ?? editingProduct.tipo ?? '').toString().trim();
+        if (/materia/i.test(tipo)) tipo = 'MateriaPrima';
+        else if (/producto/i.test(tipo)) tipo = 'ProductoTerminado';
+
+        const stockRaw = values.stock ?? editingProduct.stock ?? 0;
+        const stock = Number(stockRaw);
+
+        const costoRaw = values.costo !== undefined && values.costo !== null && values.costo !== '' ? values.costo : (editingProduct.costo ?? null);
+        const costo = costoRaw !== null ? Number(costoRaw) : null;
+
+        const precioRaw = values.precio_venta !== undefined && values.precio_venta !== null && values.precio_venta !== '' ? values.precio_venta : (editingProduct.precio_venta ?? null);
+        const precio_venta = precioRaw !== null ? Number(precioRaw) : null;
+
+        const proveedorRaw = values.proveedor_id !== undefined && values.proveedor_id !== null && values.proveedor_id !== '' ? values.proveedor_id : (editingProduct.proveedor_id ?? null);
+        const proveedor_id = proveedorRaw !== null ? Number(proveedorRaw) : null;
+
+        const payload = {
+          nombre: (values.nombre ?? editingProduct.nombre ?? '').toString(),
+          tipo,
+          unidad: (values.unidad ?? editingProduct.unidad ?? '').toString(),
+          stock: Number.isNaN(stock) ? 0 : stock,
+          costo: Number.isNaN(costo as number) ? null : costo,
+          precio_venta: Number.isNaN(precio_venta as number) ? null : precio_venta,
+          proveedor_id: Number.isNaN(proveedor_id as number) ? null : proveedor_id,
+          imagen_url: url,
+        };
+
+        const updated = await updateProducto(editingProduct.id, payload);
+        // Actualizar la lista local y el producto en edición
+        setProductos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        setEditingProduct(updated);
+        toast.success('Imagen guardada en el servidor');
+      } catch (err) {
+        console.error('Error guardando la imagen en el backend', err);
+        toast.error('No se pudo guardar la imagen en el servidor');
+      }
+    }
   };
 
   return (
@@ -150,7 +202,7 @@ export default function Productos() {
           </div>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" variant="default">
                 <Plus className="h-4 w-4" />
                 Nuevo Producto
               </Button>
@@ -256,12 +308,21 @@ export default function Productos() {
 
                       {/* Columna Derecha - Imagen */}
                       <div className="space-y-4">
+                        
+                        
+
+                        {/* Contenedor de subida separado y más claro */}
                         <FormItem className="col-span-2">
-                          <FormLabel>Imagen del Producto</FormLabel>
-                          <ImageUpload 
-                            onImageUpload={handleImageUpload}
-                            existingImageUrl={editingProduct?.imagen_url}
-                          />
+                          <FormLabel>Subir nueva imagen (opcional)</FormLabel>
+                          <div className="mt-2 p-3 border rounded-md bg-background">
+                            <ImageUpload 
+                              onImageUpload={handleImageUpload}
+                              // Pasar la imagen que viene de la base de datos o la última subida
+                              // (imageUrl) para que el uploader muestre la preview anterior/alterna al editar.
+                              existingImageUrl={imageUrl ?? getImageUrl(editingProduct) ?? null}
+                              originalImageUrl={getImageUrl(editingProduct) ?? null}
+                            />
+                          </div>
                         </FormItem>
                       </div>
                     </div>
@@ -277,7 +338,7 @@ export default function Productos() {
                       >
                         Cancelar
                       </Button>
-                      <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">
+                      <Button type="submit">
                         {editingProduct ? 'Actualizar' : 'Crear'} Producto
                       </Button>
                     </DialogFooter>
@@ -322,6 +383,7 @@ export default function Productos() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID</TableHead>
+                    <TableHead>Imagen</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Unidad</TableHead>
@@ -336,6 +398,16 @@ export default function Productos() {
                   {filteredProducts.map((product: any) => (
                     <TableRow key={product.id} className="hover:bg-muted/50 transition-smooth">
                       <TableCell className="font-mono text-sm">{product.id}</TableCell>
+                      <TableCell>
+                        <div className="w-12 h-12 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                          <img
+                            src={getImageUrl(product) ?? ''}
+                            alt={product.nombre ?? 'imagen producto'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.png'; }}
+                          />
+                        </div>
+                      </TableCell>
                       <TableCell className="font-medium">{product.nombre}</TableCell>
                       <TableCell>{product.tipo}</TableCell>
                       <TableCell>{product.unidad}</TableCell>

@@ -6,6 +6,7 @@ import CategoryFilter from '@/components/CategoryFilter';
 import { getCatalogoPaginated } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
+import { getImageUrl } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
 import Footer from '@/components/Footer';
@@ -228,7 +229,7 @@ export default function Hero() {
                 {cartItems.map((it) => (
                   <div key={it.product.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <img src={it.product.image_url} alt={it.product.name} className="w-14 h-14 object-cover rounded" />
+                      <img src={getImageUrl(it.product) || '/placeholder-product.jpg'} alt={it.product.name} className="w-14 h-14 object-cover rounded" />
                       <div>
                         <div className="font-medium text-copper-800">{it.product.name}</div>
                         <div className="text-sm text-copper-600">${it.product.price.toLocaleString('es-AR')}</div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Product } from '@/lib/types';
+import { getImageUrl } from '@/lib/utils';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -23,9 +24,15 @@ export default function ProductModal({ product, open, onClose, onAddToCart }: Pr
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex items-center justify-center">
-            <img src={product.image_url || '/placeholder-product.jpg'} alt={product.name} className="max-h-96 object-contain" />
-          </div>
+            <div className="flex items-center justify-center">
+              <img
+                src={getImageUrl(product) || '/placeholder-product.jpg'}
+                alt={product.name}
+                className="max-h-96 object-contain"
+                onError={(e) => { const t = e.currentTarget as HTMLImageElement; t.onerror = null; t.src = '/placeholder-product.jpg'; console.error('[ProductModal] image load failed:', t.src); }}
+              />
+            </div>
+            {/* Debug removido: no mostrar URL cruda en producción */}
           <div>
             <p className="text-copper-700 mb-4">{product.description || 'Sin descripción disponible.'}</p>
             <div className="mb-4">

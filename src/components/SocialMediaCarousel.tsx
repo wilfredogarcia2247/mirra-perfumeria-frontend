@@ -3,6 +3,7 @@ import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import { Product } from '@/lib/types';
+import { getImageUrl } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart';
 import { toast } from 'sonner';
 
@@ -79,7 +80,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products, isMobile = 
               <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-full flex flex-col">
                 <div className="relative pt-[100%] overflow-hidden">
                   <img 
-                    src={product.image_url || '/placeholder-product.jpg'} 
+                    src={getImageUrl(product) || '/placeholder-product.jpg'} 
                     alt={product.name} 
                     className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                     onError={(e) => {

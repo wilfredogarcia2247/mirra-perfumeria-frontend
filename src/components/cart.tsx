@@ -1,5 +1,13 @@
 import { X, Minus, Plus, Send, ShoppingBag } from 'lucide-react';
+import { getImageUrl } from '@/lib/utils';
 
+type CartProps = {
+  items: any[];
+  onClose: () => void;
+  onUpdateQuantity: (productId: number, qty: number) => void;
+  onRemove: (productId: number) => void;
+  onCheckout: () => void;
+};
 
 export function Cart({ items, onClose, onUpdateQuantity, onRemove, onCheckout }: CartProps) {
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -58,7 +66,7 @@ export function Cart({ items, onClose, onUpdateQuantity, onRemove, onCheckout }:
               className="bg-white rounded-lg p-4 flex space-x-4 border border-cream-300 shadow-sm"
             >
               <img
-                src={item.product.image_url}
+                src={getImageUrl(item.product) || '/placeholder-product.jpg'}
                 alt={item.product.name}
                 className="w-20 h-20 object-cover rounded-lg"
               />
