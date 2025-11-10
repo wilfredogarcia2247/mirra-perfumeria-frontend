@@ -73,6 +73,12 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             >
               Nosotros
             </Link>
+            <Link
+              to="/pedidos"
+              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+            >
+              Pedidos
+            </Link>
             <div className="relative group">
               <button className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
                 Productos
@@ -155,6 +161,12 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             className="block px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
           >
             Sobre Nosotros
+          </Link>
+          <Link
+            to="/pedidos"
+            className="block px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+          >
+            Pedidos
           </Link>
           <Link
             to="#catalog"

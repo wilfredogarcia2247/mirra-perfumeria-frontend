@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { X } from 'lucide-react';
+import { getProducto } from '@/integrations/api';
+import { toast } from 'sonner';
 
 interface Props {
   product: Product;
@@ -11,6 +13,30 @@ interface Props {
 }
 
 export default function ProductModal({ product, open, onClose, onAddToCart }: Props) {
+  const [detalle, setDetalle] = useState<any | null>(null);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let mounted = true;
+    setLoadingDetalle(true);
+    // Solicitar producto detallado (incluye campo inventario por almacén)
+    getProducto(product.id)
+      .then((res: any) => {
+        if (!mounted) return;
+        setDetalle(res);
+      })
+      .catch((err: any) => {
+        console.error('Error cargando detalle de producto:', err);
+        toast.error('No se pudo cargar inventario por almacén');
+      })
+      .finally(() => mounted && setLoadingDetalle(false));
+
+    return () => {
+      mounted = false;
+    };
+  }, [open, product.id]);
+
   if (!open) return null;
 
   return (
@@ -41,7 +67,20 @@ export default function ProductModal({ product, open, onClose, onAddToCart }: Pr
               ) : (
                 <div className="text-sm font-semibold text-copper-700">Consultar precio</div>
               )}
-              <div className="text-sm text-copper-600">{(product.stock ?? 0) > 0 ? `${product.stock} disponibles` : 'Sin stock'}</div>
+
+              {/* Mostrar disponibilidad total calculada a partir de inventario por almacén si está disponible */}
+              {loadingDetalle ? (
+                <div className="text-sm text-copper-600">Cargando inventario...</div>
+              ) : (
+                (() => {
+                  const inv = (detalle?.inventario) || (product as any).inventario || [];
+                  if (Array.isArray(inv) && inv.length > 0) {
+                    const totalDisponible = inv.reduce((s: number, it: any) => s + (Number(it.stock_disponible || 0)), 0);
+                    return <div className="text-sm text-copper-600">{totalDisponible > 0 ? `${totalDisponible} disponibles (ver por almacén)` : 'Sin stock disponible'}</div>;
+                  }
+                  return <div className="text-sm text-copper-600">{(product.stock ?? 0) > 0 ? `${product.stock} disponibles` : 'Sin stock'}</div>;
+                })()
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -49,6 +88,52 @@ export default function ProductModal({ product, open, onClose, onAddToCart }: Pr
               <button onClick={onClose} className="px-4 py-2 rounded-md border">Cerrar</button>
             </div>
 
+            {/* Inventario por almacén */}
+            <div className="p-4 border-t col-span-full md:col-span-2">
+              <h4 className="text-sm font-semibold mb-2">Inventario por almacén</h4>
+              {loadingDetalle ? (
+                <div className="text-sm text-copper-600">Cargando inventario...</div>
+              ) : (
+                (() => {
+                  const inv = (detalle?.inventario) || (product as any).inventario || [];
+                  if (!Array.isArray(inv) || inv.length === 0) {
+                    return <div className="text-sm text-copper-600">No hay información de inventario por almacén.</div>;
+                  }
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="text-copper-700">
+                            <th className="px-2 py-2">Almacén</th>
+                            <th className="px-2 py-2">Tipo</th>
+                            <th className="px-2 py-2">Ubicación</th>
+                            <th className="px-2 py-2">Stock físico</th>
+                            <th className="px-2 py-2">Stock comprometido</th>
+                            <th className="px-2 py-2">Disponible</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {inv.map((it: any) => (
+                            <tr key={it.id} className="border-t">
+                              <td className="px-2 py-2">{it.almacen_nombre || `#${it.almacen_id}`}</td>
+                              <td className="px-2 py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${it.almacen_tipo === 'Venta' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                  {it.almacen_tipo}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2">{it.almacen_ubicacion || '-'}</td>
+                              <td className="px-2 py-2">{Number(it.stock_fisico || 0).toLocaleString('es-AR')}</td>
+                              <td className="px-2 py-2">{Number(it.stock_comprometido || 0).toLocaleString('es-AR')}</td>
+                              <td className="px-2 py-2 font-semibold">{Number(it.stock_disponible || 0).toLocaleString('es-AR')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
           </div>
         </div>
       </div>

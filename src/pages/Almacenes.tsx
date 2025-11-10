@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { parseApiError } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -49,6 +50,7 @@ export default function Almacenes() {
     defaultValues: {
       nombre: "",
       tipo: "MateriaPrima",
+      es_materia_prima: false,
       ubicacion: "",
       responsable: "",
     },
@@ -73,21 +75,28 @@ export default function Almacenes() {
 
   async function onSubmit(values: any) {
     try {
-      const tipo = (values.tipo || "").toString();
+      // Si el frontend envía es_materia_prima preferimos eso (el backend sincroniza `tipo`)
+      const esMp = Boolean(values.es_materia_prima);
+      const tipo = esMp ? 'MateriaPrima' : (values.tipo || 'Venta').toString();
+
       // Validación cliente: asegurar que tipo esté en las opciones permitidas
       if (!['MateriaPrima', 'Venta'].includes(tipo)) {
         toast.error('Tipo inválido (selecciona una opción válida)');
         return;
       }
 
-      const payload = {
+      const payload: any = {
         nombre: (values.nombre || "").toString(),
         tipo,
         ubicacion: (values.ubicacion || "").toString(),
         responsable: (values.responsable || "").toString(),
+        es_materia_prima: esMp,
       };
 
       console.log('Almacenes payload:', payload);
+
+      // Guardar el valor anterior para poder revertir el checkbox si la API bloquea el cambio
+      const prevEsMp = editing ? (editing.es_materia_prima ?? (editing.tipo === 'MateriaPrima')) : null;
 
       if (editing) {
         const updated = await updateAlmacen(editing.id, payload);
@@ -104,15 +113,14 @@ export default function Almacenes() {
       setIsOpen(false);
     } catch (err) {
       console.error(err);
-      let message = 'Error al guardar almacén';
-      try {
-        if (err instanceof Error) {
-          const parsed = JSON.parse(err.message);
-          if (parsed && parsed.error) message = parsed.error;
-          else if (parsed && parsed.message) message = parsed.message;
-        }
-      } catch (e) {
-        // noop
+      const message = parseApiError(err) || 'Error al guardar almacén';
+      // Si el servidor bloqueó el cambio por movimientos relacionados, revertir checkbox si venía en edición
+      if (editing && /movimientos|no se puede cambiar/i.test(String(message))) {
+        // revertir valor en el formulario
+        const prev = editing.es_materia_prima ?? (editing.tipo === 'MateriaPrima');
+        form.setValue('es_materia_prima', !!prev);
+        // mostrar alerta con instrucciones
+        window.alert('No se puede cambiar el tipo de almacén: existen movimientos registrados en este almacén. Para cambiarlo, gestione o elimine los movimientos o cree un nuevo almacén.');
       }
       toast.error(message);
     }
@@ -160,6 +168,16 @@ export default function Almacenes() {
                         <option value="MateriaPrima">MateriaPrima</option>
                         <option value="Venta">Venta</option>
                       </select>
+                    </FormControl>
+                  </FormItem>
+
+                  <FormItem>
+                    <FormLabel>Es materia prima</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" {...form.register('es_materia_prima')} />
+                        <div className="text-sm text-muted-foreground">Marcar si el almacén contiene sólo materia prima</div>
+                      </div>
                     </FormControl>
                   </FormItem>
 
@@ -227,7 +245,7 @@ export default function Almacenes() {
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => {
                             setEditing(p);
-                            form.reset({ nombre: p.nombre, tipo: p.tipo ?? 'MateriaPrima', ubicacion: p.ubicacion, responsable: p.responsable });
+                            form.reset({ nombre: p.nombre, tipo: p.tipo ?? 'MateriaPrima', es_materia_prima: p.es_materia_prima ?? (p.tipo === 'MateriaPrima'), ubicacion: p.ubicacion, responsable: p.responsable });
                             setIsOpen(true);
                           }}>
                             <Edit className="h-4 w-4" />

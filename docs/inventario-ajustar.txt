@@ -1,0 +1,112 @@
+Documentación: Ajustar existencia por almacén (texto)
+
+Propósito
+Endpoint para incrementar o decrementar la existencia física de un producto en un almacén concreto. Hace las validaciones necesarias para evitar dejar stock negativo o reducir por debajo de la cantidad ya comprometida (reservada).
+
+Resumen técnico
+URL: /api/inventario/ajustar
+Método: POST
+Autenticación: Sí — endpoint protegido (token JWT / sesión). Requiere permisos de inventario/administración.
+Content-Type: application/json
+
+Body (JSON)
+Campos esperados:
+- producto_id: integer (obligatorio) — id del producto.
+- almacen_id: integer (obligatorio) — id del almacén donde ajustar.
+- cantidad: number (obligatorio) — valor positivo para sumar, negativo para restar.
+- motivo: string (opcional) — breve descripción del ajuste (recomendado para auditoría).
+- referencia: string (opcional) — documento/folio relacionado (ej: nº de remito, orden).
+
+Ejemplo:
+{
+  "producto_id": 42,
+  "almacen_id": 3,
+  "cantidad": -5,
+  "motivo": "Devolución cliente",
+  "referencia": "REM-2025-011"
+}
+
+Notas:
+- Si existe una fila en inventario (producto_id + almacen_id), se actualizará stock_fisico = stock_fisico + cantidad.
+- Si no existe la fila:
+  - Si cantidad >= 0: se crea la fila con stock_fisico = cantidad y stock_comprometido = 0.
+  - Si cantidad < 0: se rechaza con error (no se puede crear inventario con stock negativo).
+
+Validaciones y reglas de negocio
+- producto_id y almacen_id deben existir en sus tablas respectivas; si no, devuelve 404.
+- No se permite dejar stock_fisico < 0. Si la operación reduciría por debajo de 0, se devuelve 409 (conflicto).
+- No se permite reducir stock_fisico por debajo de stock_comprometido (reservas). Si la operación lo intenta, devuelve 409.
+- Los ajustes se realizan en una transacción para evitar condiciones de carrera.
+- Se recomienda enviar motivo y referencia para auditoría; el endpoint los puede almacenar o devolver para rastreo.
+- Autorización: solo usuarios con permisos adecuados (role: admin/inventario) pueden hacer ajustes.
+
+Respuestas (ejemplos)
+Respuesta exitosa al actualizar (inventario existente):
+Status: 200 OK
+{
+  "success": true,
+  "message": "Inventario actualizado",
+  "data": {
+    "id": 123,
+    "producto_id": 42,
+    "almacen_id": 3,
+    "stock_fisico": 25,
+    "stock_comprometido": 2,
+    "stock_disponible": 23,
+    "motivo": "Devolución cliente",
+    "referencia": "REM-2025-011",
+    "updated_at": "2025-11-10T16:40:00Z"
+  }
+}
+
+Respuesta exitosa al crear (inventario no existente y cantidad >= 0):
+Status: 201 Created
+{
+  "success": true,
+  "message": "Inventario creado",
+  "data": {
+    "id": 999,
+    "producto_id": 50,
+    "almacen_id": 7,
+    "stock_fisico": 10,
+    "stock_comprometido": 0,
+    "stock_disponible": 10,
+    "created_at": "2025-11-10T16:41:00Z"
+  }
+}
+
+Errores comunes:
+- 400 Bad Request — body inválido o falta campo obligatorio.
+- 401 Unauthorized — token inválido o no autenticado.
+- 403 Forbidden — usuario sin permiso.
+- 404 Not Found — producto o almacén no existe.
+- 409 Conflict — intento de reducir stock por debajo de 0 o por debajo de stock_comprometido.
+- 500 Internal Server Error — error inesperado / DB.
+
+Comportamiento atómico / transaccional
+La operación se ejecuta dentro de una transacción: lectura del inventario actual, verificación de reglas y escritura. Si cualquier chequeo falla, se hace rollback y no se aplica cambio parcial.
+
+Ejemplos de uso (cliente)
+Curl (ajuste negativo):
+curl -X POST "http://tu-servidor/api/inventario/ajustar"
+  -H "Authorization: Bearer <TOKEN>"
+  -H "Content-Type: application/json"
+  -d '{"producto_id":42,"almacen_id":3,"cantidad":-5,"motivo":"Devolución cliente","referencia":"REM-2025-011"}'
+
+Fetch (JS):
+const resp = await fetch('/api/inventario/ajustar', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token
+  },
+  body: JSON.stringify({ producto_id: 42, almacen_id: 3, cantidad: -5, motivo: 'Devolución' })
+});
+const result = await resp.json();
+
+Recomendaciones de UI / UX
+- Mostrar modal de confirmación para ajustes negativos, con campo obligatorio "motivo".
+- Mostrar el stock actual y el stock resultante antes de confirmar (p. ej. "Stock actual: 10 → Nuevo stock: 5").
+- Restringir el ajuste por roles y auditar quién hizo el cambio.
+- Registrar y mostrar motivo y referencia en el historial de inventario por producto/almacén.
+- Soft rules: limitar la magnitud de ajustes manuales (por ejemplo, no permitir cambios mayores a N unidades sin revisión).

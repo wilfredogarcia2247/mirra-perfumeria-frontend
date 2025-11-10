@@ -1,0 +1,79 @@
+Nombre de la fórmula — Documentación para Frontend
+===============================================
+
+Fecha: 10-11-2025
+
+Objetivo
+--------
+Mostrar y permitir editar un campo legible `nombre` para cada fórmula. Este nombre ayuda a los usuarios a identificar plantillas sin tener que ver solo IDs o listas de componentes.
+
+Endpoints relevantes (resumen)
+- GET /api/formulas — devuelve fórmulas con id, nombre, producto_terminado_id, componentes.
+- GET /api/formulas/:id — devuelve la fórmula completa con `nombre`.
+- POST /api/formulas — crear fórmula (campo `nombre` obligatorio).
+- PUT /api/formulas/:id — actualizar fórmula (campo `nombre` obligatorio).
+- DELETE /api/formulas/:id — eliminar fórmula (valida que no existan órdenes que la referencien).
+
+Esquema (objeto fórmula)
+```
+{
+  "id": 1,
+  "nombre": "Perfume Floral N°5 - Fórmula A",
+  "producto_terminado_id": 7,
+  "componentes": [
+    { "id": 1, "formula_id": 1, "materia_prima_id": 1, "cantidad": 10, "unidad": "ml" },
+    ...
+  ]
+}
+```
+
+Requisitos de UI para el campo `nombre`
+--------------------------------------
+- Campo obligatorio en formularios de creación y edición.
+- Longitud sugerida: hasta 200 caracteres. Validar `<= 200` en cliente y servidor.
+- Mostrar en listas y encabezados de detalle:
+  - Lista: mostrar `nombre` como columna principal y, en secundaria, `producto_terminado` (resolver por id).
+  - Detalle: mostrar `nombre` en grande (heading), debajo el producto resultante y la tabla de componentes.
+
+Validaciones
+-----------
+- Requerido: no vacío.
+- Longitud máxima: 200 caracteres.
+- Filtrado/limpieza: eliminar caracteres de control (ej. 0x00 - 0x1F salvo tab/newline razonable) antes de enviar.
+- Sanitizar o escapar en el render para evitar XSS (si el backend no normaliza).
+
+Ejemplos de uso en la UI
+------------------------
+- Crear fórmula:
+  - Inputs: `Nombre` (texto), `Producto terminado` (selector), `Componentes` (repetidor).
+  - Botones: Guardar, Cancelar.
+  - Al guardar: enviar POST con body: `{ nombre, producto_terminado_id, componentes }`.
+
+- Editar fórmula:
+  - Pre-cargar con GET /api/formulas/:id.
+  - Mostrar `nombre` en input editable.
+  - Al guardar: enviar PUT con body completo: `{ nombre, producto_terminado_id, componentes }`.
+
+- List view:
+  - Mostrar columna "Nombre" y acciones (Ver / Editar / Borrar).
+
+Mensajes y errores en UI
+-----------------------
+- Si el servidor devuelve 400 por falta de `nombre`: mostrar "Nombre de fórmula requerido".
+- Si el servidor devuelve 400 por longitud: mostrar "El nombre debe tener como máximo 200 caracteres".
+- Si 404 al editar: "Fórmula no encontrada" y redirigir al listado.
+- Si 400 al borrar por órdenes existentes: mostrar modal explicativo y enlace a órdenes (si backend devuelve conteo/enlaces).
+
+Recomendaciones UX
+------------------
+- Autocomplete/sugerencias: cuando el nombre contenga el producto terminado, prellenar con su nombre (ej. `${producto.nombre} - Variante A`).
+- Versionado: si las fórmulas cambian frecuentemente, mostrar versión o fecha de modificación junto al `nombre`.
+- Búsqueda: permitir buscar por `nombre`.
+- Considerar opción de "archivar" en vez de borrar para preservar historial y evitar romper relaciones con órdenes pasadas.
+
+Notas técnicas
+--------------
+- El frontend debe incluir `nombre` al crear/editar la fórmula. Si el backend aún no lo exige, coordinar para validar en API.
+- Al mostrar `nombre` en la UI, escapar HTML y caracteres especiales.
+
+Fin

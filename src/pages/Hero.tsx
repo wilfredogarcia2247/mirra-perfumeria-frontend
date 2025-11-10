@@ -56,7 +56,16 @@ export default function Hero() {
 
         if (!mounted) return;
         const normalized = items.map(normalize);
-        setFullProducts(normalized);
+
+        // Excluir productos de "Materia Prima" del catálogo público
+        const isMateriaPrima = (cat?: string) => {
+          if (!cat) return false;
+          const s = String(cat).toLowerCase().replace(/\s+/g, '');
+          return s === 'materiaprima' || s === 'materia' || s === 'materia_prima' || s.includes('materia');
+        };
+
+        const filtered = normalized.filter((p) => !isMateriaPrima(p.category));
+        setFullProducts(filtered);
       })
       .catch((err) => {
         console.error('Error cargando catálogo:', err);

@@ -1,0 +1,149 @@
+DOCUMENTACIÓN: Productos con inventario por almacén (texto plano)
+
+BASE
+
+Base URL local: http://localhost:3000
+
+ENDPOINTS RELEVANTES
+
+- GET /api/productos (protegido por JWT)
+- GET /api/productos/:id (protegido por JWT)
+- GET /api/productos/catalogo (público, admite q, includeOutOfStock, limit)
+
+AUTENTICACIÓN
+
+- /api/productos y /api/productos/:id requieren header: Authorization: Bearer <TOKEN>
+- /api/productos/catalogo es público y no requiere token.
+
+OBJETIVO
+
+Cada objeto producto devuelto incluye un campo `inventario` con la lista de inventarios por almacén. Esto permite ver `stock_fisico`, `stock_comprometido` y `stock_disponible` por almacén (tipo 'Venta' o 'MateriaPrima').
+
+Útil para UI que muestre desde qué almacén se sirve o para decidir producir.
+
+EJEMPLOS DE USO (curl)
+
+- Obtener todos los productos (con inventario por almacén)
+  curl -H "Authorization: Bearer <TOKEN>" http://localhost:3000/api/productos
+
+- Obtener un producto por id (con inventario por almacén)
+  curl -H "Authorization: Bearer <TOKEN>" http://localhost:3000/api/productos/8
+
+- Obtener catálogo público (con inventario por almacén incluido)
+  curl http://localhost:3000/api/productos/catalogo
+
+Opciones query:
+- q (string): búsqueda por nombre (ILIKE)
+- includeOutOfStock=true: incluir productos con stock <= 0
+- limit=N: límite de resultados
+
+SCHEMA (RESPUESTA POR PRODUCTO)
+
+- id: integer
+- nombre: string
+- tipo: string ('MateriaPrima' | 'ProductoTerminado')
+- unidad: string
+- stock: integer (campo antiguo; puede no reflejar inventario por almacén)
+- costo: numeric (string en BD, convertido a number por backend si corresponde)
+- precio_venta: numeric
+- proveedor_id: integer|null
+- image_url: string|null
+- inventario: array de objetos con:
+  - id: integer (registro en tabla inventario)
+  - almacen_id: integer
+  - almacen_nombre: string
+  - almacen_tipo: string ('MateriaPrima' | 'Venta')
+  - almacen_ubicacion: string|null
+  - stock_fisico: number
+  - stock_comprometido: number
+  - stock_disponible: number (stock_fisico - stock_comprometido)
+
+EJEMPLO DE RESPUESTA (GET /api/productos/:id)
+
+{
+  "id": 8,
+  "nombre": "Esencia de Jazmín",
+  "tipo": "MateriaPrima",
+  "unidad": "ml",
+  "stock": 1000,
+  "costo": "0.5",
+  "precio_venta": null,
+  "proveedor_id": 1,
+  "image_url": "https://...",
+  "inventario": [
+    {
+      "id": 1,
+      "almacen_id": 1,
+      "almacen_nombre": "Almacén de Materia Prima",
+      "almacen_tipo": "MateriaPrima",
+      "almacen_ubicacion": null,
+      "stock_fisico": 1000,
+      "stock_comprometido": 0,
+      "stock_disponible": 1000
+    },
+    {
+      "id": 5,
+      "almacen_id": 2,
+      "almacen_nombre": "Almacén de Venta",
+      "almacen_tipo": "Venta",
+      "almacen_ubicacion": "Tienda 1",
+      "stock_fisico": 50,
+      "stock_comprometido": 10,
+      "stock_disponible": 40
+    }
+  ]
+}
+
+NOTAS PARA FRONTEND (CÓMO MOSTRAR Y QUÉ PRIORIZAR)
+
+Mostrar ambas vistas:
+- Vista resumen (lista): mostrar producto con `stock_disponible_total` (suma de `stock_disponible`) o mostrar solo flag "Disponible" si `stock_disponible_total > 0`.
+- Vista detalle: mostrar `inventario` por almacén con columnas: Almacén (nombre/tipo), `stock_fisico`, `stock_comprometido`, `stock_disponible`, y posiblemente un botón "Reservar desde este almacén".
+
+Priorizar para compras:
+- Solo los almacenes de tipo 'Venta' son fuente directa de despacho al cliente. Las de tipo 'MateriaPrima' son insumos.
+- Si el front necesita saber si puede vender al cliente, calcular `stock_disponible_total` sumando `stock_disponible` de inventario (backend ya manda detalle; frontend suma).
+
+UX al elegir almacén:
+- Sugerir por defecto tomar del primer almacén 'Venta' con `stock_disponible > 0`.
+- Si no hay stock en 'Venta', indicar que se necesita producir: el backend puede devolver `producciones` al crear pedido (si aplica).
+
+TAMAÑO DE PAYLOAD / RENDIMIENTO
+
+- El catálogo público ahora puede incluir inventario por almacén: esto puede aumentar el tamaño de la respuesta si hay muchos almacenes.
+- Para listados grandes, considerar:
+  - pedir solo `stock_disponible_total` (backend podría agregarlos) o
+  - pedir `/api/productos` sin inventario y luego, al abrir detalle, pedir `/api/productos/:id` que incluye inventario.
+- Parámetros útiles en frontend: usar `limit` y `q` en `/api/productos/catalogo` para minimizar datos.
+
+SUGERENCIAS DE IMPLEMENTACIÓN EN FRONTEND (JS Fetch)
+
+- Obtener lista y mostrar stock total:
+  GET /api/productos (o /api/productos/catalogo)
+  Para cada producto, calcular total sumando `inventario.stock_disponible`.
+  Mostrar disponibilidad, y al abrir detalle renderizar inventario por almacén.
+
+- Si la UI requiere elegir almacén para cada línea del pedido, actualizar el payload de creación de pedido para incluir `almacen_id` por línea (backend actualmente no lo requiere, pero puede adaptarse).
+
+MANEJO DE ERRORES
+
+- 401: el token expiró o no existe — redirigir a login o reautenticar.
+- 500: mostrar mensaje de error genérico y permitir reintentar.
+- Si necesitas detectar que el producto solo puede producirse (no hay stock en 'Venta' pero hay fórmula), revisa `producciones` en la respuesta del POST de pedidos (esto indica que backend creó órdenes para producir).
+
+RECOMENDACIONES ADICIONALES (BACK/FRONTEND)
+
+- Si el frontend quiere performance en listados, solicitar al backend una versión "catalogo-light" que devuelva `stock_disponible_total` en lugar del detalle por almacén; puedo añadir este endpoint si lo quieres.
+- Cuando muestres inventario, formatea números: decimales para precios y enteros para cantidades.
+
+PRUEBAS RÁPIDAS PARA QA
+
+- Ver inventario por almacén en producto:
+  GET /api/productos/:id y comprobar campo `inventario`.
+
+- Simular venta desde almacén:
+  Identificar el inventario con `almacen_tipo: 'Venta'` y `stock_disponible > 0`.
+  Crear pedido (POST /api/pedidos-venta con token o POST público) y comprobar que en DB `inventario.stock_comprometido` se incrementó.
+
+- Simular producción:
+  Dejar stock en 'Venta' en 0 y comprobar que al crear pedido, backend crea orden en `ordenes_produccion` y reserva materia prima en inventario de tipo 'MateriaPrima'.

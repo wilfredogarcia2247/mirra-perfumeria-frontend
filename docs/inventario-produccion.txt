@@ -1,0 +1,212 @@
+Documentación Frontend — Inventario y Producción
+
+Este documento recoge los endpoints y comportamientos que el frontend necesita para trabajar con inventario y producción.
+Incluye: ajustar inventario por almacén, añadir almacén a un producto (con existencia), producir desde una fórmula, completar órdenes de producción y movimientos de inventario.
+
+1) Ajustar existencia por almacén
+
+URL: POST /api/inventario/ajustar
+Autenticación: Sí (Bearer token / sesión). Requiere permisos de inventario/administración.
+Content-Type: application/json
+
+Request body example:
+{
+  "producto_id": 42,
+  "almacen_id": 3,
+  "cantidad": 5,
+  "motivo": "Ajuste inicial",
+  "referencia": "REM-1001"
+}
+
+Campos:
+- producto_id: integer (obligatorio)
+- almacen_id: integer (obligatorio)
+- cantidad: number (obligatorio) — suma si positivo; resta si negativo. Validaciones:
+  - No deja stock_fisico < 0.
+  - No permite reducir por debajo de stock_comprometido.
+- motivo: string (opcional) — para auditoría.
+- referencia: string (opcional)
+
+Respuestas:
+- 200 OK — inventario actualizado (si existía).
+  { "success": true, "message": "Inventario actualizado", "data": { "id": 123, "producto_id": 42, "almacen_id": 3, "stock_fisico": 25, "stock_comprometido": 2, "stock_disponible": 23 } }
+- 201 Created — inventario creado (si no existía y cantidad >= 0).
+  { "success": true, "message": "Inventario creado", "data": { "id": 999, "producto_id": 50, "almacen_id": 7, "stock_fisico": 10, "stock_comprometido": 0, "stock_disponible": 10 } }
+- 400 Bad Request — payload inválido (ej. falta campo, cantidad no numérica).
+- 401 / 403 — auth/permisos.
+- 404 Not Found — producto o almacén no existe.
+- 409 Conflict — intento de dejar stock negativo o por debajo de stock_comprometido.
+- 500 Internal Server Error — error interno.
+
+UI notes:
+- Mostrar confirmación para ajustes negativos.
+- Mostrar stock actual y stock resultante antes de enviar.
+- Requerir motivo para ajustes negativos grandes o sensibles.
+
+
+2) Añadir almacén a un producto y asignar existencia
+
+URL: POST /api/productos/:id/almacen
+Ejemplo: POST /api/productos/42/almacen
+Autenticación: Sí (admin/inventario)
+Content-Type: application/json
+
+Request body example:
+{
+  "almacen_id": 3,
+  "cantidad": 10,
+  "motivo": "Inicialización",
+  "referencia": "INV-2025-01"
+}
+
+Campos:
+- almacen_id: integer (obligatorio)
+- cantidad: number (obligatorio) — debe ser >= 0 cuando se crea. Si ya existe inventario para (producto, almacen) el endpoint suma cantidad.
+- motivo, referencia: opcionales.
+
+Comportamiento:
+- Si inventario no existe y cantidad >= 0: crea fila con stock_fisico = cantidad y stock_comprometido = 0 → devuelve 201.
+- Si inventario existe: incrementa stock_fisico by cantidad → devuelve 200 con inventario actualizado.
+- Transacción y SELECT FOR UPDATE para evitar race conditions.
+
+Respuestas:
+- 201 Created — inventario creado.
+- 200 OK — inventario actualizado.
+- 400 Bad Request — payload inválido o cantidad negativa para creación.
+- 404 Not Found — producto o almacén no existe.
+- 500 Internal Server Error.
+
+UI notes:
+- Mostrar el estado nuevo del inventario tras la operación.
+- Si la fila ya existe, mostrar una alerta tipo “Se agregaron X unidades a este almacén”.
+
+
+3) Producir desde una fórmula (crear + completar producción inmediata)
+
+URL: POST /api/formulas/:id/produccion
+Ejemplo: POST /api/formulas/1/produccion
+Autenticación: Sí (operaciones/producción)
+Content-Type: application/json
+
+Request body example:
+{
+  "cantidad": 10,
+  "almacen_venta_id": 2
+}
+
+Campos:
+- cantidad: integer > 0 — unidades a producir.
+- almacen_venta_id: integer — almacén destino donde entrará el producto terminado (debe ser tipo 'Venta').
+
+Flujo (transaccional):
+1. Valida fórmula y almacén destino.
+2. Lee componentes (materia prima y cantidad por unidad).
+3. Verifica que haya materia prima suficiente en almacenes tipo 'MateriaPrima' (suma disponibilidad).
+4. Crea una orden de producción con estado 'Completada' (si la implementación es completa en un paso).
+5. Consume materia prima (resta stock_fisico, ajusta stock_comprometido si aplica).
+6. Incrementa o crea inventario del producto terminado en el almacen_venta_id.
+7. Guarda movimientos en inventario_movimientos (tipo 'salida' para materia prima, 'entrada' para producto).
+8. Commit y devuelve detalle.
+
+Success response (201):
+{
+  "success": true,
+  "orden": { "id": 10, "producto_terminado_id": 7, "cantidad": 10, "formula_id": 1, "estado": "Completada", "fecha": "..." },
+  "materiales": [ { "materia_prima_id": 1, "almacen_id": 1, "cantidad": 100 }, ... ],
+  "inventario_destino": { "id": 55, "producto_id": 7, "almacen_id": 2, "stock_fisico": 10, "stock_comprometido": 0, "stock_disponible": 10 }
+}
+
+Errors:
+- 400 Bad Request — cantidad inválida, almacén destino no es 'Venta', insuficiente materia prima.
+- 404 Not Found — fórmula o almacén no existe.
+- 500 Internal Server Error — error DB / transaccional.
+
+UI notes:
+- Antes de confirmar producción mostrar un resumen de material requerido por componente (cantidad por unidad * cantidad solicitada).
+- Indicar los almacenes desde donde se consumirá la materia prima (si se desea mostrar).
+- Mostrar progreso y resultado (movimientos registrados) tras la operación.
+
+
+4) Completar orden de producción (si se utiliza proceso en 2 pasos: crear → completar)
+
+URL: POST /api/ordenes-produccion/:id/completar
+Ejemplo: POST /api/ordenes-produccion/5/completar
+Autenticación: Sí (producción/operaciones)
+Content-Type: application/json
+
+Request body example:
+{
+  "almacen_venta_id": 2
+}
+
+Campos:
+- almacen_venta_id: integer — destino tipo 'Venta'.
+
+Flujo:
+1. Valida orden (existe y no esté ya completada).
+2. Verifica y bloquea inventarios de materia prima.
+3. Verifica suficiencia; si insuficiente → 400.
+4. Resta stock_fisico y reduce stock_comprometido (GREATEST(0, stock_comprometido - cantidad)) por cada inventario donde se consuma.
+5. Inserta entradas y salidas en inventario_movimientos.
+6. Incrementa inventario del producto terminado en almacén de venta.
+7. Marca orden como 'Completada' y devuelve resumen.
+
+Response (200):
+{
+  "success": true,
+  "orden": { "id": 5, "producto_terminado_id": 7, "cantidad": 20, "estado": "Completada" },
+  "movimientos": [ { "producto_id": 1, "almacen_id": 1, "cantidad": 200, "tipo": "salida" }, ... ],
+  "inventario_destino": { "id": 60, "producto_id": 7, "almacen_id": 2, "stock_fisico": 20, "stock_disponible": 20 }
+}
+
+Errors:
+- 400 Bad Request — ya completada, insuficiencia, almacén destino inválido.
+- 404 Not Found — orden no encontrada o almacén no existe.
+- 500 Internal Server Error.
+
+UI notes:
+- Mostrar la orden con su detalle y un botón “Completar producción”.
+- Mostrar lista de componentes y su stock antes de completar.
+- Mostrar movimientos (salidas/entradas) después de completar.
+
+
+5) Inventario movimientos (auditoría)
+
+Endpoint sugerido: GET /api/inventario/movimientos?producto_id=...&almacen_id=...&limit=...
+Devuelve registros de `inventario_movimientos` con: id, producto_id, almacen_id, tipo, cantidad, motivo, referencia, creado_en.
+
+Notas:
+- Actualmente se insertan movimientos desde endpoints de producción y ajustes; si necesitas un endpoint read-only lo implemento.
+
+UI notes:
+- Mostrar historial por producto y por almacén con filtros por fecha.
+- Ofrecer export CSV / impresión.
+
+
+Ejemplos de llamadas (curl y fetch)
+
+Curl — añadir almacén a producto:
+
+curl -X POST 'https://tu-api/api/productos/42/almacen' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"almacen_id":3,"cantidad":10,"motivo":"Inicialización"}'
+
+Fetch — completar orden de producción:
+
+const resp = await fetch('/api/ordenes-produccion/5/completar', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+  body: JSON.stringify({ almacen_venta_id: 2 })
+});
+const data = await resp.json();
+
+Recomendaciones generales para Frontend
+
+- Validar campos en UI antes de llamar a la API (tipos, valores > 0, existencia de almacén seleccionado).
+- Mostrar al usuario la información de stock actual y el resultado esperado antes de confirmar.
+- Registrar motivo y referencia cuando se hacen ajustes manuales.
+- Manejar errores 400/409 con mensajes claros para el usuario (ej. “No hay suficiente materia prima: falta X unidades”).
+- Para operaciones largas (producción) mostrar un modal con progreso y bloquear acciones duplicadas (evitar double-submit).
+- Implementar notificaciones o registros para auditoría (quién hizo qué y cuándo).
+- Para integraciones CI/CD, añadir tests de e2e que cubran: producir exitoso, completar orden, ajuste negativo rechazado.

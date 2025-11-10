@@ -1,0 +1,83 @@
+Documentación: Añadir almacén a un producto y asignar existencia
+
+Resumen
+
+URL: POST /api/productos/:id/almacen
+Propósito: Añadir un almacén a un producto (crear la fila de inventario) y asignarle existencia inicial, o si ya existe, incrementar su existencia en una sola llamada.
+Autenticación: Sí (token/session) — requiere permisos de inventario/administración.
+Content-Type: application/json
+
+Body (JSON)
+
+- almacen_id: integer (obligatorio) — id del almacén.
+- cantidad: number (obligatorio) — unidades a colocar (>= 0). Si la fila existe, se suman; si no existe, se crea con este valor.
+- motivo: string (opcional) — descripción del ajuste (recomendado).
+- referencia: string (opcional) — referencia externa (remito, orden, etc).
+
+Ejemplo request:
+{
+  "almacen_id": 3,
+  "cantidad": 10,
+  "motivo": "Inicialización de stock",
+  "referencia": "INV-2025-1001"
+}
+
+Reglas y validaciones
+
+- `producto_id` se recibe por la ruta (:id) y debe existir; si no, devuelve 404.
+- `almacen_id` debe existir; si no, devuelve 404.
+- `cantidad` es obligatoria y debe ser numérica; al crear no puede ser negativa.
+- Si ya existe inventario (producto_id + almacen_id), el endpoint incrementa `stock_fisico` con `cantidad`.
+- La operación es atómica: se realiza en transacción y se hace rollback ante errores.
+- Responde 400 para payload inválido, 404 para producto/almacén no existentes, 500 para errores internos.
+
+Respuestas (ejemplos)
+
+Creación (no existía inventario):
+Status: 201 Created
+{
+  "success": true,
+  "message": "Inventario creado",
+  "data": {
+    "id": 999,
+    "producto_id": 42,
+    "almacen_id": 3,
+    "stock_fisico": 10,
+    "stock_comprometido": 0,
+    "stock_disponible": 10,
+    "motivo": "Inicialización de stock",
+    "referencia": "INV-2025-1001"
+  }
+}
+
+Actualización (ya existía inventario):
+Status: 200 OK
+{
+  "success": true,
+  "message": "Inventario actualizado",
+  "data": {
+    "id": 123,
+    "producto_id": 42,
+    "almacen_id": 3,
+    "stock_fisico": 25,
+    "stock_comprometido": 2,
+    "stock_disponible": 23,
+    "motivo": null,
+    "referencia": null
+  }
+}
+
+Códigos de error (resumen)
+
+- 400 Bad Request — payload inválido (ej. cantidad negativa para creación).
+- 401 Unauthorized — no autenticado.
+- 403 Forbidden — sin permisos.
+- 404 Not Found — producto o almacén no existe.
+- 500 Internal Server Error — error servidor/BD.
+
+Notas operativas y recomendaciones
+
+- UI: Mostrar el stock actual y el stock resultante antes de confirmar. Requerir motivo para grandes ajustes.
+- Auditoría: Registrar user_id, motivo, referencia, stock_anterior y stock_nuevo en una tabla `inventario_movimientos` (se recomienda añadir esto).
+- Extensiones: Si quieres que el endpoint permita decrementar (cantidad negativa) al crear la fila, aclara la regla; hoy el endpoint no admite crear con cantidad negativa por seguridad.
+- Concurrencia: El handler usa bloqueo (SELECT FOR UPDATE) al leer el inventario existente para evitar condiciones de carrera al incrementar.

@@ -1,0 +1,231 @@
+--- DOCUMENTACIÓN PARA FRONT: PEDIDOS DE VENTA (texto plano) ---
+
+BASE
+Base URL local: http://localhost:3000
+
+RUTAS PRINCIPALES
+
+- Protegido: /api/pedidos-venta
+- Público (checkout): /api/pedidos-venta (POST público, montado antes del middleware de auth)
+
+AUTENTICACIÓN
+
+- Rutas protegidas requieren header: Authorization: Bearer <TOKEN>
+- Rutas públicas no requieren token (solo la ruta POST público).
+
+COMPORTAMIENTO CLAVE (resumen)
+
+- El sistema soporta 2 tipos de almacén:
+  - 'Venta' — stock desde donde se satisfacen pedidos al cliente.
+  - 'MateriaPrima' — stock de insumos que se usan para fabricar productos terminados.
+
+- Al crear un pedido (protegido o público):
+  1) Se intenta reservar (incrementando stock_comprometido) desde inventarios de tipo 'Venta'.
+  2) Si no hay suficiente stock en 'Venta', el backend busca una fórmula (si existe) para producir el producto.
+  3) Verifica que haya materia prima suficiente en almacenes 'MateriaPrima'.
+  4) Si hay materia prima, crea una orden de producción (estado 'Pendiente') por la cantidad faltante y reserva la materia prima (stock_comprometido en inventario de materia prima).
+  5) Si no hay fórmula o materia prima insuficiente, la creación del pedido falla con error 400 y un mensaje claro.
+
+- Reservas: se usan columnas `stock_fisico` y `stock_comprometido`. Las reservas incrementan `stock_comprometido`; el stock físico no se reduce hasta que se procese la producción o despacho.
+
+- Respuesta del POST incluye el pedido creado con detalle de productos y, si se crearon órdenes de producción, un array `producciones` con las órdenes generadas.
+
+ENDPOINTS / CONTRATOS
+
+1) LISTAR PEDIDOS (PROTEGIDO)
+
+- Método: GET
+- Ruta: /api/pedidos-venta
+- Headers: Authorization: Bearer <TOKEN>
+- Respuesta: 200 OK, array de pedidos. Cada pedido incluye:
+  - id, cliente_id, nombre_cliente, telefono, cedula, estado, fecha, origen_ip, user_agent
+  - productos: array de líneas con { id, pedido_venta_id, producto_id, cantidad, producto_nombre, precio_venta (number|null), costo (number|null), image_url, subtotal (number) }
+  - total: número (suma de subtotales)
+
+Ejemplo curl (listar):
+
+curl -s -H "Authorization: Bearer <TOKEN>" http://localhost:3000/api/pedidos-venta | jq
+
+
+2) OBTENER PEDIDO POR ID (PROTEGIDO)
+
+- Método: GET
+- Ruta: /api/pedidos-venta/:id
+- Headers: Authorization: Bearer <TOKEN>
+- Respuesta: 200 OK con objeto pedido (misma estructura que en listar).
+- Errores: 404 si no existe el pedido.
+
+Ejemplo curl (detalle):
+
+curl -s -H "Authorization: Bearer <TOKEN>" http://localhost:3000/api/pedidos-venta/1 | jq
+
+
+3) CREAR PEDIDO (PROTEGIDO)
+
+- Método: POST
+- Ruta: /api/pedidos-venta
+- Headers: Authorization: Bearer <TOKEN>, Content-Type: application/json
+
+- Body (ejemplo):
+{
+  "cliente_id": 1,
+  "productos": [
+    { "producto_id": 1, "cantidad": 2 },
+    { "producto_id": 3, "cantidad": 1 }
+  ],
+  "estado": "Pendiente", // 'Pendiente'|'Enviado'|'Completado'
+  "nombre_cliente": "Nombre opcional",
+  "telefono": "555-0000",
+  "cedula": "12345678"
+}
+
+- Comportamiento en backend:
+  - Intenta reservar stock en almacén 'Venta'.
+  - Si falta, intenta crear orden de producción y reservar materia prima.
+  - Todo se ejecuta en transacción; o se realiza todo o se revierte.
+
+- Respuesta exitosa: 201 Created
+  {
+    "pedido": { id, cliente_id, nombre_cliente, ..., productos: [...], total: number },
+    "producciones": [ { ordenes de producción creadas (si las hubo) } ]
+  }
+
+- Errores posibles:
+  - 400 Bad Request: validación de payload o si no hay stock ni posibilidad de producir (mensaje claro).
+  - 401 Unauthorized: si falta token.
+  - 500 Internal Server Error: fallos inesperados.
+
+Ejemplo curl (crear protegido):
+
+curl -X POST http://localhost:3000/api/pedidos-venta \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"cliente_id":1,"productos":[{"producto_id":1,"cantidad":2}],"estado":"Pendiente"}' | jq
+
+
+4) CREAR PEDIDO (PÚBLICO - CHECKOUT)
+
+- Método: POST
+- Ruta: /api/pedidos-venta (misma ruta, montada antes de auth)
+- Headers: Content-Type: application/json
+
+- Body (ejemplo público):
+{
+  "cliente_id": null,
+  "productos": [{ "producto_id": 7, "cantidad": 1 }],
+  "nombre_cliente": "Anonimo",
+  "telefono": "555-0000",
+  "cedula": "00000000"
+}
+
+- Comportamiento: idéntico a versión protegida en cuanto a reserva y producción; fuerza `estado = 'Pendiente'`.
+- Respuesta: 201 Created con pedido detallado y `producciones` si se crearon órdenes.
+
+Ejemplo curl (crear público):
+
+curl -X POST http://localhost:3000/api/pedidos-venta \
+  -H "Content-Type: application/json" \
+  -d '{"productos":[{"producto_id":7,"cantidad":1}],"nombre_cliente":"Anonimo"}' | jq
+
+
+MODELO DE DATOS RELEVANTE (resumido)
+
+- pedidos_venta: id, cliente_id, nombre_cliente, telefono, cedula, estado, fecha, origen_ip, user_agent
+- pedido_venta_productos: id, pedido_venta_id, producto_id, cantidad
+- inventario: id, producto_id, almacen_id, stock_fisico, stock_comprometido
+- almacenes: id, nombre, tipo ('MateriaPrima'|'Venta'), ubicacion, responsable
+- formulas: id, producto_terminado_id
+- formula_componentes: id, formula_id, materia_prima_id, cantidad, unidad
+- ordenes_produccion: id, producto_terminado_id, cantidad, formula_id, estado, fecha
+
+
+RESPUESTAS TÍPICAS (EJEMPLOS)
+
+1) CREACIÓN CON STOCK DISPONIBLE (201)
+
+{
+  "id": 10,
+  "cliente_id": 1,
+  "nombre_cliente": "Prueba",
+  "telefono": "...",
+  "cedula": "...",
+  "estado": "Pendiente",
+  "fecha": "2025-11-10T...Z",
+  "productos": [
+    {
+      "id": 4,
+      "pedido_venta_id": 10,
+      "producto_id": 1,
+      "cantidad": 2,
+      "producto_nombre": "Perfume X",
+      "precio_venta": 25.0,
+      "costo": 10.0,
+      "image_url": "https://...",
+      "subtotal": 50.0
+    }
+  ],
+  "total": 50.0,
+  "producciones": []
+}
+
+
+2) CREACIÓN QUE GENERA ORDEN DE PRODUCCIÓN (201)
+
+{
+  "id": 11,
+  "...": "...",
+  "productos": [...],
+  "total": 40.0,
+  "producciones": [
+    { "id": 3, "producto_terminado_id": 7, "cantidad": 5, "formula_id": 2, "estado": "Pendiente", "fecha": "..." }
+  ]
+}
+
+
+3) ERROR POR MATERIA PRIMA INSUFICIENTE (400)
+
+{ "error": "Materia prima 3 insuficiente para producir producto 7" }
+
+
+CÓDIGOS DE ERROR (RESUMEN)
+
+- 400 Bad Request: validación del payload o falta de stock sin posibilidad de producir.
+- 401 Unauthorized: ruta protegida sin token.
+- 404 Not Found: pedido no existe (GET /:id).
+- 500 Internal Server Error: problema en servidor/DB.
+
+
+RECOMENDACIONES PARA FRONTEND (UX / MANEJO)
+
+- Mostrar al usuario:
+  - Si el pedido se crea y `producciones` no está vacío → informar: "Se creó el pedido y se generó una orden de producción por X unidades. Te avisaremos cuando esté lista."
+  - Si el pedido se crea sin `producciones` → confirmar: "Pedido reservado en almacén de venta."
+  - Si recibes 400 por falta de materia prima → mostrar mensaje claro y opciones: contactar soporte o notificar retraso.
+
+- Durante el checkout, validar en frontend: cantidades > 0, `producto_id` válidos.
+
+- Mostrar indicadores de estado en la UI:
+  - Para cada línea: cantidad solicitada, cantidad reservada (implícita), subtotal.
+  - En detalle del pedido: incluir campo `producciones` si existe.
+
+- Manejar los números:
+  - `precio_venta` y `costo` vienen como numbers (se convierten en backend); si llegasen como strings, convertir con `parseFloat` antes de usarlos en UI.
+
+
+PRUEBAS / QA (rápido)
+
+- Test rápido local:
+  1) Ejecutar `node initNeonDB.js` para asegurarse de que existen tablas y columnas.
+  2) Arrancar server: `node server.js` (o el comando que use vuestro entorno).
+  3) Hacer POST público con un producto conocido y revisar la respuesta.
+
+- Para simular falta de stock:
+  - Ajustar manualmente en DB (psql) `inventario.stock_fisico = 0` para el producto en almacén 'Venta' y volver a POST; el backend debería crear `ordenes_produccion` si hay fórmula y materia prima.
+
+
+NOTAS TÉCNICAS ADICIONALES
+
+- Reservas y producción se ejecutan en transacciones; si algo falla se hace rollback.
+- Reservas se realizan greedy desde inventarios con más stock disponible.
+- La lógica actual NO incrementa automáticamente `stock_fisico` del producto terminado cuando una orden de producción se completa. Debe haber un proceso (manual o automático) que, al marcar `ordenes_produccion.estado = 'Completada'`, reduzca `stock_comprometido` de materias primas y aumente `stock_fisico` del producto en almacén tipo 'Venta'.
+- Si queréis, puedo implementar esa finalización automática.

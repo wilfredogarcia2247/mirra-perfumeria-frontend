@@ -1,0 +1,125 @@
+Editar y borrar fórmulas — Documentación para Frontend
+===============================================
+
+Última actualización: 10-11-2025
+
+Resumen
+-------
+Este documento especifica los endpoints y el comportamiento esperado para editar (PUT) y borrar (DELETE) fórmulas desde el frontend. Incluye esquema de request/response, códigos de error esperados y recomendaciones de UI/UX.
+
+1) Editar fórmula
+-----------------
+Endpoint
+URL: PUT /api/formulas/:id
+Ej: PUT /api/formulas/1
+Autenticación: Sí (token/session). Requiere permisos de producción/administración.
+Headers:
+- Authorization: Bearer <TOKEN>
+- Content-Type: application/json
+
+Propósito
+Reemplazar la fórmula completa (producto terminado + lista completa de componentes). La implementación servidor debe eliminar los componentes anteriores y sustituirlos por los nuevos dentro de una transacción.
+
+Request body (schema)
+{
+  "producto_terminado_id": 7,
+  "componentes": [
+    { "materia_prima_id": 1, "cantidad": 10, "unidad": "ml" },
+    { "materia_prima_id": 2, "cantidad": 35, "unidad": "ml" }
+  ]
+}
+
+Validaciones (cliente/servidor)
+- `producto_terminado_id`: integer obligatorio.
+- `componentes`: array obligatorio y no vacío.
+- Cada componente:
+  - `materia_prima_id`: integer obligatorio.
+  - `cantidad`: number obligatorio (>0).
+  - `unidad`: string obligatorio.
+
+Comportamiento esperado (servidor)
+- Operación atómica: se ejecuta en una transacción.
+- Se actualiza `producto_terminado_id` en la tabla `formulas`.
+- Se eliminan los `formula_componentes` anteriores y se insertan los nuevos.
+- Devuelve la fórmula actualizada (incluyendo los componentes) con 200 OK.
+
+Ejemplo de request (curl)
+curl -X PUT 'https://tu-api/api/formulas/1' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "producto_terminado_id": 7,
+    "componentes":[ {"materia_prima_id":1,"cantidad":10,"unidad":"ml"}, {"materia_prima_id":2,"cantidad":35,"unidad":"ml"} ]
+  }'
+
+Ejemplo de success response (200)
+{
+  "id": 1,
+  "producto_terminado_id": 7,
+  "componentes": [
+    { "id": 11, "formula_id": 1, "materia_prima_id": 1, "cantidad": 10, "unidad": "ml" },
+    { "id": 12, "formula_id": 1, "materia_prima_id": 2, "cantidad": 35, "unidad": "ml" }
+  ]
+}
+
+Errores y códigos esperados
+- 400 Bad Request — validación (payload inválido o reglas de negocio violadas).
+- 401 / 403 — auth/permisos.
+- 404 Not Found — fórmula no encontrada.
+- 500 Internal Server Error — errores inesperados.
+
+UI/UX recomendaciones (editar)
+- Cargar la fórmula actual con GET /api/formulas/:id y mostrar el formulario con los campos rellenados.
+- Permitir editar producto terminado y las filas de componentes (añadir/quitar/reordenar).
+- Mostrar validaciones en cliente (campos requeridos, cantidad > 0) antes de enviar.
+- Mostrar un resumen de cambios (diferencias antes/después) especialmente si las cantidades se reducen.
+- Confirmación para cambios importantes (ej. reducción de cantidad de un componente que puede afectar stock proyectado).
+- Tras editar con éxito, refrescar listados y caches relacionadas (listas de fórmulas, calculadoras de materiales, vistas de producción).
+
+Mensajes y manejo de errores en frontend (editar)
+- Para 400: mostrar el detalle de validación devuelto por el servidor cuando exista.
+- Para 401/403: redirigir al login o mostrar pantalla de permisos insuficientes.
+- Para 404: mostrar mensaje aclarando que la fórmula no existe y refrescar la lista.
+- Para 500: mostrar mensaje genérico y permitir reintento.
+
+2) Borrar fórmula
+------------------
+Endpoint
+URL: DELETE /api/formulas/:id
+Ej: DELETE /api/formulas/1
+Autenticación: Sí (admin/producción).
+
+Propósito
+Eliminar una fórmula y sus componentes asociados.
+
+Validaciones y reglas (servidor)
+- No se permite eliminar una fórmula si existen `ordenes_produccion` que la referencian (bloqueo a nivel aplicación). En ese caso devolver 400 con mensaje explicativo.
+- Si no hay órdenes asociadas: eliminar en una transacción (primero `formula_componentes`, luego `formulas`).
+- Si la fórmula no existe: 404.
+
+Responses
+- 200 OK — eliminación exitosa:
+  { "eliminado": true, "formula": { ...datos de la fórmula eliminada... } }
+- 400 Bad Request — no se puede eliminar por órdenes existentes:
+  { "error": "No se puede eliminar la fórmula: existen órdenes de producción asociadas" }
+- 401 / 403 — auth/permisos.
+- 404 Not Found — fórmula no encontrada.
+
+UI/UX recomendaciones (borrar)
+- Mostrar un modal de confirmación con texto claro: "¿Seguro que quieres eliminar esta fórmula? Esta acción eliminará todos sus componentes y no podrá revertirse.".
+- Si el backend indica que hay órdenes vinculadas, mostrar cuántas órdenes (si el backend devuelve el conteo) y ofrecer enlaces para gestionarlas.
+- Considerar ofrecer una opción alternativa a borrar: "Desactivar/archivar" la fórmula para mantener historial y evitar roturas con órdenes pasadas.
+
+Mensajes y manejo de errores en frontend (borrar)
+- Para 400 con mensaje de órdenes vinculadas: mostrar el mensaje exacto del servidor y ofrecer información de navegación para revisar órdenes.
+- Para 401/403: redirigir al login o pantalla de permisos insuficientes.
+- Para 404: informar que la fórmula no existe y refrescar el listado.
+- Para 500: mostrar mensaje genérico y opción de reintento.
+
+Notas finales
+--------------
+- Todas las operaciones de edición y borrado requieren permisos de producción/administración.
+- Recomendación: siempre realizar operaciones destructivas (borrar) acompañadas de confirmación y, cuando sea posible, una opción de archivado para preservar historial.
+- Si se amplía el backend para devolver conteo de órdenes al intentar borrar, usar ese dato en el modal para mejorar la UX.
+
+Fin del documento

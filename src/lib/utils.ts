@@ -36,3 +36,28 @@ export function getImageUrl(obj?: any): string | undefined {
   if (import.meta.env.DEV) console.debug('[getImageUrl] using raw image', { raw });
   return raw;
 }
+
+// Extrae un mensaje legible de un error devuelto por `apiFetch`.
+// `apiFetch` actualmente lanza `new Error(await res.text())`, por lo que
+// `err.message` puede ser JSON serializado o texto plano. Esta función
+// intenta parsear JSON y extraer `message` o `error`, y si no es JSON,
+// devuelve el texto crudo.
+export function parseApiError(err: unknown): string {
+  if (!err) return 'Error desconocido';
+  if (err instanceof Error) {
+    const raw = err.message || String(err);
+    // intentar parsear JSON
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.message) return String(parsed.message);
+        if (parsed.error) return String(parsed.error);
+      }
+    } catch (e) {
+      // no es JSON, devolver raw
+    }
+    return raw;
+  }
+  if (typeof err === 'string') return err;
+  try { return String(err); } catch (e) { return 'Error desconocido'; }
+}

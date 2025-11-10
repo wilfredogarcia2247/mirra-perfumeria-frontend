@@ -33,6 +33,14 @@ export async function getCatalogoPaginated(page = 1, per_page = 12) {
 export async function getProducto(id: number) {
   return apiFetch(`/productos/${id}`);
 }
+// Pedidos de venta (protegido: requiere Authorization: Bearer <token>)
+export async function getPedidos() {
+  return apiFetch(`/pedidos-venta`);
+}
+
+export async function getPedidoVenta(id: number) {
+  return apiFetch(`/pedidos-venta/${id}`);
+}
 export async function createProducto(data: any) {
   return apiFetch("/productos", { method: "POST", body: JSON.stringify(data) });
 }
@@ -41,6 +49,10 @@ export async function updateProducto(id: number, data: any) {
 }
 export async function deleteProducto(id: number) {
   return apiFetch(`/productos/${id}`, { method: "DELETE" });
+}
+// Añadir almacén a un producto / asignar existencia: POST /api/productos/:id/almacen
+export async function addProductoAlmacen(productoId: number, data: { almacen_id: number; cantidad: number; motivo?: string; referencia?: string }) {
+  return apiFetch(`/productos/${productoId}/almacen`, { method: "POST", body: JSON.stringify(data) });
 }
 
 // Proveedores
@@ -75,6 +87,37 @@ export async function updateAlmacen(id: number, data: any) {
 }
 export async function deleteAlmacen(id: number) {
   return apiFetch(`/almacenes/${id}`, { method: "DELETE" });
+}
+// Ajuste de inventario: POST /api/inventario/ajustar
+export async function adjustInventario(data: { producto_id: number; almacen_id: number; cantidad: number; motivo?: string; referencia?: string }) {
+  return apiFetch(`/inventario/ajustar`, { method: "POST", body: JSON.stringify(data) });
+}
+
+// Fórmulas
+export async function getFormulas() {
+  return apiFetch(`/formulas`);
+}
+
+export async function getFormula(id: number) {
+  return apiFetch(`/formulas/${id}`);
+}
+
+export async function updateFormula(id: number, data: { producto_terminado_id: number; componentes: Array<{ materia_prima_id: number; cantidad: number; unidad: string }> }) {
+  return apiFetch(`/formulas/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteFormula(id: number) {
+  return apiFetch(`/formulas/${id}`, { method: 'DELETE' });
+}
+
+// Crear fórmula (POST /api/formulas)
+export async function createFormula(data: { producto_terminado_id: number; componentes: Array<{ materia_prima_id: number; cantidad: number; unidad: string }> }) {
+  return apiFetch(`/formulas`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+// Crear/ejecutar producción desde una fórmula (POST /api/formulas/:id/produccion)
+export async function createProduccion(formulaId: number, data: { cantidad: number; almacen_venta_id: number }) {
+  return apiFetch(`/formulas/${formulaId}/produccion`, { method: "POST", body: JSON.stringify(data) });
 }
 
 // Bancos
@@ -111,6 +154,16 @@ export async function createPago(data: any) {
 // Pedidos de venta
 export async function createPedidoVenta(data: any) {
   return apiFetch(`/pedidos-venta`, { method: "POST", body: JSON.stringify(data) });
+}
+
+// Completar (despachar) un pedido de venta: POST /api/pedidos-venta/:id/completar
+export async function completarPedidoVenta(id: number) {
+  return apiFetch(`/pedidos-venta/${id}/completar`, { method: 'POST' });
+}
+
+// Cancelar un pedido de venta: POST /api/pedidos-venta/:id/cancelar
+export async function cancelarPedidoVenta(id: number) {
+  return apiFetch(`/pedidos-venta/${id}/cancelar`, { method: 'POST' });
 }
 
 // Envío público de pedido (sin Authorization). Útil para checkout público que no requiere token.

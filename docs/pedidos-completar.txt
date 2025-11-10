@@ -1,0 +1,117 @@
+Documentación: Completar pedido de venta (para frontend)
+
+Resumen
+
+Endpoint: POST /api/pedidos-venta/:id/completar
+Propósito: finalizar un pedido de venta — consumir el stock previamente reservado (stock_comprometido) en los inventarios tipo "Venta", registrar movimientos (salidas) y marcar el pedido como Completado.
+Autenticación: Sí (Bearer token / sesión). Requiere permisos de ventas/operaciones.
+Content-Type: application/json
+Idempotencia: no idempotente por diseño; el endpoint verifica si el pedido ya está completado y devuelve 400 si así fuera. La UI debe deshabilitar doble envío.
+
+Request
+
+URL: POST /api/pedidos-venta/:id/completar
+Body: vacío (por ahora no requiere cuerpo). Opcionalmente podrías enviar metadata (usuario, referencia) si lo extiendes.
+Ejemplo:
+POST /api/pedidos-venta/123/completar
+Headers:
+
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+Comportamiento y reglas (servidor)
+
+- Ejecuta todo dentro de una transacción.
+- Lee y bloquea el pedido (SELECT ... FOR UPDATE). Verifica que exista y que no esté ya completado.
+- Por cada línea del pedido (tabla pedido_venta_productos) consume las reservas:
+  - Busca inventarios de almacenes de tipo 'Venta' con stock_comprometido > 0 y hace FOR UPDATE.
+  - Para cada inventario reduce simultáneamente stock_fisico y stock_comprometido por la cantidad consumida.
+  - El UPDATE es condicional (WHERE stock_fisico - take >= 0 AND stock_comprometido >= take) para evitar dejar stock negativo o sobreconsumir.
+  - Inserta un registro en inventario_movimientos por cada consumo con tipo 'salida' y motivo "Venta pedido <id>".
+- Si todo OK, actualiza pedidos_venta.estado = 'Completado' y hace COMMIT.
+- Si alguna verificación falla (por ejemplo, falta stock comprometido o condición concurrente), se hace ROLLBACK y se devuelve un error.
+
+Success response (200)
+
+Body:
+{
+  "success": true,
+  "pedido_id": 123,
+  "movimientos": [
+    { "producto_id": 7, "almacen_id": 2, "cantidad": 3 },
+    ...
+  ]
+}
+
+Errores y códigos relevantes
+
+400 Bad Request
+"Pedido ya completado" → si se intenta completar dos veces.
+"Cantidad inválida en líneas del pedido" → si hay datos corruptos.
+"No se pudo consumir inventario reservado..." / "Stock comprometido insuficiente..." → si la reserva ya no cubre la cantidad (condición de carrera o inconsistencia). Acción recomendada: informar a usuario y pedir revisión manual.
+401 / 403 → auth / permisos.
+404 Not Found → pedido no encontrado.
+500 Internal Server Error → problema imprevisto.
+Ejemplo de error (400):
+Status: 400
+{ "error": "Stock comprometido insuficiente para producto 7" }
+
+Notas de concurrencia y seguridad
+
+La operación usa SELECT FOR UPDATE y UPDATE condicional con RETURNING para asegurarse de que dos procesos concurrentes no consuman más stock del debido.
+Reintentos automáticos en frontend: evitar reintentos ciegos; si recibes un 400 "Stock comprometido insuficiente", mostrar al usuario y ofrecer reintento manual tras revisar inventario.
+Bloquear doble submit: deshabilitar el botón al enviar hasta recibir respuesta.
+
+UI/UX recomendado
+
+En la vista del pedido:
+- Mostrar botón "Marcar como completado" o "Despachar".
+- Al hacer clic: abrir modal de confirmación con resumen (productos, cantidades, almacén/es de origen si quieres mostrar).
+- Mostrar spinner / estado "Procesando..." y deshabilitar acciones duplicadas.
+- En éxito: mostrar toast "Pedido completado" y actualizar estado en la UI.
+- En error 400 por falta de stock: mostrar modal con mensaje claro y acciones sugeridas:
+  "Revisar inventario", "Reasignar desde otro almacén", "Crear incidencia".
+- Mostrar movimientos devueltos en la respuesta como recibo: indica qué almacén entregó qué cantidad.
+
+Recomendaciones para integraciones / mejoras
+
+- Incluir usuario_id en inventario_movimientos para auditoría (si el backend dispone de auth middleware). Puedo implementarlo para que la API inserte quién completó la venta.
+- Devolver en la respuesta un desglose por línea con almacen_origen_id para mostrar el recibo final con origen por producto.
+- Implementar un endpoint opcional GET /api/pedidos-venta/:id/movimientos para consultar el historial de movimientos de ese pedido.
+- Añadir pruebas E2E que cubran: crear pedido con reservas, completar pedido con éxito, y caso de fallo por consumo concurrente.
+
+Consideraciones para frontend (pasos recomendados)
+
+1. Cuando el pedido cambia a estado 'Listo para completar' o cuando el operador lo confirma, llamar:
+   POST /api/pedidos-venta/:id/completar
+
+2. Manejar status:
+   - 200: mostrar éxito, actualizar lista de pedidos y stock en UI.
+   - 400: mostrar motivo (insuficiencia) y sugerir acciones.
+   - 401/403: redirigir al login o mostrar permiso requerido.
+
+3. Evitar que el usuario pueda pulsar dos veces. Mostrar confirmación antes de ejecutar (especialmente si la operación es irreversible).
+
+4. Registrar en frontend (logs/activities) quién realizó la acción y la respuesta devuelta.
+
+Comandos de ejemplo (curl)
+
+Completar pedido:
+curl -X POST 'https://tu-api/api/pedidos-venta/123/completar'
+-H 'Authorization: Bearer <TOKEN>'
+-H 'Content-Type: application/json'
+
+Fetch (JS):
+const resp = await fetch(`/api/pedidos-venta/${pedidoId}/completar`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+});
+const body = await resp.json();
+if (!resp.ok) { /* manejar error */ }
+
+Tests sugeridos (frontend/QA)
+
+- Happy path: pedido con reservas correctas → completar → verificar inventario y estado.
+- Race: simular que otro proceso consume parte de la reserva antes → completar falla → mostrar error.
+- Double submit: asegurarse que dos clicks no aplican la operación dos veces.
+- Permisos: usuario sin permiso recibe 403.
