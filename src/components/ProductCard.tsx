@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
+import { getCachedTasaActiva } from '@/integrations/api';
 import ProductModal from './ProductModal';
 
 interface ProductCardProps {
@@ -11,6 +12,21 @@ interface ProductCardProps {
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const [open, setOpen] = useState(false);
+  const [tasa, setTasa] = useState<any | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const t = await getCachedTasaActiva();
+        if (!mounted) return;
+        setTasa(t);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <>
@@ -47,7 +63,13 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
           <div className="flex items-center justify-between pt-3 border-t border-cream-200">
             <div>
               {product.price && Number(product.price) > 0 ? (
-                <p className="text-2xl font-bold text-copper-800">${Number(product.price).toLocaleString('es-AR')}</p>
+                <div>
+                  {tasa && tasa.monto ? (
+                    <p className="text-2xl font-bold text-copper-800">{(tasa.simbolo || 'USD')} {(Number(product.price) * Number(tasa.monto)).toFixed(2)}</p>
+                  ) : (
+                    <p className="text-2xl font-bold text-copper-800">${Number(product.price).toLocaleString('es-AR')}</p>
+                  )}
+                </div>
               ) : (
                 <p className="text-sm font-semibold text-copper-700">Consultar precio</p>
               )}

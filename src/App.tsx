@@ -11,6 +11,7 @@ import Proveedores from "./pages/Proveedores";
 import Formulas from "./pages/Formulas";
 import Produccion from "./pages/Produccion";
 import Pedidos from "./pages/Pedidos";
+import TasasCambio from "./pages/TasasCambio";
 import Contactos from "./pages/Contactos";
 import Bancos from "./pages/Bancos";
 import Pagos from "./pages/Pagos";
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/formulas" element={<Formulas />} />
             <Route path="/produccion" element={<Produccion />} />
             <Route path="/pedidos" element={<Pedidos />} />
+            <Route path="/tasas-cambio" element={<TasasCambio />} />
             <Route path="/contactos" element={<Contactos />} />
             <Route path="/bancos" element={<Bancos />} />
             <Route path="/pagos" element={<Pagos />} />

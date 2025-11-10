@@ -10,7 +10,7 @@ import { getImageUrl } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
 import Footer from '@/components/Footer';
-import { createPedidoVentaPublic } from '@/integrations/api';
+import { createPedidoVentaPublic, getCachedTasaActiva } from '@/integrations/api';
 import ProductCarousel from '@/components/SocialMediaCarousel';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -33,6 +33,7 @@ export default function Hero() {
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
+  const [tasaPublic, setTasaPublic] = useState<any | null>(null);
 
   // Load full catalog once on mount
   useEffect(() => {
@@ -77,6 +78,21 @@ export default function Hero() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  // Obtener tasa pública cacheada para mostrar precios convertidos en el carrito público
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const t = await getCachedTasaActiva();
+        if (!mounted) return;
+        setTasaPublic(t);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   // Compute filtered + paginated products whenever source or filters change
@@ -235,25 +251,36 @@ export default function Hero() {
               <div className="py-8 text-center text-copper-600">El carrito está vacío</div>
             ) : (
               <div className="space-y-4">
-                {cartItems.map((it) => (
-                  <div key={it.product.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={getImageUrl(it.product) || '/placeholder-product.jpg'} alt={it.product.name} className="w-14 h-14 object-cover rounded" />
-                      <div>
-                        <div className="font-medium text-copper-800">{it.product.name}</div>
-                        <div className="text-sm text-copper-600">${it.product.price.toLocaleString('es-AR')}</div>
+                {cartItems.map((it) => {
+                  const base = Number(it.product.price || 0);
+                  const useConv = tasaPublic && typeof tasaPublic.monto === 'number' && tasaPublic.monto > 0;
+                  const priceDisplay = useConv ? `${tasaPublic.simbolo || 'USD'} ${Number(base * Number(tasaPublic.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${Number(base).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  return (
+                    <div key={it.product.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img src={getImageUrl(it.product) || '/placeholder-product.jpg'} alt={it.product.name} className="w-14 h-14 object-cover rounded" />
+                        <div>
+                          <div className="font-medium text-copper-800">{it.product.name}</div>
+                          <div className="text-sm text-copper-600">{priceDisplay}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="number" min={1} value={it.qty} onChange={(e) => updateQty(it.product.id, Math.max(1, Number(e.target.value || 1)))} className="w-16 p-1 border rounded text-center" />
+                        <button className="text-sm text-red-600" onClick={() => removeItem(it.product.id)}>Eliminar</button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={1} value={it.qty} onChange={(e) => updateQty(it.product.id, Math.max(1, Number(e.target.value || 1)))} className="w-16 p-1 border rounded text-center" />
-                      <button className="text-sm text-red-600" onClick={() => removeItem(it.product.id)}>Eliminar</button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="text-lg font-semibold text-copper-800">Total</div>
-                  <div className="text-lg font-bold text-copper-800">${cartItems.reduce((s, it) => s + (it.product.price || 0) * it.qty, 0).toLocaleString('es-AR')}</div>
+                  <div className="text-lg font-bold text-copper-800">{(() => {
+                    const subtotal = cartItems.reduce((s, it) => s + (Number(it.product.price || 0) * it.qty), 0);
+                    if (tasaPublic && typeof tasaPublic.monto === 'number' && tasaPublic.monto > 0) {
+                      return `${tasaPublic.simbolo || 'USD'} ${Number(subtotal * Number(tasaPublic.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+                    return `${Number(subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  })()}</div>
                 </div>
 
                 {!isCheckoutOpen ? (
@@ -267,16 +294,67 @@ export default function Hero() {
                     if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
                     if (!nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
                     if (!telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
+                    // Construir lineas mínimas: solo producto_id y cantidad, el servidor calculará precios
+                    const lineas = cartItems.map((it) => ({ producto_id: it.product.id, cantidad: Number(it.qty || 0) }));
+
+                    // Construir payload minimalista pero también incluir `productos` snapshots y pedir
+                    // que sean preservados por el cliente si el backend requiere campos adicionales.
+                    const productosSnapshot = cartItems.map((it) => {
+                      const p: any = it.product as any;
+                      return {
+                        id: undefined,
+                        producto_id: it.product.id,
+                        cantidad: Number(it.qty || 0),
+                        producto_nombre: it.product.name,
+                        precio_venta: Number(p.price ?? p.precio_venta ?? 0),
+                        costo: p.costo ?? undefined,
+                        image_url: p.image_url ?? p.image ?? undefined,
+                        subtotal: Number(p.price ?? p.precio_venta ?? 0) * Number(it.qty || 0),
+                      };
+                    });
+
                     const payload = {
                       nombre_cliente: nombreCliente.trim(),
                       telefono: telefonoCliente.trim(),
                       cedula: cedulaCliente.trim() || undefined,
-                      productos: cartItems.map((it) => ({ producto_id: it.product.id, cantidad: it.qty })),
+                      lineas,
+                      // indicamos al helper que queremos preservar productos tal cual
+                      _preserve_productos: true,
+                      productos: productosSnapshot,
                     } as any;
+                    // Si disponemos de la tasa pública cacheada, añadirla al payload como snapshot
+                    if (tasaPublic && typeof tasaPublic.monto === 'number' && tasaPublic.monto > 0) {
+                      payload.tasa_cambio_monto = tasaPublic.monto;
+                    }
                     try {
                       setCheckoutLoading(true);
-                      await createPedidoVentaPublic(payload);
+                      const created = await createPedidoVentaPublic(payload);
                       toast.success('Pedido creado correctamente');
+                      // comprobar si backend cambió precios
+                      try {
+                        const sentMap = new Map<number, any>();
+                        (payload.lineas || []).forEach((it: any) => sentMap.set(Number(it.producto_id), it));
+                        const mismatches: string[] = [];
+                        const returnedLines = (created?.lineas || created?.productos || []);
+                        returnedLines.forEach((it: any) => {
+                          const pid = Number(it.producto_id ?? it.producto?.id ?? it.producto_id);
+                          const sent = sentMap.get(pid);
+                          if (!sent) return;
+                          const sentPrice = Number(sent.precio_venta ?? sent.price ?? sent.precio_unitario ?? 0);
+                          const sentSubtotal = Number(sent.subtotal ?? 0);
+                          const retPrice = Number(it.precio_venta ?? it.price ?? it.precio_unitario ?? 0);
+                          const retSubtotal = Number(it.subtotal ?? it.subtotal_venta ?? 0);
+                          const eps = 0.0001;
+                          if (Math.abs(sentPrice - retPrice) > eps || Math.abs(sentSubtotal - retSubtotal) > eps) {
+                            mismatches.push(`producto ${pid}: enviado ${sentPrice}/${sentSubtotal} → recibido ${retPrice}/${retSubtotal}`);
+                          }
+                        });
+                        if (mismatches.length > 0) {
+                          console.warn('Precio mismatch al crear pedido:', mismatches, { sent: payload, created });
+                        }
+                      } catch (e) {
+                        // ignore
+                      }
                       setCheckoutSuccess(true);
                       // show success badge briefly
                       setTimeout(() => setCheckoutSuccess(false), 1600);

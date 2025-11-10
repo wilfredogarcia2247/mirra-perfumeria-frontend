@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { getProducto } from '@/integrations/api';
+import { getProducto, getCachedTasaActiva } from '@/integrations/api';
 import { toast } from 'sonner';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
 export default function ProductModal({ product, open, onClose, onAddToCart }: Props) {
   const [detalle, setDetalle] = useState<any | null>(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [tasa, setTasa] = useState<any | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,6 +37,18 @@ export default function ProductModal({ product, open, onClose, onAddToCart }: Pr
       mounted = false;
     };
   }, [open, product.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const t = await getCachedTasaActiva();
+        if (!mounted) return;
+        setTasa(t);
+      } catch (e) {}
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   if (!open) return null;
 
@@ -63,7 +76,11 @@ export default function ProductModal({ product, open, onClose, onAddToCart }: Pr
             <p className="text-copper-700 mb-4">{product.description || 'Sin descripción disponible.'}</p>
             <div className="mb-4">
               {product.price && Number(product.price) > 0 ? (
-                <div className="text-2xl font-bold text-copper-800">${Number(product.price).toLocaleString('es-AR')}</div>
+                tasa && tasa.monto ? (
+                  <div className="text-2xl font-bold text-copper-800">{(tasa.simbolo || 'USD')} {(Number(product.price) * Number(tasa.monto)).toFixed(2)}</div>
+                ) : (
+                  <div className="text-2xl font-bold text-copper-800">${Number(product.price).toLocaleString('es-AR')}</div>
+                )
               ) : (
                 <div className="text-sm font-semibold text-copper-700">Consultar precio</div>
               )}

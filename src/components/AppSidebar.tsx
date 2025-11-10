@@ -24,6 +24,7 @@ const menuItems = [
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
   { title: "Producción", url: "/produccion", icon: FlaskConical },
   { title: "Pedidos", url: "/pedidos", icon: ShoppingCart },
+  { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard },
 ];
 
 export function AppSidebar() {

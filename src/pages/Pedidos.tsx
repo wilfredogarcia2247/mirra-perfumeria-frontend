@@ -31,9 +31,15 @@ export default function Pedidos() {
     getPedidos()
       .then((data) => {
         // API returns an array of pedidos (or { data: [...] })
-        if (Array.isArray(data)) setPedidos(data);
-        else if (data && Array.isArray(data.data)) setPedidos(data.data);
-        else setPedidos([]);
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+        // Ordenar por fecha más reciente primero
+        const withDates = list.slice();
+        withDates.sort((a: any, b: any) => {
+          const da = Date.parse(a?.fecha || a?.created_at || a?.createdAt || '') || 0;
+          const db = Date.parse(b?.fecha || b?.created_at || b?.createdAt || '') || 0;
+          return db - da;
+        });
+        setPedidos(withDates);
       })
       .catch((err) => {
         console.error('Error cargando pedidos', err);
@@ -69,39 +75,77 @@ export default function Pedidos() {
     let es: EventSource | null = null;
     let polling: any = null;
     const token = getToken?.();
-    try {
-      // Intentar conectar SSE con token en query (si el backend lo soporta)
-      const url = `${API_URL}/pedidos-venta/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-      es = new EventSource(url);
-      es.onmessage = async (ev) => {
-        try {
-          const data = JSON.parse(ev.data);
-          // Si el servidor envía detalle del pedido
-          if (data && (data.pedido || data.type === 'new_pedido')) {
-            setNewOrdersCount((c) => c + 1);
-            toast.success('Nuevo pedido recibido');
-            // opcional: actualizar lista
+    (async () => {
+      // Preflight check: try a short GET to the SSE endpoint to detect 401 quickly.
+      const streamUrl = `${API_URL}/pedidos-venta/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      try {
+        const headers: any = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const pre = await fetch(streamUrl, { method: 'GET', headers, signal: controller.signal });
+        if (pre.status === 401) {
+          // Not authorized -> clear token and navigate to login
+          try { localStorage.removeItem('jwt_token'); } catch (e) {}
+          navigate('/login', { replace: true });
+          clearTimeout(timeout);
+          return;
+        }
+      } catch (e) {
+        // If preflight times out or errors, we'll still try EventSource: server may accept SSE.
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      try {
+        // Intentar conectar SSE con token en query (si el backend lo soporta)
+        es = new EventSource(streamUrl);
+        es.onmessage = async (ev) => {
+          try {
+            const data = JSON.parse(ev.data);
+            // Si el servidor envía detalle del pedido
+            if (data && (data.pedido || data.type === 'new_pedido')) {
+              setNewOrdersCount((c) => c + 1);
+              toast.success('Nuevo pedido recibido');
+              // opcional: actualizar lista
+              try {
+                const fresh = await getPedidos();
+                if (Array.isArray(fresh)) setPedidos(fresh);
+              } catch (e) {}
+              return;
+            }
+          } catch (e) {
+            // si no es JSON, tratar como evento genérico: refrescar y notificar
+          }
+          setNewOrdersCount((c) => c + 1);
+          toast.success('Nuevo pedido recibido');
+          try {
+            const fresh = await getPedidos();
+            if (Array.isArray(fresh)) setPedidos(fresh);
+          } catch (e) {}
+        };
+        es.onerror = (err) => {
+          // Si falla, cerrar y usar polling
+          try { es?.close(); } catch (e) {}
+          es = null;
+          // start polling
+          polling = setInterval(async () => {
             try {
               const fresh = await getPedidos();
-              if (Array.isArray(fresh)) setPedidos(fresh);
-            } catch (e) {}
-            return;
-          }
-        } catch (e) {
-          // si no es JSON, tratar como evento genérico: refrescar y notificar
-        }
-        setNewOrdersCount((c) => c + 1);
-        toast.success('Nuevo pedido recibido');
-        try {
-          const fresh = await getPedidos();
-          if (Array.isArray(fresh)) setPedidos(fresh);
-        } catch (e) {}
-      };
-      es.onerror = (err) => {
-        // Si falla, cerrar y usar polling
-        try { es?.close(); } catch (e) {}
-        es = null;
-        // start polling
+              if (Array.isArray(fresh)) {
+                if (fresh.length > pedidos.length) {
+                  setNewOrdersCount((c) => c + (fresh.length - pedidos.length));
+                  toast.success(`Hay ${fresh.length - pedidos.length} pedidos nuevos`);
+                }
+                setPedidos(fresh);
+              }
+            } catch (e) {
+              // ignore
+            }
+          }, 15000);
+        };
+      } catch (e) {
+        // No SSE: fallback polling
         polling = setInterval(async () => {
           try {
             const fresh = await getPedidos();
@@ -112,26 +156,10 @@ export default function Pedidos() {
               }
               setPedidos(fresh);
             }
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) {}
         }, 15000);
-      };
-    } catch (e) {
-      // No SSE: fallback polling
-      polling = setInterval(async () => {
-        try {
-          const fresh = await getPedidos();
-          if (Array.isArray(fresh)) {
-            if (fresh.length > pedidos.length) {
-              setNewOrdersCount((c) => c + (fresh.length - pedidos.length));
-              toast.success(`Hay ${fresh.length - pedidos.length} pedidos nuevos`);
-            }
-            setPedidos(fresh);
-          }
-        } catch (e) {}
-      }, 15000);
-    }
+      }
+    })();
 
     return () => {
       if (es) try { es.close(); } catch (e) {}
@@ -144,24 +172,41 @@ export default function Pedidos() {
   const fmtProductosCount = (p: any) => Array.isArray(p?.productos) ? p.productos.length : 0;
   const fmtEstado = (p: any) => p?.estado || p?.status || '-';
   const fmtTotal = (p: any) => {
-    // Prefer explicit total numeric field
-    const t = p?.total ?? p?.monto ?? null;
-    if (typeof t === 'number') return `$${t.toFixed(2)}`;
-    const tnum = Number(t);
-    if (!Number.isNaN(tnum)) return `$${tnum.toFixed(2)}`;
+    // Obtener total base (en moneda local) como número
+    const base = (() => {
+      const t = p?.total ?? p?.monto ?? null;
+      if (typeof t === 'number') return t;
+      const tnum = Number(t);
+      if (!Number.isNaN(tnum)) return tnum;
+      if (Array.isArray(p?.productos) && p.productos.length > 0) {
+        return p.productos.reduce((acc: number, it: any) => {
+          if (typeof it.subtotal === 'number') return acc + it.subtotal;
+          const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
+          const qty = typeof it.cantidad === 'number' ? it.cantidad : Number(it.cantidad) || 0;
+          return acc + price * qty;
+        }, 0);
+      }
+      return null;
+    })();
 
-    // fallback: sum subtotals from productos
-    if (Array.isArray(p?.productos) && p.productos.length > 0) {
-      const sum = p.productos.reduce((acc: number, it: any) => {
-        if (typeof it.subtotal === 'number') return acc + it.subtotal;
-        const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
-        const qty = typeof it.cantidad === 'number' ? it.cantidad : Number(it.cantidad) || 0;
-        return acc + price * qty;
-      }, 0);
-      return `$${sum.toFixed(2)}`;
+    if (base === null) return '-';
+
+    // Obtener tasa (si existe)
+    const tRaw = p?.tasa_cambio_monto ?? p?.tasa ?? null;
+    const tNum = typeof tRaw === 'number' ? tRaw : (tRaw ? Number(String(tRaw).replace(',', '.')) : null);
+    const tasaVal = Number.isFinite(tNum) && tNum > 0 ? tNum : null;
+    const simbolo = p?.tasa_simbolo || (p?.tasa && p.tasa.simbolo) || 'USD';
+
+    if (tasaVal) {
+      const converted = base * tasaVal;
+      return `$${base.toFixed(2)} x ${tasaVal.toFixed(4)} = ${simbolo} ${converted.toFixed(2)}`;
     }
-
-    return '-';
+    return `$${base.toFixed(2)}`;
+  };
+  const fmtTasa = (p: any) => {
+    const t = p?.tasa_cambio_monto ?? p?.tasa ?? null;
+    const n = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
+    return Number.isFinite(n) && n > 0 ? n : null;
   };
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -284,6 +329,7 @@ export default function Pedidos() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>#Productos</TableHead>
+                    <TableHead>Tasa</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -300,7 +346,8 @@ export default function Pedidos() {
                         </div>
                       </TableCell>
                       <TableCell>{fmtProductosCount(p)}</TableCell>
-                      <TableCell>{fmtTotal(p)}</TableCell>
+                        <TableCell>{(fmtTasa(p) || 0).toFixed(2)}</TableCell>
+                        <TableCell>{fmtTotal(p)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openDetalle(p.id); }}>
@@ -324,11 +371,11 @@ export default function Pedidos() {
             <DialogHeader>
               <DialogTitle>Detalle del pedido {selectedPedido?.id ?? ''}</DialogTitle>
               <DialogDescription>
-                {selectedPedido ? (
-                  <div className="text-sm text-muted-foreground">
-                    Cliente: {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'} • Fecha:{' '}
-                    {selectedPedido.fecha ? format(new Date(selectedPedido.fecha), 'PPpp') : '-'} • Estado: {selectedPedido.estado || '-'}
-                  </div>
+                    {selectedPedido ? (
+                      <div className="text-sm text-muted-foreground">
+                        Cliente: {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'} • Fecha:{' '}
+                        {selectedPedido.fecha ? format(new Date(selectedPedido.fecha), 'PPpp') : '-'} • Estado: {selectedPedido.estado || '-'} • Tasa: {(fmtTasa(selectedPedido) || 0).toFixed(4)}
+                      </div>
                 ) : (
                   <div className="text-sm text-muted-foreground">Cargando...</div>
                 )}
@@ -375,6 +422,21 @@ export default function Pedidos() {
                     <div className="text-right">
                       <div className="text-sm text-muted-foreground">Total</div>
                       <div className="text-lg font-semibold">{typeof selectedPedido.total === 'number' ? `$${selectedPedido.total.toFixed(2)}` : selectedPedido.total}</div>
+                      {/* Mostrar convertido si hay tasa aplicada */}
+                      {(() => {
+                        const base = (typeof selectedPedido.total === 'number') ? selectedPedido.total : (Number(selectedPedido.total) || null);
+                        const t = selectedPedido?.tasa_cambio_monto ?? selectedPedido?.tasa ?? null;
+                        const tn = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
+                        const tasaVal = Number.isFinite(tn) && tn > 0 ? tn : null;
+                        const simbolo = selectedPedido?.tasa_simbolo || (selectedPedido?.tasa && selectedPedido.tasa.simbolo) || 'Bs';
+                        if (base && tasaVal) {
+                          const conv = base * tasaVal;
+                          return (
+                            <div className="text-sm text-muted-foreground">Convertido: <strong>{simbolo} {conv.toFixed(2)}</strong> </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </div>
