@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { createProducto, updateProducto } from "@/integrations/api";
+import ImageUpload from "@/components/ImageUpload";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -45,8 +46,6 @@ export default function Productos() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
@@ -69,10 +68,9 @@ export default function Productos() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Inicializa el estado de imagen cuando se abre el dialog (crear/editar)
+  // Initialize image state when dialog opens (create/edit)
   useEffect(() => {
     if (isOpen) {
-      setSelectedFile(null);
       setImageUrl(editingProduct?.image_url || null);
     }
   }, [isOpen, editingProduct]);
@@ -105,7 +103,7 @@ export default function Productos() {
         costo: Number.isNaN(costo) ? null : costo,
         precio_venta: Number.isNaN(precio_venta) ? null : precio_venta,
         proveedor_id: Number.isNaN(proveedor_id) ? null : proveedor_id,
-        ...(imageUrl ? { image_url: imageUrl } : {}),
+        imagen_url: imageUrl || null, // Changed from image_url to imagen_url to match your API
       };
       console.log("Creando/actualizando producto, payload:", payload);
       if (editingProduct) {
@@ -137,37 +135,10 @@ export default function Productos() {
     }
   }
 
-  // Sube el archivo al endpoint externo y obtiene publicUrl
-  async function uploadFile(file: File) {
-    setImageUploading(true);
-    try {
-      const token = import.meta.env.VITE_TOKEN_IMAGE_STORAGE || "";
-      const form = new FormData();
-      form.append("file", file);
-
-      const res = await fetch("https://endpoint.icarosoft.com/fileupload", {
-        method: "POST",
-        headers: token ? { Token: token } : undefined,
-        body: form,
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Error subiendo imagen");
-      }
-      const data = await res.json();
-      const publicUrl = data?.content?.publicUrl || data?.content?.publicurl || null;
-      if (!publicUrl) throw new Error("No se recibió publicUrl desde el servidor");
-      setImageUrl(publicUrl);
-      toast.success("Imagen subida correctamente");
-      return publicUrl;
-    } catch (err) {
-      console.error(err);
-      toast.error("Error subiendo imagen");
-      throw err;
-    } finally {
-      setImageUploading(false);
-    }
-  }
+  // Handle image upload from the ImageUpload component
+  const handleImageUpload = (url: string) => {
+    setImageUrl(url);
+  };
 
   return (
     <Layout>
@@ -285,50 +256,12 @@ export default function Productos() {
 
                       {/* Columna Derecha - Imagen */}
                       <div className="space-y-4">
-                        <FormItem>
+                        <FormItem className="col-span-2">
                           <FormLabel>Imagen del Producto</FormLabel>
-                          <div className="mt-1 flex flex-col items-center rounded-lg border-2 border-dashed border-gray-300 px-6 pt-5 pb-6">
-                            {imageUploading ? (
-                              <div className="py-8 text-center">
-                                <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-gray-900"></div>
-                                <p className="mt-2 text-sm text-gray-600">Subiendo imagen...</p>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="mb-4 h-48 w-full overflow-hidden rounded-md bg-gray-100">
-                                  <img 
-                                    src={imageUrl || (editingProduct?.image_url) || '/placeholder-product.jpg'} 
-                                    alt="Vista previa" 
-                                    className="h-full w-full object-contain p-2"
-                                  />
-                                </div>
-                                <div className="text-center">
-                                  <div className="mt-2 flex justify-center text-sm text-gray-600">
-                                    <label className="relative cursor-pointer rounded-md bg-white font-medium text-indigo-600 hover:text-indigo-500">
-                                      <span>Subir una imagen</span>
-                                      <input 
-                                        type="file" 
-                                        className="sr-only" 
-                                        accept="image/*"
-                                        onChange={async (e) => {
-                                          const f = e.target.files?.[0];
-                                          if (!f) return;
-                                          setSelectedFile(f);
-                                          try {
-                                            await uploadFile(f);
-                                          } catch (err) {
-                                            // Error manejado en uploadFile
-                                          }
-                                        }}
-                                      />
-                                    </label>
-                                    <p className="pl-1">o arrastra y suelta</p>
-                                  </div>
-                                  <p className="text-xs text-gray-500">PNG, JPG, GIF hasta 5MB</p>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                          <ImageUpload 
+                            onImageUpload={handleImageUpload}
+                            existingImageUrl={editingProduct?.imagen_url}
+                          />
                         </FormItem>
                       </div>
                     </div>
