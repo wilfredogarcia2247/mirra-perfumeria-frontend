@@ -24,6 +24,7 @@ const menuItems = [
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
   { title: "Producción", url: "/produccion", icon: FlaskConical },
   { title: "Pedidos", url: "/pedidos", icon: ShoppingCart },
+  { title: "Bancos", url: "/bancos", icon: Building2 },
   { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard },
 ];
 
@@ -77,13 +78,20 @@ export function AppSidebar() {
                 const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton onClick={() => navigate(item.url)} isActive={isActive}>
-                      {item.title === "Producción" ? (
-                        <i className="fa-solid fa-industry inline-block w-4 h-4" aria-hidden="true" />
-                      ) : (
-                        <item.icon className="h-4 w-4" />
-                      )}
-                      <span>{item.title}</span>
+                    <SidebarMenuButton
+                      onClick={() => navigate(item.url)}
+                      isActive={isActive}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? 'bg-primary-600 text-white' : 'text-sidebar-foreground hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
+                      title={!open ? item.title : undefined}
+                    >
+                      <span className="flex items-center justify-center w-6 h-6 shrink-0">
+                        {item.title === "Producción" ? (
+                          <i className="fa-solid fa-industry inline-block w-4 h-4" aria-hidden="true" />
+                        ) : (
+                          <item.icon className="h-5 w-5" />
+                        )}
+                      </span>
+                      {open && <span className="flex-1 text-sm font-medium">{item.title}</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

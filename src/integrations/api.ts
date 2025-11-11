@@ -124,8 +124,18 @@ export async function createProduccion(formulaId: number, data: { cantidad: numb
 export async function getBancos() {
   return apiFetch("/bancos");
 }
+export async function getBanco(id: number) {
+  return apiFetch(`/bancos/${id}`);
+}
 export async function createBanco(data: any) {
   return apiFetch("/bancos", { method: "POST", body: JSON.stringify(data) });
+}
+export async function updateBanco(id: number, data: any) {
+  return apiFetch(`/bancos/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteBanco(id: number) {
+  return apiFetch(`/bancos/${id}`, { method: 'DELETE' });
 }
 
 // Formas de pago
