@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getBancos, createBanco, updateBanco, deleteBanco, getFormasPago, getBanco } from "@/integrations/api";
+import { getBancos, createBanco, updateBanco, deleteBanco, getFormasPago, getBanco, getTasasCambio } from "@/integrations/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,16 @@ export default function Bancos() {
   const [bancos, setBancos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [moneda, setMoneda] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editingMoneda, setEditingMoneda] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formasPago, setFormasPago] = useState<any[]>([]);
+  const [tasas, setTasas] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalBanco, setModalBanco] = useState<any | null>(null);
+  const [modalMoneda, setModalMoneda] = useState<string>('');
   const [editingFormas, setEditingFormas] = useState<Array<{ forma_pago_id: number; detalles: any }>>([]);
   const [modalSaving, setModalSaving] = useState(false);
   const [editingFormasErrors, setEditingFormasErrors] = useState<string[]>([]);
@@ -68,8 +72,9 @@ export default function Bancos() {
   useEffect(() => {
     (async () => {
       try {
-        const fps = await getFormasPago();
+        const [fps, t] = await Promise.all([getFormasPago(), getTasasCambio()]);
         setFormasPago(Array.isArray(fps) ? fps : []);
+        setTasas(Array.isArray(t) ? t : (t?.data || []));
       } catch (e) {
         // ignore
       }
@@ -80,9 +85,10 @@ export default function Bancos() {
     if (!name.trim()) return toast.error('Nombre requerido');
     setSubmitting(true);
     try {
-      await createBanco({ nombre: name.trim() });
+      await createBanco({ nombre: name.trim(), moneda: moneda ? String(moneda).trim() : undefined });
       toast.success('Banco creado');
       setName('');
+      setMoneda('');
       await load();
     } catch (e: any) {
       console.error(e);
@@ -93,6 +99,7 @@ export default function Bancos() {
   function startEdit(b: any) {
     setEditingId(b.id);
     setEditingName(b.nombre || '');
+    setEditingMoneda(b.moneda ?? '');
   }
 
   function cancelEdit() {
@@ -105,7 +112,7 @@ export default function Bancos() {
     if (!editingName.trim()) return toast.error('Nombre requerido');
     setSubmitting(true);
     try {
-      await updateBanco(editingId, { nombre: editingName.trim() });
+      await updateBanco(editingId, { nombre: editingName.trim(), moneda: editingMoneda ? String(editingMoneda).trim() : undefined });
       toast.success('Banco actualizado');
       cancelEdit();
       await load();
@@ -134,6 +141,7 @@ export default function Bancos() {
       setModalOpen(true);
       const b = await getBanco(id);
       setModalBanco(b || null);
+      setModalMoneda(b?.moneda ?? '');
       // prepare editingFormas from response
       // build editing forms from banco response (use fp.nombre for reliable dedupe)
   let ef = Array.isArray(b?.formas_pago) ? b.formas_pago.map((fp: any) => {
@@ -173,6 +181,7 @@ export default function Bancos() {
     setModalOpen(false);
     setModalBanco(null);
     setEditingFormas([]);
+    setModalMoneda('');
   }
 
   function dedupeFormasList(list: any[] | undefined) {
@@ -326,6 +335,7 @@ export default function Bancos() {
     try {
       const payload = {
         nombre: modalBanco.nombre,
+        moneda: modalMoneda ? String(modalMoneda).trim() : undefined,
         formas_pago: editingFormas.map((f) => ({ forma_pago_id: Number(f.forma_pago_id), detalles: typeof f.detalles === 'string' ? JSON.parse(f.detalles) : f.detalles || {} })),
       };
       await updateBanco(modalBanco.id, payload);
@@ -344,7 +354,17 @@ export default function Bancos() {
       <h1 className="text-2xl font-bold mb-4">Bancos</h1>
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Input placeholder="Nombre del banco" value={name} onChange={(e: any) => setName(e.target.value)} />
-        <div className="sm:col-span-2 flex gap-2">
+        {tasas && tasas.length > 0 ? (
+          <select className="w-full rounded border p-2" value={moneda} onChange={(e:any) => setMoneda(e.target.value)}>
+            <option value="">-- Selecciona moneda --</option>
+            {tasas.map((t:any) => (
+              <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
+            ))}
+          </select>
+        ) : (
+          <Input placeholder="Moneda (ej. USD)" value={moneda} onChange={(e: any) => setMoneda(e.target.value)} />
+        )}
+        <div className="flex gap-2">
           <Button onClick={handleCreate} disabled={submitting}>{submitting ? 'Creando...' : 'Crear banco'}</Button>
         </div>
       </div>
@@ -356,6 +376,7 @@ export default function Bancos() {
           <thead>
             <tr>
               <th className="text-left p-2">Nombre</th>
+              <th className="p-2">Moneda</th>
               <th className="p-2">Acciones</th>
             </tr>
           </thead>
@@ -367,6 +388,20 @@ export default function Bancos() {
                     <input className="w-full border rounded p-1" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
                   ) : (
                     b.nombre
+                  )}
+                </td>
+                <td className="p-2">
+                  {editingId === b.id ? (
+                    tasas && tasas.length > 0 ? (
+                      <select className="w-full rounded border p-1" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
+                        <option value="">-- Selecciona moneda --</option>
+                        {tasas.map((t:any) => <option key={t.id ?? t.simbolo} value={t.simbolo}>{t.simbolo}</option>)}
+                      </select>
+                    ) : (
+                      <input className="w-full border rounded p-1" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
+                    )
+                  ) : (
+                    b.moneda ?? '-'
                   )}
                 </td>
                 <td className="p-2">
@@ -395,9 +430,26 @@ export default function Bancos() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModal} />
           <div className="relative bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 z-10">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Banco: {modalBanco.nombre}</h3>
-              <button onClick={closeModal} className="p-1">Cerrar</button>
+            <div className="flex justify-between items-start mb-4 gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold">Banco: {modalBanco.nombre}</h3>
+                <div className="mt-2 flex gap-2 items-center">
+                  <label className="text-sm text-gray-600">Moneda</label>
+                  {tasas && tasas.length > 0 ? (
+                    <select className="border rounded p-1 w-40" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)}>
+                      <option value="">-- Selecciona moneda --</option>
+                      {tasas.map((t:any) => (
+                        <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className="border rounded p-1 w-32" placeholder="USD" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)} />
+                  )}
+                </div>
+              </div>
+              <div>
+                <button onClick={closeModal} className="p-1">Cerrar</button>
+              </div>
             </div>
 
             <div className="space-y-3">

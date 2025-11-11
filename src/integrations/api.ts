@@ -230,6 +230,21 @@ export async function getTasasCambio(query: { simbolo?: string; page?: number; l
   return apiFetch(`/tasas-cambio${qs}`);
 }
 
+// Obtener una tasa por símbolo (frontend helper). Devuelve la primera coincidencia o null.
+export async function getTasaBySimbolo(simbolo: string) {
+  try {
+    if (!simbolo) return null;
+    const res = await getTasasCambio({ simbolo });
+    const list = Array.isArray(res) ? res : (res?.data || []);
+    if (!list || list.length === 0) return null;
+    const t = list[0];
+    const monto = typeof t.monto === 'number' ? t.monto : (t.monto ? Number(String(t.monto).replace(',', '.')) : null);
+    return { ...t, monto };
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function getTasaCambio(id: number) {
   return apiFetch(`/tasas-cambio/${id}`);
 }
@@ -316,8 +331,23 @@ export async function deleteTasaCambio(id: number) {
 }
 
 // Completar (despachar) un pedido de venta: POST /api/pedidos-venta/:id/completar
-export async function completarPedidoVenta(id: number) {
-  return apiFetch(`/pedidos-venta/${id}/completar`, { method: 'POST' });
+// Ahora acepta opcionalmente un objeto { pago: { ... } } en el body para registrar el pago
+export async function completarPedidoVenta(id: number, pago?: any) {
+  const body = pago ? { pago } : undefined;
+  return apiFetch(`/pedidos-venta/${id}/completar`, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+}
+
+// Finalizar pedido (alias explícito): POST /api/pedidos-venta/:id/finalizar
+// Funcionalmente equivalente a /completar y acepta el mismo body opcional { pago: {...} }
+export async function finalizarPedidoVenta(id: number, pago?: any) {
+  const body = pago ? { pago } : undefined;
+  return apiFetch(`/pedidos-venta/${id}/finalizar`, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+}
+
+// Cambiar estado de pedido: PUT /api/pedidos-venta/:id/status
+// Permite enviar { estado: "Completado", pago: { ... } } para completar y registrar pago
+export async function updatePedidoStatus(id: number, data: { estado: string; pago?: any }) {
+  return apiFetch(`/pedidos-venta/${id}/status`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 // Cancelar un pedido de venta: POST /api/pedidos-venta/:id/cancelar

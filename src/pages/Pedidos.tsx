@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken } from "@/integrations/api";
+import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch } from "@/integrations/api";
+import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError } from '@/lib/utils';
 import { Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -208,11 +209,85 @@ export default function Pedidos() {
     const n = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
     return Number.isFinite(n) && n > 0 ? n : null;
   };
+  
+  function isPedidoPaid(p: any) {
+    try {
+      // Prefer explicit flag
+      if (p?.pagado === true || p?.is_paid === true) return true;
+      const pagos = Array.isArray(p?.pagos) ? p.pagos : (Array.isArray(p?.pagos_venta) ? p.pagos_venta : (Array.isArray(p?.payments) ? p.payments : []));
+      if (!pagos || pagos.length === 0) return false;
+      // calcular total base similar a fmtTotal
+      const base = (() => {
+        const t = p?.total ?? p?.monto ?? null;
+        if (typeof t === 'number') return t;
+        const tnum = Number(t);
+        if (!Number.isNaN(tnum)) return tnum;
+        if (Array.isArray(p?.productos) && p.productos.length > 0) {
+          return p.productos.reduce((acc: number, it: any) => {
+            const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
+            const qty = typeof it.cantidad === 'number' ? it.cantidad : Number(it.cantidad) || 0;
+            return acc + price * qty;
+          }, 0);
+        }
+        return null;
+      })();
+      if (base === null) return false;
+      const tasaVal = fmtTasa(p);
+      // sumar equivalencias (si las hay) o derivarlas con tasa del pedido
+      let sumEq = 0;
+      for (const pay of pagos) {
+        const eq = pay?.equivalencia ?? pay?.equivalente ?? null;
+        if (eq !== null && eq !== undefined && Number.isFinite(Number(eq))) {
+          sumEq += Number(eq);
+          continue;
+        }
+        const monto = Number(pay?.monto ?? pay?.amount ?? 0);
+        const tpay = pay?.tasa_monto ?? null;
+        const tnum = typeof tpay === 'number' ? tpay : (tpay ? Number(String(tpay).replace(',', '.')) : null);
+        const usedT = Number.isFinite(tnum) && tnum > 0 ? tnum : (tasaVal || NaN);
+        if (Number.isFinite(monto) && Number.isFinite(usedT) && usedT !== 0) {
+          sumEq += monto / usedT;
+        }
+      }
+      const tol = 0.05;
+      return Number.isFinite(sumEq) && Math.abs(sumEq - base) <= tol;
+    } catch (e) {
+      return false;
+    }
+  }
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  // Mostrar el formulario de pago inline dentro del detalle del pedido
+  const [showPaymentInline, setShowPaymentInline] = useState(false);
+  // Mostrar vista de solo lectura de pagos para pedidos completados
+  const [showPaymentsView, setShowPaymentsView] = useState(false);
+  // Estados para registrar un pago directo (útil para pedidos ya completados)
+  const [directMonto, setDirectMonto] = useState<string>('');
+  const [directReferencia, setDirectReferencia] = useState<string>('');
+  const [directFecha, setDirectFecha] = useState<string>('');
+  const [directBancos, setDirectBancos] = useState<any[]>([]);
+  const [directFormas, setDirectFormas] = useState<any[]>([]);
+  const [directBancoId, setDirectBancoId] = useState<number | null>(null);
+  const [directFormaId, setDirectFormaId] = useState<number | null>(null);
+  const [directLoading, setDirectLoading] = useState(false);
+
+  useEffect(() => {
+    // cargar opciones para el formulario directo
+    (async () => {
+      try {
+        const [b, f] = await Promise.all([getBancos(), getFormasPago()]);
+        const bancosList = Array.isArray(b) ? b : (b?.data || []);
+        const formasList = Array.isArray(f) ? f : (f?.data || []);
+        setDirectBancos(bancosList);
+        setDirectFormas(formasList);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   const openDetalle = async (id: number) => {
     try {
@@ -239,27 +314,28 @@ export default function Pedidos() {
   };
 
   async function handleCompletarPedido() {
+    // Abrir modal de pago para preguntar cómo paga el cliente
     if (!selectedPedido?.id) return;
-    const ok = window.confirm('¿Seguro que deseas marcar este pedido como COMPLETADO? Esta acción consumirá el stock reservado.');
+    // Mostrar el formulario de pago embebido en el detalle del pedido
+    setShowPaymentInline(true);
+  }
+
+  async function completarSinPago() {
+    if (!selectedPedido?.id) return;
+    const ok = window.confirm('¿Seguro que deseas marcar este pedido como COMPLETADO sin registrar pago?');
     if (!ok) return;
     setCompleting(true);
     try {
       const resp = await completarPedidoVenta(selectedPedido.id);
       toast.success('Pedido completado');
-      // Actualizar estado local del pedido y la lista
       setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
       setPedidos((list) => list.map((p) => (p.id === selectedPedido.id ? { ...p, estado: 'Completado' } : p)));
-      // Opcional: si la API devuelve movimientos, podríamos mostrarlos; por ahora cerramos el modal
+      setPaymentOpen(false);
       setIsDetailOpen(false);
     } catch (err) {
       console.error('Error completando pedido', err);
-      if (err instanceof Error && /401/.test(err.message)) {
-        toast.error('No autorizado. Por favor inicia sesión.');
-        navigate('/login', { replace: true });
-      } else {
-        const message = parseApiError(err) || 'No se pudo completar el pedido';
-        toast.error(message);
-      }
+      const message = parseApiError(err) || 'No se pudo completar el pedido';
+      toast.error(message);
     } finally {
       setCompleting(false);
     }
@@ -343,6 +419,13 @@ export default function Pedidos() {
                       <TableCell>
                         <div className="inline-flex items-center gap-2">
                           <Badge variant={estadoColor(fmtEstado(p)) as any}>{fmtEstado(p)}</Badge>
+                            {fmtEstado(p).toString().toLowerCase() === 'completado' && (
+                              isPedidoPaid(p) ? (
+                                <Badge className="ml-2" variant="green">Pagado</Badge>
+                              ) : (
+                                <Badge className="ml-2" variant="destructive">Sin pago</Badge>
+                              )
+                            )}
                         </div>
                       </TableCell>
                       <TableCell>{fmtProductosCount(p)}</TableCell>
@@ -367,7 +450,7 @@ export default function Pedidos() {
 
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-3xl">
+    <DialogContent className="w-full max-w-6xl sm:max-w-5xl">
             <DialogHeader>
               <DialogTitle>Detalle del pedido {selectedPedido?.id ?? ''}</DialogTitle>
               <DialogDescription>
@@ -439,21 +522,183 @@ export default function Pedidos() {
                       })()}
                     </div>
                   </div>
+                  {/* Vista de pagos en solo lectura (se puede abrir para pedidos completados) */}
+                  {selectedPedido && showPaymentsView && (
+                    <div className="mt-4 p-4 bg-white border rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium">Pagos ({((selectedPedido.pagos || selectedPedido.pagos_venta || selectedPedido.payments) || []).length})</div>
+                        <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowPaymentsView(false)}>Cerrar</button>
+                      </div>
+                      <div className="space-y-2">
+                        {(((selectedPedido.pagos || selectedPedido.pagos_venta || selectedPedido.payments) || []) as any[]).map((pay: any, idx: number) => {
+                          const monto = Number(pay?.monto ?? pay?.amount ?? 0);
+                          const equiv = pay?.equivalencia ?? pay?.equivalente ?? null;
+                          const forma = pay?.forma_nombre ?? pay?.forma_pago?.nombre ?? pay?.forma_pago_id ?? '—';
+                          const banco = pay?.banco_nombre ?? pay?.banco?.nombre ?? pay?.banco_id ?? '—';
+                          const ref = pay?.referencia ?? pay?.ref ?? '';
+                          const fecha = pay?.fecha_transaccion ?? pay?.created_at ?? pay?.createdAt ?? '';
+                          return (
+                            <div key={idx} className="p-2 border rounded bg-gray-50">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <div className="font-medium">{typeof monto === 'number' ? `$${monto.toFixed(2)}` : monto}</div>
+                                  <div className="text-xs text-gray-500">{forma} {banco ? `— ${banco}` : ''}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm">Equiv.: {equiv !== null && equiv !== undefined ? (Number.isFinite(Number(equiv)) ? Number(equiv).toFixed(2) : equiv) : '—'}</div>
+                                  {ref && <div className="text-xs text-gray-500">ref: {ref}</div>}
+                                  {fecha && <div className="text-xs text-gray-500">{String(fecha)}</div>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Formulario compacto para añadir pago directamente (útil cuando pedido ya está completado) */}
+                  {selectedPedido && selectedPedido.estado === 'Completado' && (
+                    <div className="mt-4 p-4 bg-white border rounded">
+                      <div className="font-medium mb-2">Registrar pago adicional</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                        <div>
+                          <label className="block text-xs">Monto</label>
+                          <input type="number" step="0.01" className="mt-1 w-full border rounded px-2 py-1" value={directMonto} onChange={(e) => setDirectMonto(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="block text-xs">Forma</label>
+                          <select className="mt-1 w-full border rounded px-2 py-1" value={directFormaId ?? ''} onChange={(e) => setDirectFormaId(e.target.value ? Number(e.target.value) : null)}>
+                            <option value="">-- forma --</option>
+                            {directFormas.map((f: any) => <option key={f.id} value={f.id}>{f.nombre ?? f.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs">Banco</label>
+                          <select className="mt-1 w-full border rounded px-2 py-1" value={directBancoId ?? ''} onChange={(e) => setDirectBancoId(e.target.value ? Number(e.target.value) : null)}>
+                            <option value="">-- banco (opcional) --</option>
+                            {directBancos.map((b: any) => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs">Referencia</label>
+                          <input type="text" className="mt-1 w-full border rounded px-2 py-1" value={directReferencia} onChange={(e) => setDirectReferencia(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="block text-xs">Fecha</label>
+                          <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={directFecha} onChange={(e) => setDirectFecha(e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-3 text-right">
+                          <Button size="sm" onClick={async () => {
+                            if (!selectedPedido?.id) return;
+                            const m = Number(String(directMonto).replace(',', '.'));
+                            if (!Number.isFinite(m) || m <= 0) { toast.error('Monto inválido'); return; }
+                            if (!directFormaId) { toast.error('Selecciona forma de pago'); return; }
+                            setDirectLoading(true);
+                            try {
+                            const payload: any = { pedido_venta_id: selectedPedido.id, forma_pago_id: directFormaId, monto: m };
+                              if (directBancoId) payload.banco_id = directBancoId;
+                              if (directReferencia) payload.referencia = directReferencia;
+                              if (directFecha) {
+                                try {
+                                  const now = new Date();
+                                  const hh = String(now.getHours()).padStart(2, '0');
+                                  const mm = String(now.getMinutes()).padStart(2, '0');
+                                  const ss = String(now.getSeconds()).padStart(2, '0');
+                                  const iso = new Date(`${directFecha}T${hh}:${mm}:${ss}`);
+                                  payload.fecha_transaccion = iso.toISOString();
+                                } catch (err) {
+                                  payload.fecha_transaccion = new Date().toISOString();
+                                }
+                              }
+                              // Debug: registrar payload enviado
+                              try {
+                                // Log payload to console for debugging
+                                // eslint-disable-next-line no-console
+                                console.debug('create-pago-payload', payload);
+                                await createPago(payload);
+                              } catch (err: any) {
+                                // intentar fallback: algunos backends esperan { pago: { ... } }
+                                // eslint-disable-next-line no-console
+                                console.debug('create-pago-failed, intentando fallback', { err });
+                                const msg = (err && err.message) ? String(err.message).toLowerCase() : '';
+                                try {
+                                  if (msg.includes('pago') || err?.status === 400) {
+                                    // intentar enviar envuelto
+                                    await apiFetch(`/pagos`, { method: 'POST', body: JSON.stringify({ pago: payload }) });
+                                    // eslint-disable-next-line no-console
+                                    console.debug('create-pago-fallback-success');
+                                  } else {
+                                    throw err;
+                                  }
+                                } catch (err2: any) {
+                                  // rethrow original for outer catch handling
+                                  throw err;
+                                }
+                              }
+                              toast.success('Pago registrado');
+                              // refrescar detalle
+                              const fresh = await getPedidoVenta(selectedPedido.id);
+                              setSelectedPedido(fresh);
+                            } catch (err: any) {
+                              console.error('Error creando pago', err);
+                              toast.error(parseApiError(err) || (err?.message ?? 'Error creando pago'));
+                            } finally {
+                              setDirectLoading(false);
+                              // limpiar campos
+                              setDirectMonto(''); setDirectReferencia(''); setDirectFecha(''); setDirectBancoId(null); setDirectFormaId(null);
+                            }
+                          }} disabled={directLoading}>
+                            {directLoading ? 'Enviando...' : 'Registrar pago'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>No hay detalle disponible</div>
               )}
             </div>
 
+            {/* Formulario de registro de pago embebido en el detalle del pedido (se muestra dentro del dialog) */}
+            {selectedPedido && showPaymentInline && (
+              <div className="mt-4 p-0">
+                <PaymentByBank
+                  pedidoId={selectedPedido?.id ?? 0}
+                  onSuccess={(data: any) => {
+                    toast.success('Pedido completado y pago registrado');
+                    setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
+                    setPedidos((list) => list.map((p) => (p.id === selectedPedido?.id ? { ...p, estado: 'Completado' } : p)));
+                    setShowPaymentInline(false);
+                    setIsDetailOpen(false);
+                  }}
+                  onClose={() => setShowPaymentInline(false)}
+                />
+              </div>
+            )}
+
             <DialogFooter>
-              <div className="flex items-center gap-2">
-                <Button variant="destructive" onClick={handleCompletarPedido} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
-                  {completing ? 'Procesando...' : 'Marcar como completado'}
-                </Button>
-                <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
-                  {canceling ? 'Procesando...' : 'Cancelar pedido'}
-                </Button>
-                <Button variant="outline" onClick={closeDetalle}>Cerrar</Button>
+              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
+                <div className="flex gap-2">
+                    <Button size="lg" variant="default" onClick={() => setShowPaymentInline(true)} disabled={selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
+                      Registrar pago y completar
+                    </Button>
+                    {selectedPedido?.estado === 'Completado' && (
+                      <Button size="lg" variant="outline" onClick={() => setShowPaymentsView(true)}>
+                        Ver pagos
+                      </Button>
+                    )}
+                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
+                    {completing ? 'Procesando...' : 'Completar sin registrar pago'}
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
+                    {canceling ? 'Procesando...' : 'Cancelar pedido'}
+                  </Button>
+                  <Button variant="ghost" onClick={closeDetalle}>Cerrar</Button>
+                </div>
               </div>
             </DialogFooter>
           </DialogContent>
