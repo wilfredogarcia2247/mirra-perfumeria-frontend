@@ -14,6 +14,19 @@ type Props = {
 };
 
 export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
+  // Guard para evitar crear el mismo pago varias veces desde el cliente
+  const inFlightCreates = React.useRef<Set<string>>(new Set());
+  const makeClientUid = () => {
+    try {
+      // @ts-ignore
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof (globalThis.crypto as any).randomUUID === 'function') return (globalThis.crypto as any).randomUUID();
+      // eslint-disable-next-line no-undef
+      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') return (crypto as any).randomUUID();
+    } catch (e) {
+      // fallback
+    }
+    return `cu_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+  };
   const [mounted, setMounted] = useState(false);
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [globalFormas, setGlobalFormas] = useState<Forma[]>([]);
@@ -375,11 +388,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     setErrors(null);
     const m = Number(String(monto).replace(',', '.'));
     if (!selectedFormaId) {
-      setErrors('Selecciona una forma de pago');
+      setErrors('Seleccione una forma de pago válida.');
       return false;
     }
     if (!Number.isFinite(m) || m <= 0) {
-      setErrors('Monto inválido');
+      setErrors('El monto debe ser un número mayor que 0.');
       return false;
     }
     // si la forma es Transferencia y no hay banco seleccionado -> error
@@ -387,7 +400,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     const formaNombre = (forma?.nombre || '').toLowerCase();
     if (formaNombre.includes('transfer') || formaNombre.includes('transferencia')) {
       if (!selectedBancoId) {
-        setErrors('Selecciona un banco para Transferencia');
+        setErrors('Seleccione un banco para esta forma de pago.');
         return false;
       }
     }
@@ -407,11 +420,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     setErrors(null);
     const m = Number(String(monto).replace(',', '.'));
     if (!selectedFormaId) {
-      setErrors('Selecciona una forma de pago');
+      setErrors('Seleccione una forma de pago válida.');
       return false;
     }
     if (!Number.isFinite(m) || m <= 0) {
-      setErrors('Monto inválido');
+      setErrors('El monto debe ser un número mayor que 0.');
       return false;
     }
     const forma = availableFormas.find((f) => f.id === selectedFormaId);
@@ -423,15 +436,63 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         return false;
       }
     }
+    // Si la forma exige banco, verificar que haya banco seleccionado
+    if (nombre.includes('transfer') || nombre.includes('transferencia') || nombre.includes('pago movil') || nombre.includes('pago móvil') || nombre.includes('zelle') || nombre.includes('spei')) {
+      if (!selectedBancoId) {
+        setErrors('Seleccione un banco para esta forma de pago.');
+        return false;
+      }
+    }
     return true;
+  }
+
+  async function checkTasaForBanco(bancoId?: number | null) {
+    try {
+      if (!bancoId) return true; // no banco -> backend puede fallback
+      const banco = bancos.find((b) => b.id === bancoId) as any | undefined;
+      const moneda = banco?.moneda ?? banco?.currency ?? null;
+      if (!moneda) {
+        // permitir, backend hará fallback; avisar al usuario
+        return window.confirm('El banco seleccionado no tiene moneda configurada. Continuar sin comprobar tasa?');
+      }
+      // Intentar obtener tasa por símbolo
+      const t = await getTasaBySimbolo(String(moneda));
+      if (t && Number.isFinite(Number(t.monto)) && Number(t.monto) > 0) return true;
+      // Buscar difuso en listado
+      try {
+        const all = await getTasasCambio();
+        const list = Array.isArray(all) ? all : (all?.data || []);
+        const clean = (s: any) => String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        const target = clean(moneda);
+        for (const it of list) {
+          const s = clean(it.simbolo ?? it.simbol ?? it.symbol ?? '');
+          if (!s) continue;
+          if (s === target || s.includes(target) || target.includes(s)) {
+            if (Number.isFinite(Number(it.monto)) && Number(it.monto) > 0) return true;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+      // No hay tasa válida
+      return window.confirm(`No hay tasa activa para la moneda ${moneda}. ¿Desea continuar igual?`);
+    } catch (e) {
+      return window.confirm('No se pudo comprobar la tasa del banco. ¿Desea continuar?');
+    }
   }
 
   async function handleAddPayment() {
     if (!validateForAdd()) return;
+    // comprobar tasa del banco si aplica
+    if (selectedBancoId) {
+      const ok = await checkTasaForBanco(selectedBancoId);
+      if (!ok) return;
+    }
     // construir pago parcial y añadir a la lista
     const pago: any = {
       forma_pago_id: selectedFormaId,
       monto: Number(String(monto).replace(',', '.')),
+      client_uid: makeClientUid(),
     };
     if (selectedBancoId) pago.banco_id = selectedBancoId;
     if (referencia) pago.referencia = referencia;
@@ -546,29 +607,87 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     setErrors(null);
     try {
         if (payments && payments.length > 0) {
+        let createdCount = 0;
+        const createdPayments: any[] = [];
         for (const p of payments) {
           if (p?.existing || p?.id) continue;
-          const body = { ...p, pedido_venta_id: pedidoId };
-          try {
-            // Debug: log payload sent for pago
+          // asegurar client_uid en el body para idempotencia server-side
+          const body = { ...p, pedido_venta_id: pedidoId, client_uid: p.client_uid ?? makeClientUid() };
+          // comprobar tasa para el banco del pago antes de crear
+          if (body.banco_id) {
+            const ok = await checkTasaForBanco(body.banco_id);
+            if (!ok) {
+              setLoading(false);
+              return;
+            }
+          }
+            try {
+            // Debug: log payload sent for pago (incluye client_uid)
             // eslint-disable-next-line no-console
             console.debug('create-pago-payload', body);
-            await createPago(body);
-          } catch (err: any) {
-            // intentar fallback a { pago: body } si el backend espera payload envuelto
-            // eslint-disable-next-line no-console
-            console.debug('create-pago-failed, intentando fallback', { err });
-            try {
-              await apiFetch('/pagos', { method: 'POST', body: JSON.stringify({ pago: body }) });
-              // eslint-disable-next-line no-console
-              console.debug('create-pago-fallback-success');
-            } catch (err2) {
-              // rethrow el error original para que el flujo principal lo capture
-              throw err;
+            // Evitar crear pagos idénticos si ya hay uno en vuelo
+            const key = JSON.stringify(body);
+            if (inFlightCreates.current.has(key)) {
+              // Ya hay una petición idéntica en curso; saltar
+              console.debug('create-pago-skip-duplicate-inflight', { body });
+              continue;
             }
+            inFlightCreates.current.add(key);
+            // Preferir endpoint específico por pedido: POST /pedidos-venta/:id/pagos
+            try {
+              const resp = await apiFetch(`/pedidos-venta/${pedidoId}/pagos`, { method: 'POST', body: JSON.stringify(body) });
+              createdCount++;
+              createdPayments.push(resp);
+              // eslint-disable-next-line no-console
+              console.debug('create-pago-pedidos-success', resp);
+            } catch (errInner) {
+              // Si falla, intentar /pagos directo
+              // eslint-disable-next-line no-console
+              console.debug('create-pago-pedidos-failed, intentando /pagos directo', { errInner });
+              try {
+                const resp2 = await apiFetch('/pagos', { method: 'POST', body: JSON.stringify(body) });
+                createdCount++;
+                createdPayments.push(resp2);
+                // eslint-disable-next-line no-console
+                console.debug('create-pago-pagos-direct-success', resp2);
+              } catch (err2) {
+                // intentar fallback envuelto { pago: body }
+                // eslint-disable-next-line no-console
+                console.debug('create-pago-pagos-direct-failed, intentando fallback envuelto', { err2 });
+                try {
+                  const resp3 = await apiFetch('/pagos', { method: 'POST', body: JSON.stringify({ pago: body }) });
+                  createdCount++;
+                  createdPayments.push(resp3);
+                  // eslint-disable-next-line no-console
+                  console.debug('create-pago-fallback-success', resp3);
+                } catch (err3) {
+                  // No pudimos enviar con ninguno de los tres formatos: propagar el error original
+                  throw err3;
+                }
+              }
+            }
+          } catch (err: any) {
+            throw err;
           }
         }
         const data = await completarPedidoVenta(pedidoId);
+        // Verificar que el pedido ahora incluye los pagos recién creados
+        try {
+          const fresh = await getPedidoVenta(pedidoId);
+          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          if (createdCount > 0 && (!pagosList || pagosList.length === 0)) {
+            // Mostrar aviso y registrar detalle para diagnóstico
+            console.error('pedido-finalizado-sin-pagos-detectados', { createdCount, createdPayments, fresh });
+            setErrors('Pedido completado pero no se detectaron pagos asociados. Revisa logs o la respuesta del servidor.');
+            toast.error('Pedido completado pero no se detectaron pagos asociados');
+            if (onSuccess) onSuccess(fresh);
+            if (onClose) onClose();
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('No se pudo verificar pagos tras completar', e);
+        }
         if (onSuccess) onSuccess(data);
         toast.success('Pagos registrados y pedido completado correctamente');
         if (onClose) onClose();
@@ -597,6 +716,22 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         }
 
         const data = await completarPedidoVenta(pedidoId, payload.pago);
+        // Verificar que el pago quedó asociado
+        try {
+          const fresh = await getPedidoVenta(pedidoId);
+          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          if (!pagosList || pagosList.length === 0) {
+            console.error('pago-finalizar-sin-asociacion', { payload, fresh });
+            setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa logs.');
+            toast.error('Pago registrado pero no se detectó asociación al pedido');
+            if (onSuccess) onSuccess(fresh);
+            if (onClose) onClose();
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('No se pudo verificar pago tras completar', e);
+        }
         if (onSuccess) onSuccess(data);
         toast.success('Pago registrado y pedido completado correctamente');
         if (onClose) onClose();
@@ -616,7 +751,20 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
 
   // Acción rápida: crear 1 pago y completar pedido en un solo click
   async function handleAddAndComplete() {
-    // Si el restante ya está cubierto, completar directamente sin requerir forma de pago
+    // Si ya hay pagos parciales en memoria, delegar a handleSubmit()
+    // handleSubmit se encarga de crear los pagos en el servidor y luego completar el pedido.
+    try {
+      if (payments && payments.length > 0) {
+        await handleSubmit();
+        return;
+      }
+    } catch (err) {
+      console.error('Error al crear pagos previos antes de completar', err);
+      setErrors('Error creando pagos previos');
+      return;
+    }
+
+    // Si no hay pagos parciales en memoria y el restante ya está cubierto, completar directamente
     try {
       if (pedidoTotal !== null && remaining !== null && remaining <= 0.009) {
         setLoading(true);
@@ -689,28 +837,39 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
       }
 
       try {
-        // Debug: log payload
-        // eslint-disable-next-line no-console
-        console.debug('create-pago-payload', { ...pago, pedido_venta_id: pedidoId });
-        await createPago({ ...pago, pedido_venta_id: pedidoId });
-      } catch (err: any) {
-        // intentar fallback envuelto
-        // eslint-disable-next-line no-console
-        console.debug('create-pago-failed, intentando fallback', { err });
-        try {
-          await apiFetch('/pagos', { method: 'POST', body: JSON.stringify({ pago: { ...pago, pedido_venta_id: pedidoId } }) });
-          // eslint-disable-next-line no-console
-          console.debug('create-pago-fallback-success');
-        } catch (err2) {
-          throw err;
+        // comprobar tasa del banco antes de enviar
+        if (pago.banco_id) {
+          const ok = await checkTasaForBanco(pago.banco_id);
+          if (!ok) { setLoading(false); return; }
         }
+        // Enviar en un solo paso: crear y completar el pedido (backend debe soportar crear+finalizar)
+        // Esto evita duplicados al crear el pago por separado y luego completar.
+        const data = await completarPedidoVenta(pedidoId, pago);
+        // Verificar asociación del pago
+        try {
+          const fresh = await getPedidoVenta(pedidoId);
+          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          if (!pagosList || pagosList.length === 0) {
+            console.error('add-and-complete-no-pagos-detected', { pago, fresh });
+            setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa la respuesta del servidor.');
+            toast.error('Pago registrado pero no se detectó asociación al pedido');
+            if (onSuccess) onSuccess(fresh);
+            if (onClose) onClose();
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('No se pudo verificar pago tras completar (addAndComplete)', e);
+        }
+        if (onSuccess) onSuccess(data);
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 1600);
+        toast.success('Pago registrado y pedido completado');
+        if (onClose) onClose();
+        return;
+      } catch (e: any) {
+        throw e;
       }
-      const data = await completarPedidoVenta(pedidoId);
-      if (onSuccess) onSuccess(data);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 1600);
-      toast.success('Pago registrado y pedido completado');
-      if (onClose) onClose();
     } catch (e: any) {
       console.error('Error en AddAndComplete', e);
       setErrors(e?.message ?? 'Error registrando pago');
@@ -1099,28 +1258,21 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
                 {loading ? 'Procesando...' : 'Pagar y completar'}
               </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={loading || (payments.length > 0 && pedidoTotal !== null && Math.abs(paymentsEquivalenciaSum - (pedidoTotal ?? 0)) > 0.01)}
-                className="flex-1"
-              >
-                {loading ? 'Procesando...' : 'Registrar pagos y completar'}
-              </Button>
-            )}
+            ) : null}
           </div>
         </div>
+
+        {showSuccess && (
+          <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-50">
+            <div className="bg-white/90 p-6 rounded-full shadow-lg flex items-center justify-center animate-pulse">
+              <svg className="w-16 h-16 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+        )}
+
       </div>
-      {/* Success overlay animation */}
-      {showSuccess && (
-        <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white/90 p-6 rounded-full shadow-lg flex items-center justify-center animate-pulse">
-            <svg className="w-16 h-16 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

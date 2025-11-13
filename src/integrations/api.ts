@@ -158,6 +158,21 @@ export async function createClienteBanco(data: any) {
 export async function getPagos() {
   return apiFetch("/pagos");
 }
+// Obtener pagos por pedido: GET /api/pedidos-venta/:id/pagos
+export async function getPagosByPedido(id: number) {
+  try {
+    return await apiFetch(`/pedidos-venta/${id}/pagos`);
+  } catch (e) {
+    // Fallback: si no existe el endpoint dedicado, obtener /pagos y filtrar localmente
+    try {
+      const all = await getPagos();
+      const list = Array.isArray(all) ? all : (all?.data || []);
+      return list.filter((p: any) => Number(p.pedido_venta_id) === Number(id));
+    } catch (err) {
+      throw e; // rethrow original error if fallback también falla
+    }
+  }
+}
 export async function createPago(data: any) {
   return apiFetch("/pagos", { method: "POST", body: JSON.stringify(data) });
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch } from "@/integrations/api";
+import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError } from '@/lib/utils';
 import { Eye } from 'lucide-react';
@@ -25,14 +25,35 @@ export default function Pedidos() {
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [newOrdersCount, setNewOrdersCount] = useState<number>(0);
+  const [pagosMap, setPagosMap] = useState<Record<number, any[]>>({});
+  // Refrescar y reconstruir el mapa de pagos por pedido
+  const refreshPagosMap = async () => {
+    try {
+      const pagosAll = await getPagos();
+      const pagosList = Array.isArray(pagosAll) ? pagosAll : (pagosAll?.data || []);
+      const map: Record<number, any[]> = {};
+      for (const pg of pagosList) {
+        // soportar varias formas de referenciar el pedido en el objeto pago
+        const possible = pg?.pedido_venta_id ?? pg?.pedido_id ?? pg?.pedidoId ?? pg?.venta_id ?? pg?.ventaId ?? pg?.order_id ?? pg?.orderId ?? pg?.pedidoVentaId ?? pg?.pedido?.id ?? pg?.pedidoVenta?.id;
+        const pid = Number(possible);
+        if (!Number.isFinite(pid) || pid <= 0) continue;
+        if (!map[pid]) map[pid] = [];
+        map[pid].push(pg);
+      }
+      setPagosMap(map);
+    } catch (e) {
+      console.error('Error cargando pagos para pagosMap', e);
+    }
+  };
   const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
-    getPedidos()
-      .then((data) => {
-        // API returns an array of pedidos (or { data: [...] })
-        const list = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+    // Cargar pedidos y luego el mapa de pagos
+    (async () => {
+      try {
+        const data = await getPedidos();
+        const list = Array.isArray(data) ? data : (data && Array.isArray((data as any).data) ? (data as any).data : []);
         // Ordenar por fecha más reciente primero
         const withDates = list.slice();
         withDates.sort((a: any, b: any) => {
@@ -41,18 +62,20 @@ export default function Pedidos() {
           return db - da;
         });
         setPedidos(withDates);
-      })
-      .catch((err) => {
+        // Construir mapa de pagos
+        await refreshPagosMap();
+      } catch (err) {
         console.error('Error cargando pedidos', err);
-        // Si 401 -> pedir login y redirigir
         if (err instanceof Error && /401/.test(err.message)) {
           toast.error('No autorizado. Por favor inicia sesión.');
           navigate('/login', { replace: true });
         } else {
           toast.error('No se pudieron cargar los pedidos');
         }
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   // Filtrado local por estado
@@ -71,102 +94,45 @@ export default function Pedidos() {
   const allStatuses = ['Pendiente', 'Enviado', 'Completado', 'Cancelado'];
   const countFor = (st: string) => pedidos.filter((p: any) => (p.estado || p.status || '').toString().toLowerCase() === st.toLowerCase()).length;
 
-  // Real-time notifications: intentar EventSource y fallback a polling
+  // Notificaciones: usar polling cada 15s (el endpoint SSE no existe en este backend)
   useEffect(() => {
-    let es: EventSource | null = null;
     let polling: any = null;
-    const token = getToken?.();
     (async () => {
-      // Preflight check: try a short GET to the SSE endpoint to detect 401 quickly.
-      const streamUrl = `${API_URL}/pedidos-venta/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
       try {
-        const headers: any = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const pre = await fetch(streamUrl, { method: 'GET', headers, signal: controller.signal });
-        if (pre.status === 401) {
-          // Not authorized -> clear token and navigate to login
-          try { localStorage.removeItem('jwt_token'); } catch (e) {}
-          navigate('/login', { replace: true });
-          clearTimeout(timeout);
-          return;
-        }
+        const fresh = await getPedidos();
+        if (Array.isArray(fresh)) setPedidos(fresh);
       } catch (e) {
-        // If preflight times out or errors, we'll still try EventSource: server may accept SSE.
-      } finally {
-        clearTimeout(timeout);
+        // ignore
       }
-
-      try {
-        // Intentar conectar SSE con token en query (si el backend lo soporta)
-        es = new EventSource(streamUrl);
-        es.onmessage = async (ev) => {
-          try {
-            const data = JSON.parse(ev.data);
-            // Si el servidor envía detalle del pedido
-            if (data && (data.pedido || data.type === 'new_pedido')) {
-              setNewOrdersCount((c) => c + 1);
-              toast.success('Nuevo pedido recibido');
-              // opcional: actualizar lista
+      polling = setInterval(async () => {
+        try {
+          const fresh = await getPedidos();
+          if (Array.isArray(fresh)) {
+            // Usar actualización funcional para comparar con el estado previo y evitar capturar `pedidos` en el closure
+            setPedidos((prev) => {
               try {
-                const fresh = await getPedidos();
-                if (Array.isArray(fresh)) setPedidos(fresh);
-              } catch (e) {}
-              return;
-            }
-          } catch (e) {
-            // si no es JSON, tratar como evento genérico: refrescar y notificar
-          }
-          setNewOrdersCount((c) => c + 1);
-          toast.success('Nuevo pedido recibido');
-          try {
-            const fresh = await getPedidos();
-            if (Array.isArray(fresh)) setPedidos(fresh);
-          } catch (e) {}
-        };
-        es.onerror = (err) => {
-          // Si falla, cerrar y usar polling
-          try { es?.close(); } catch (e) {}
-          es = null;
-          // start polling
-          polling = setInterval(async () => {
-            try {
-              const fresh = await getPedidos();
-              if (Array.isArray(fresh)) {
-                if (fresh.length > pedidos.length) {
-                  setNewOrdersCount((c) => c + (fresh.length - pedidos.length));
-                  toast.success(`Hay ${fresh.length - pedidos.length} pedidos nuevos`);
+                if (fresh.length > (prev?.length || 0)) {
+                  setNewOrdersCount((c) => c + (fresh.length - (prev?.length || 0)));
+                  toast.success(`Hay ${fresh.length - (prev?.length || 0)} pedidos nuevos`);
                 }
-                setPedidos(fresh);
+              } catch (err) {
+                // ignore
               }
-            } catch (e) {
-              // ignore
-            }
-          }, 15000);
-        };
-      } catch (e) {
-        // No SSE: fallback polling
-        polling = setInterval(async () => {
-          try {
-            const fresh = await getPedidos();
-            if (Array.isArray(fresh)) {
-              if (fresh.length > pedidos.length) {
-                setNewOrdersCount((c) => c + (fresh.length - pedidos.length));
-                toast.success(`Hay ${fresh.length - pedidos.length} pedidos nuevos`);
-              }
-              setPedidos(fresh);
-            }
-          } catch (e) {}
-        }, 15000);
-      }
+              return fresh;
+            });
+            // refrescar pagosMap en background para mantener el listado sincronizado
+            try { await refreshPagosMap(); } catch (e) { /* ignore */ }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, 15000);
     })();
 
     return () => {
-      if (es) try { es.close(); } catch (e) {}
       if (polling) clearInterval(polling);
     };
-  }, [pedidos]);
+  }, []);
 
   const fmtCliente = (p: any) => p?.nombre_cliente || p?.cliente_nombre || p?.cliente?.nombre || 'Anónimo';
   const fmtFecha = (p: any) => p?.fecha || p?.created_at || p?.createdAt || '-';
@@ -214,7 +180,26 @@ export default function Pedidos() {
     try {
       // Prefer explicit flag
       if (p?.pagado === true || p?.is_paid === true) return true;
-      const pagos = Array.isArray(p?.pagos) ? p.pagos : (Array.isArray(p?.pagos_venta) ? p.pagos_venta : (Array.isArray(p?.payments) ? p.payments : []));
+      let pagos = Array.isArray(p?.pagos) ? p.pagos : (Array.isArray(p?.pagos_venta) ? p.pagos_venta : (Array.isArray(p?.payments) ? p.payments : []));
+      // Si el mapa global de pagos ya contiene entradas para este pedido, considerarlo pagado.
+      try {
+        const candidate = p?.id ?? p?.pedido_venta_id ?? p?.pedidoId ?? p?.venta_id ?? p?.ventaId ?? p?.order_id ?? p?.orderId;
+        const pidNum = Number(candidate);
+        if ((!pagos || pagos.length === 0) && pagosMap && Number.isFinite(pidNum) && pidNum > 0) {
+          const mapped = pagosMap[pidNum];
+          if (Array.isArray(mapped) && mapped.length > 0) return true;
+        }
+      } catch (e) {
+        // ignore mapping errors
+      }
+      // fallback: usar pagosMap cargado globalmente. Soportar varias formas de identificar el id del pedido
+      if ((!pagos || pagos.length === 0) && pagosMap) {
+        const candidate = p?.id ?? p?.pedido_venta_id ?? p?.pedidoId ?? p?.venta_id ?? p?.ventaId ?? p?.order_id ?? p?.orderId;
+        const pidNum = Number(candidate);
+        if (Number.isFinite(pidNum) && pidNum > 0) {
+          pagos = pagosMap[pidNum] || [];
+        }
+      }
       if (!pagos || pagos.length === 0) return false;
       // calcular total base similar a fmtTotal
       const base = (() => {
@@ -231,18 +216,27 @@ export default function Pedidos() {
         }
         return null;
       })();
-      if (base === null) return false;
+      if (base === null) {
+        // Si el listado no incluye el total del pedido (base === null) pero sí tenemos pagos
+        // asociados (por ejemplo porque se consultaron con `getPagos()`), consideramos
+        // el pedido como pagado para efectos del badge en el listado.
+        // Esto evita mostrar "Sin pago" cuando el detalle sí contiene pagos.
+        return pagos.length > 0;
+      }
       const tasaVal = fmtTasa(p);
       // sumar equivalencias (si las hay) o derivarlas con tasa del pedido
       let sumEq = 0;
+      let sumRawMonto = 0;
       for (const pay of pagos) {
         const eq = pay?.equivalencia ?? pay?.equivalente ?? null;
         if (eq !== null && eq !== undefined && Number.isFinite(Number(eq))) {
           sumEq += Number(eq);
+          sumRawMonto += Number(pay?.monto ?? pay?.amount ?? 0);
           continue;
         }
         const monto = Number(pay?.monto ?? pay?.amount ?? 0);
-        const tpay = pay?.tasa_monto ?? null;
+        sumRawMonto += monto;
+        const tpay = pay?.tasa_monto ?? pay?.tasa ?? pay?.tasa_cambio_monto ?? null;
         const tnum = typeof tpay === 'number' ? tpay : (tpay ? Number(String(tpay).replace(',', '.')) : null);
         const usedT = Number.isFinite(tnum) && tnum > 0 ? tnum : (tasaVal || NaN);
         if (Number.isFinite(monto) && Number.isFinite(usedT) && usedT !== 0) {
@@ -250,6 +244,12 @@ export default function Pedidos() {
         }
       }
       const tol = 0.05;
+      // Si no pudimos derivar equivalencias (sumEq === 0) pero los pagos suman montos en la misma
+      // unidad que el pedido (no hay tasa), comparar la suma bruta de montos con el total.
+      if ((!Number.isFinite(sumEq) || sumEq === 0) && (!tasaVal || Number.isNaN(Number(tasaVal)))) {
+        // comparar sumRawMonto con base
+        return Number.isFinite(sumRawMonto) && Math.abs(sumRawMonto - base) <= tol;
+      }
       return Number.isFinite(sumEq) && Math.abs(sumEq - base) <= tol;
     } catch (e) {
       return false;
@@ -273,6 +273,17 @@ export default function Pedidos() {
   const [directBancoId, setDirectBancoId] = useState<number | null>(null);
   const [directFormaId, setDirectFormaId] = useState<number | null>(null);
   const [directLoading, setDirectLoading] = useState(false);
+  const makeClientUid = () => {
+    try {
+      // @ts-ignore
+      if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof (globalThis.crypto as any).randomUUID === 'function') return (globalThis.crypto as any).randomUUID();
+      // eslint-disable-next-line no-undef
+      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') return (crypto as any).randomUUID();
+    } catch (e) {}
+    return `cu_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+  };
+  // Guard para evitar crear pagos duplicados desde el formulario directo
+  const directInFlight = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // cargar opciones para el formulario directo
@@ -293,7 +304,74 @@ export default function Pedidos() {
     try {
       setDetailLoading(true);
       const detalle = await getPedidoVenta(id);
-      setSelectedPedido(detalle);
+      // Intentar obtener pagos específicos del pedido (si el backend expone /pedidos-venta/:id/pagos)
+      try {
+        const pagos = await getPagosByPedido(id);
+        if (Array.isArray(pagos)) detalle.pagos = pagos;
+        else if (pagos && Array.isArray((pagos as any).data)) detalle.pagos = (pagos as any).data;
+      } catch (e) {
+        // Si falla (endpoint no disponible), continuar con lo que devolvió getPedidoVenta
+      }
+      // Calcular diagnóstico de pagos y marcar indicador en el detalle
+      try {
+        const pagosList = Array.isArray(detalle?.pagos) ? detalle.pagos : [];
+        // calcular base del pedido
+        const base = (() => {
+          const t = detalle?.total ?? detalle?.monto ?? null;
+          if (typeof t === 'number') return t;
+          const tnum = Number(t);
+          if (!Number.isNaN(tnum)) return tnum;
+          if (Array.isArray(detalle?.productos) && detalle.productos.length > 0) {
+            return detalle.productos.reduce((acc: number, it: any) => {
+              if (typeof it.subtotal === 'number') return acc + it.subtotal;
+              const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
+              const qty = typeof it.cantidad === 'number' ? it.cantidad : Number(it.cantidad) || 0;
+              return acc + price * qty;
+            }, 0);
+          }
+          return null;
+        })();
+        // sumar equivalencias / montos
+        let sumEq = 0;
+        let sumRaw = 0;
+        const tasaVal = (() => {
+          const t = detalle?.tasa_cambio_monto ?? detalle?.tasa ?? null;
+          const n = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        })();
+        for (const pay of pagosList) {
+          const eq = pay?.equivalencia ?? pay?.equivalente ?? null;
+          const monto = Number(pay?.monto ?? pay?.amount ?? 0);
+          sumRaw += monto;
+          if (eq !== null && eq !== undefined && Number.isFinite(Number(eq))) {
+            sumEq += Number(eq);
+            continue;
+          }
+          const tpay = pay?.tasa_monto ?? pay?.tasa ?? pay?.tasa_cambio_monto ?? null;
+          const tnum = typeof tpay === 'number' ? tpay : (tpay ? Number(String(tpay).replace(',', '.')) : null);
+          const usedT = Number.isFinite(tnum) && tnum > 0 ? tnum : (tasaVal || NaN);
+          if (Number.isFinite(monto) && Number.isFinite(usedT) && usedT !== 0) sumEq += monto / usedT;
+        }
+        const tol = 0.05;
+        const computedPaid = (base === null) ? (pagosList.length > 0) : (Number.isFinite(sumEq) && Math.abs(sumEq - base) <= tol) || ((!tasaVal || Number.isNaN(Number(tasaVal))) && Number.isFinite(sumRaw) && Math.abs(sumRaw - base) <= tol);
+        // attach for UI
+        (detalle as any).__computedPaid = computedPaid;
+        // debug log
+        // eslint-disable-next-line no-console
+        console.debug('detalle-pago-check', { id, base, tasaVal, sumEq, sumRaw, pagosCount: pagosList.length, computedPaid });
+        setSelectedPedido(detalle);
+        // Si el pedido trae pagos, abrir la vista de pagos automáticamente
+        try {
+          const hasPagos = Array.isArray(detalle?.pagos) && detalle.pagos.length > 0;
+          setShowPaymentsView(Boolean(hasPagos));
+        } catch (e) {
+          setShowPaymentsView(false);
+        }
+      } catch (errInner) {
+        // si algo falla en diagnóstico, continuar mostrando detalle
+        setSelectedPedido(detalle);
+        setShowPaymentsView(Array.isArray(detalle?.pagos) && detalle.pagos.length > 0);
+      }
       setIsDetailOpen(true);
     } catch (err) {
       console.error('Error cargando detalle de pedido', err);
@@ -330,7 +408,7 @@ export default function Pedidos() {
       toast.success('Pedido completado');
       setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
       setPedidos((list) => list.map((p) => (p.id === selectedPedido.id ? { ...p, estado: 'Completado' } : p)));
-      setPaymentOpen(false);
+      setShowPaymentInline(false);
       setIsDetailOpen(false);
     } catch (err) {
       console.error('Error completando pedido', err);
@@ -421,7 +499,7 @@ export default function Pedidos() {
                           <Badge variant={estadoColor(fmtEstado(p)) as any}>{fmtEstado(p)}</Badge>
                             {fmtEstado(p).toString().toLowerCase() === 'completado' && (
                               isPedidoPaid(p) ? (
-                                <Badge className="ml-2" variant="green">Pagado</Badge>
+                                <Badge className="ml-2 bg-green-600 text-white" variant="default">Pagado</Badge>
                               ) : (
                                 <Badge className="ml-2" variant="destructive">Sin pago</Badge>
                               )
@@ -537,15 +615,35 @@ export default function Pedidos() {
                           const banco = pay?.banco_nombre ?? pay?.banco?.nombre ?? pay?.banco_id ?? '—';
                           const ref = pay?.referencia ?? pay?.ref ?? '';
                           const fecha = pay?.fecha_transaccion ?? pay?.created_at ?? pay?.createdAt ?? '';
+                          // Determinar símbolo/etiqueta de moneda para el pago
+                          const simbolo = pay?.tasa_simbolo ?? (pay?.tasa && pay.tasa.simbolo) ?? pay?.banco?.moneda ?? selectedPedido?.tasa_simbolo ?? 'Bs';
+                          const montoStr = Number.isFinite(monto) ? `${simbolo} ${monto.toFixed(2)}` : String(monto);
                           return (
                             <div key={idx} className="p-2 border rounded bg-gray-50">
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <div className="font-medium">{typeof monto === 'number' ? `$${monto.toFixed(2)}` : monto}</div>
+                                  <div className="font-medium">{montoStr}</div>
                                   <div className="text-xs text-gray-500">{forma} {banco ? `— ${banco}` : ''}</div>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-sm">Equiv.: {equiv !== null && equiv !== undefined ? (Number.isFinite(Number(equiv)) ? Number(equiv).toFixed(2) : equiv) : '—'}</div>
+                                  {/* Equivalencia: preferir campo explícito, si no existe calcular como monto / tasa */}
+                                  {(() => {
+                                    try {
+                                      const tasaCand = pay?.tasa_monto ?? pay?.tasa ?? pay?.tasa_cambio_monto ?? selectedPedido?.tasa_cambio_monto ?? selectedPedido?.tasa ?? null;
+                                      const tasaNum = typeof tasaCand === 'number' ? tasaCand : (tasaCand ? Number(String(tasaCand).replace(',', '.')) : null);
+                                      let computed: number | null = null;
+                                      if (equiv !== null && equiv !== undefined && Number.isFinite(Number(equiv))) {
+                                        computed = Number(equiv);
+                                      } else if (Number.isFinite(monto) && Number.isFinite(tasaNum) && tasaNum !== 0) {
+                                        computed = monto / tasaNum;
+                                      }
+                                      return (
+                                        <div className="text-sm">Equiv.: {computed !== null && Number.isFinite(computed) ? computed.toFixed(2) : '—'}</div>
+                                      );
+                                    } catch (e) {
+                                      return <div className="text-sm">Equiv.: —</div>;
+                                    }
+                                  })()}
                                   {ref && <div className="text-xs text-gray-500">ref: {ref}</div>}
                                   {fecha && <div className="text-xs text-gray-500">{String(fecha)}</div>}
                                 </div>
@@ -559,101 +657,174 @@ export default function Pedidos() {
 
                   {/* Formulario compacto para añadir pago directamente (útil cuando pedido ya está completado) */}
                   {selectedPedido && selectedPedido.estado === 'Completado' && (
-                    <div className="mt-4 p-4 bg-white border rounded">
-                      <div className="font-medium mb-2">Registrar pago adicional</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                        <div>
-                          <label className="block text-xs">Monto</label>
-                          <input type="number" step="0.01" className="mt-1 w-full border rounded px-2 py-1" value={directMonto} onChange={(e) => setDirectMonto(e.target.value)} />
-                        </div>
-                        <div>
-                          <label className="block text-xs">Forma</label>
-                          <select className="mt-1 w-full border rounded px-2 py-1" value={directFormaId ?? ''} onChange={(e) => setDirectFormaId(e.target.value ? Number(e.target.value) : null)}>
-                            <option value="">-- forma --</option>
-                            {directFormas.map((f: any) => <option key={f.id} value={f.id}>{f.nombre ?? f.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs">Banco</label>
-                          <select className="mt-1 w-full border rounded px-2 py-1" value={directBancoId ?? ''} onChange={(e) => setDirectBancoId(e.target.value ? Number(e.target.value) : null)}>
-                            <option value="">-- banco (opcional) --</option>
-                            {directBancos.map((b: any) => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs">Referencia</label>
-                          <input type="text" className="mt-1 w-full border rounded px-2 py-1" value={directReferencia} onChange={(e) => setDirectReferencia(e.target.value)} />
-                        </div>
-                        <div>
-                          <label className="block text-xs">Fecha</label>
-                          <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={directFecha} onChange={(e) => setDirectFecha(e.target.value)} />
-                        </div>
-                        <div className="sm:col-span-3 text-right">
-                          <Button size="sm" onClick={async () => {
-                            if (!selectedPedido?.id) return;
-                            const m = Number(String(directMonto).replace(',', '.'));
-                            if (!Number.isFinite(m) || m <= 0) { toast.error('Monto inválido'); return; }
-                            if (!directFormaId) { toast.error('Selecciona forma de pago'); return; }
-                            setDirectLoading(true);
-                            try {
-                            const payload: any = { pedido_venta_id: selectedPedido.id, forma_pago_id: directFormaId, monto: m };
-                              if (directBancoId) payload.banco_id = directBancoId;
-                              if (directReferencia) payload.referencia = directReferencia;
+                    isPedidoPaid(selectedPedido) ? (
+                      <div className="mt-4 p-4 bg-green-50 border rounded text-sm text-green-800">
+                        <div className="font-medium">Pedido pagado</div>
+                        <div>El pedido ya está pagado en su totalidad. No se pueden registrar pagos adicionales.</div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 p-4 bg-white border rounded">
+                        <div className="font-medium mb-2">Registrar pago adicional</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                          <div>
+                            <label className="block text-xs">Monto</label>
+                            <input type="number" step="0.01" className="mt-1 w-full border rounded px-2 py-1" value={directMonto} onChange={(e) => setDirectMonto(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-xs">Forma</label>
+                            <select className="mt-1 w-full border rounded px-2 py-1" value={directFormaId ?? ''} onChange={(e) => setDirectFormaId(e.target.value ? Number(e.target.value) : null)}>
+                              <option value="">-- forma --</option>
+                              {directFormas.map((f: any) => <option key={f.id} value={f.id}>{f.nombre ?? f.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs">Banco</label>
+                            <select className="mt-1 w-full border rounded px-2 py-1" value={directBancoId ?? ''} onChange={(e) => setDirectBancoId(e.target.value ? Number(e.target.value) : null)}>
+                              <option value="">-- banco (opcional) --</option>
+                              {directBancos.map((b: any) => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs">Referencia</label>
+                            <input type="text" className="mt-1 w-full border rounded px-2 py-1" value={directReferencia} onChange={(e) => setDirectReferencia(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-xs">Fecha</label>
+                            <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={directFecha} onChange={(e) => setDirectFecha(e.target.value)} />
+                          </div>
+                          <div className="sm:col-span-3 text-right">
+                            <Button size="sm" onClick={async () => {
+                              if (!selectedPedido?.id) return;
+                              // Protección: si el pedido ya está pagado completamente, no permitir crear pagos
+                              if (isPedidoPaid(selectedPedido)) { toast.error('El pedido ya está pagado en su totalidad.'); return; }
+                              const m = Number(String(directMonto).replace(',', '.'));
+                              // Validaciones
+                              if (!directFormaId || !Number.isInteger(Number(directFormaId))) { toast.error('Seleccione una forma de pago válida.'); return; }
+                              if (!Number.isFinite(m) || m <= 0) { toast.error('El monto debe ser un número mayor que 0.'); return; }
+                              const forma = directFormas.find((f: any) => Number(f.id) === Number(directFormaId));
+                              const nombre = String(forma?.nombre || forma?.name || '').toLowerCase();
+                              const requiresBank = nombre.includes('transfer') || nombre.includes('transferencia') || nombre.includes('pago movil') || nombre.includes('pago móvil') || nombre.includes('zelle') || nombre.includes('spei');
+                              if (requiresBank && (!directBancoId || !Number.isInteger(Number(directBancoId)))) { toast.error('Seleccione un banco para esta forma de pago.'); return; }
+                              if (directReferencia && String(directReferencia).length > 255) { toast.error('Referencia demasiado larga'); return; }
                               if (directFecha) {
-                                try {
-                                  const now = new Date();
-                                  const hh = String(now.getHours()).padStart(2, '0');
-                                  const mm = String(now.getMinutes()).padStart(2, '0');
-                                  const ss = String(now.getSeconds()).padStart(2, '0');
-                                  const iso = new Date(`${directFecha}T${hh}:${mm}:${ss}`);
-                                  payload.fecha_transaccion = iso.toISOString();
-                                } catch (err) {
-                                  payload.fecha_transaccion = new Date().toISOString();
-                                }
+                                const d = new Date(directFecha);
+                                if (isNaN(d.getTime())) { toast.error('Fecha de transacción inválida.'); return; }
                               }
-                              // Debug: registrar payload enviado
-                              try {
-                                // Log payload to console for debugging
-                                // eslint-disable-next-line no-console
-                                console.debug('create-pago-payload', payload);
-                                await createPago(payload);
-                              } catch (err: any) {
-                                // intentar fallback: algunos backends esperan { pago: { ... } }
-                                // eslint-disable-next-line no-console
-                                console.debug('create-pago-failed, intentando fallback', { err });
-                                const msg = (err && err.message) ? String(err.message).toLowerCase() : '';
+
+                              // Comprobar tasa para el banco si aplica
+                              if (directBancoId) {
                                 try {
-                                  if (msg.includes('pago') || err?.status === 400) {
-                                    // intentar enviar envuelto
-                                    await apiFetch(`/pagos`, { method: 'POST', body: JSON.stringify({ pago: payload }) });
-                                    // eslint-disable-next-line no-console
-                                    console.debug('create-pago-fallback-success');
-                                  } else {
-                                    throw err;
+                                  const banco = directBancos.find((b: any) => Number(b.id) === Number(directBancoId));
+                                  const moneda = banco?.moneda ?? banco?.currency ?? null;
+                                  let hasTasa = false;
+                                  if (moneda) {
+                                    const t = await getTasaBySimbolo(String(moneda));
+                                    if (t && Number.isFinite(Number(t.monto)) && Number(t.monto) > 0) hasTasa = true;
+                                    else {
+                                      try {
+                                        const all = await getTasasCambio();
+                                        const list = Array.isArray(all) ? all : (all?.data || []);
+                                        const clean = (s: any) => String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                                        const target = clean(moneda);
+                                        for (const it of list) {
+                                          const s = clean(it.simbolo ?? it.simbol ?? it.symbol ?? '');
+                                          if (!s) continue;
+                                          if (s === target || s.includes(target) || target.includes(s)) {
+                                            if (Number.isFinite(Number(it.monto)) && Number(it.monto) > 0) { hasTasa = true; break; }
+                                          }
+                                        }
+                                      } catch (e) { /* ignore */ }
+                                    }
                                   }
-                                } catch (err2: any) {
-                                  // rethrow original for outer catch handling
+                                  if (!hasTasa) {
+                                    const ok = window.confirm(`No hay tasa activa para la moneda ${moneda || 'desconocida'}. ¿Desea continuar?`);
+                                    if (!ok) return;
+                                  }
+                                } catch (e) { const ok = window.confirm('No se pudo comprobar la tasa del banco. ¿Desea continuar?'); if (!ok) return; }
+                              }
+
+                              setDirectLoading(true);
+                              try {
+                                const payload: any = { pedido_venta_id: selectedPedido.id, forma_pago_id: directFormaId, monto: m };
+                                if (directBancoId) payload.banco_id = directBancoId;
+                                if (directReferencia) payload.referencia = directReferencia;
+                                if (directFecha) {
+                                  try {
+                                    const now = new Date();
+                                    const hh = String(now.getHours()).padStart(2, '0');
+                                    const mm = String(now.getMinutes()).padStart(2, '0');
+                                    const ss = String(now.getSeconds()).padStart(2, '0');
+                                    const iso = new Date(`${directFecha}T${hh}:${mm}:${ss}`);
+                                    payload.fecha_transaccion = iso.toISOString();
+                                  } catch (err) {
+                                    payload.fecha_transaccion = new Date().toISOString();
+                                  }
+                                }
+                                // Debug: registrar payload enviado
+                                try {
+                                  // asegurar client_uid en payload para idempotencia backend
+                                  payload.client_uid = payload.client_uid ?? makeClientUid();
+                                  // Log payload to console for debugging
+                                  // eslint-disable-next-line no-console
+                                  console.debug('create-pago-payload', payload);
+                                  // Evitar crear duplicados idénticos en vuelo
+                                  const key = JSON.stringify(payload);
+                                  if (directInFlight.current.has(key)) {
+                                    console.debug('create-pago-skip-duplicate-inflight', { payload });
+                                  } else {
+                                    directInFlight.current.add(key);
+                                    try {
+                                      // Intentar endpoint específico por pedido primero
+                                      try {
+                                        await apiFetch(`/pedidos-venta/${selectedPedido.id}/pagos`, { method: 'POST', body: JSON.stringify(payload) });
+                                        console.debug('create-pago-pedidos-success');
+                                      } catch (errInner) {
+                                        console.debug('create-pago-pedidos-failed, intentando /pagos directo', { errInner });
+                                        try {
+                                          await apiFetch('/pagos', { method: 'POST', body: JSON.stringify(payload) });
+                                          console.debug('create-pago-pagos-direct-success');
+                                        } catch (err2) {
+                                          console.debug('create-pago-pagos-direct-failed, intentando fallback envuelto', { err2 });
+                                          await apiFetch('/pagos', { method: 'POST', body: JSON.stringify({ pago: payload }) });
+                                          console.debug('create-pago-fallback-success');
+                                        }
+                                      }
+                                    } finally {
+                                      try { directInFlight.current.delete(key); } catch (e) { /* ignore */ }
+                                    }
+                                  }
+                                } catch (err: any) {
+                                  // rethrow to outer catch
                                   throw err;
                                 }
+                                toast.success('Pago registrado');
+                                // refrescar detalle y obtener pagos por pedido
+                                const fresh = await getPedidoVenta(selectedPedido.id);
+                                try {
+                                  const pagos = await getPagosByPedido(selectedPedido.id);
+                                  if (Array.isArray(pagos)) fresh.pagos = pagos;
+                                  else if (pagos && Array.isArray((pagos as any).data)) fresh.pagos = (pagos as any).data;
+                                } catch (e) {
+                                  // ignore if endpoint missing
+                                }
+                                setSelectedPedido(fresh);
+                                // Actualizar el mapa de pagos global para que el listado refleje el nuevo pago
+                                try { await refreshPagosMap(); } catch (e) { /* ignore */ }
+                              } catch (err: any) {
+                                console.error('Error creando pago', err);
+                                toast.error(parseApiError(err) || (err?.message ?? 'Error creando pago'));
+                              } finally {
+                                setDirectLoading(false);
+                                // limpiar campos
+                                setDirectMonto(''); setDirectReferencia(''); setDirectFecha(''); setDirectBancoId(null); setDirectFormaId(null);
                               }
-                              toast.success('Pago registrado');
-                              // refrescar detalle
-                              const fresh = await getPedidoVenta(selectedPedido.id);
-                              setSelectedPedido(fresh);
-                            } catch (err: any) {
-                              console.error('Error creando pago', err);
-                              toast.error(parseApiError(err) || (err?.message ?? 'Error creando pago'));
-                            } finally {
-                              setDirectLoading(false);
-                              // limpiar campos
-                              setDirectMonto(''); setDirectReferencia(''); setDirectFecha(''); setDirectBancoId(null); setDirectFormaId(null);
-                            }
-                          }} disabled={directLoading}>
-                            {directLoading ? 'Enviando...' : 'Registrar pago'}
-                          </Button>
+                            }} disabled={directLoading}>
+                              {directLoading ? 'Enviando...' : 'Registrar pago'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )
                   )}
                 </div>
               ) : (
@@ -666,7 +837,9 @@ export default function Pedidos() {
               <div className="mt-4 p-0">
                 <PaymentByBank
                   pedidoId={selectedPedido?.id ?? 0}
-                  onSuccess={(data: any) => {
+                  onSuccess={async (data: any) => {
+                    // Asegurar que actualizamos pagosMap para que el listado muestre 'Pagado'
+                    try { await refreshPagosMap(); } catch (e) { /* ignore */ }
                     toast.success('Pedido completado y pago registrado');
                     setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
                     setPedidos((list) => list.map((p) => (p.id === selectedPedido?.id ? { ...p, estado: 'Completado' } : p)));
@@ -681,9 +854,9 @@ export default function Pedidos() {
             <DialogFooter>
               <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
                 <div className="flex gap-2">
-                    <Button size="lg" variant="default" onClick={() => setShowPaymentInline(true)} disabled={selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
-                      Registrar pago y completar
-                    </Button>
+                    <Button size="lg" variant="default" onClick={() => setShowPaymentInline(true)} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido)}>
+                        Registrar pago y completar
+                      </Button>
                     {selectedPedido?.estado === 'Completado' && (
                       <Button size="lg" variant="outline" onClick={() => setShowPaymentsView(true)}>
                         Ver pagos
