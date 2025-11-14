@@ -27,7 +27,14 @@ export default function CategoryMenu({ value, onChange, showManage = true }: { v
     }
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => {
+    if (showManage) {
+      fetch();
+    } else {
+      // when not showing manage UI (public pages like Hero), avoid calling API
+      setCategories([]);
+    }
+  }, [showManage]);
 
   const startCreate = () => { setEditing(null); setName(''); setDesc(''); };
   const startEdit = (c: any) => { setEditing(c); setName(c.nombre || ''); setDesc(c.descripcion || ''); };

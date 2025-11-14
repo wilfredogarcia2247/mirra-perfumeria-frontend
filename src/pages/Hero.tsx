@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
-import { getCategorias } from '@/integrations/api';
+import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Loader2, X, Search, User, Phone, FileText } from 'lucide-react';
 import Footer from '@/components/Footer';
-import { createPedidoVentaPublic, getCachedTasaActiva } from '@/integrations/api';
 import ProductCarousel from '@/components/SocialMediaCarousel';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -34,55 +33,49 @@ export default function Hero() {
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
 
-  // Load categories (each category contains products with available stock in almacenes 'venta')
+  // Load public catalog using server-side pagination and search
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getCategorias()
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data ?? [];
-        // list: array of categories, each with .productos array
-        const products: Product[] = [];
-        const cats: string[] = [];
-        list.forEach((cat: any) => {
-          const catName = cat.nombre ?? cat.name ?? '';
-          if (catName) cats.push(catName);
-          const prodArr = Array.isArray(cat.productos) ? cat.productos : [];
-          prodArr.forEach((item: any) => {
-            const normalized: Product = {
-              id: item.id ?? item.producto_id ?? 0,
-              name: item.nombre ?? item.name ?? '',
-              image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
-              featured: Boolean(item.destacado ?? item.featured ?? false),
-              brand: item.marca_nombre ?? item.marca ?? item.brand ?? '',
-              category: catName,
-              description: item.descripcion ?? item.description ?? '',
-              price: Number(item.precio_venta ?? item.price ?? 0) || 0,
-              stock: Number(item.stock_disponible ?? item.stock ?? 0) || 0,
-            } as Product;
-            products.push(normalized);
-          });
-        });
-
+    (async () => {
+      try {
+        const res = await getCatalogoPaginated({ q: search || undefined, limit: perPage, offset: (page - 1) * perPage });
+        // getCatalogoPaginated normaliza a { items, meta }
+        const items = Array.isArray(res) ? res : (res?.items ?? res?.data ?? []);
+        const meta = res?.meta ?? null;
+        const productsList: Product[] = (Array.isArray(items) ? items : []).map((item: any) => ({
+          id: item.id ?? item.producto_id ?? 0,
+          name: item.nombre ?? item.name ?? '',
+          image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
+          featured: Boolean(item.destacado ?? item.featured ?? false),
+          brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
+          category: (item.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item.categoria_nombre ?? item.categoria ?? item.category ?? '',
+          description: item.descripcion ?? item.description ?? '',
+          price: Number(item.precio_venta ?? item.price ?? 0) || 0,
+          stock: Number(item.stock ?? item.stock_disponible ?? 0) || 0,
+          // attach raw inventory and full objects for detail views
+          inventario: item.inventario ?? item.inventario_detalle ?? item.inventory ?? undefined,
+          categoria_obj: item.categoria ?? null,
+          marca_obj: item.marca ?? null,
+        } as Product));
         if (!mounted) return;
-        // Excluir productos de "Materia Prima" por categoría nombre
-        const isMateriaPrima = (cat?: string) => {
-          if (!cat) return false;
-          const s = String(cat).toLowerCase().replace(/\s+/g, '');
-          return s === 'materiaprima' || s === 'materia' || s === 'materia_prima' || s.includes('materia');
-        };
-        const filtered = products.filter((p) => !isMateriaPrima(p.category));
-        setFullProducts(filtered);
-      })
-      .catch((err) => {
-        console.error('Error cargando categorías para catálogo:', err);
-        toast.error('Error al cargar catálogo');
+        setFullProducts(productsList);
+        setProducts(productsList);
+        // set total from meta if available
+        if (meta && (meta.total !== undefined && meta.total !== null)) setTotal(Number(meta.total));
+        else setTotal(Array.isArray(items) ? items.length : null);
+      } catch (err) {
+        console.error('Error cargando catálogo público:', err);
+        toast.error('Error al cargar catálogo público');
         setFullProducts([]);
-      })
-      .finally(() => mounted && setLoading(false));
-
+        setProducts([]);
+        setTotal(0);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
     return () => { mounted = false; };
-  }, []);
+  }, [page, perPage, search]);
 
   // Obtener tasa pública cacheada para mostrar precios convertidos en el carrito público
   useEffect(() => {

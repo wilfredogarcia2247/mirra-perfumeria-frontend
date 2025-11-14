@@ -23,12 +23,29 @@ export async function getProductosPaginated(page = 1, per_page = 12) {
 }
 
 // Endpoint público del catálogo que NO requiere token
-export async function getCatalogoPaginated(page = 1, per_page = 12) {
+export async function getCatalogoPaginated(opts: { q?: string; includeOutOfStock?: boolean; limit?: number; offset?: number; categoria_id?: number; marca_id?: number } = {}) {
   // El endpoint público correcto es /api/productos/catalogo
-  const url = `${API_URL}/productos/catalogo?page=${page}&per_page=${per_page}`;
-  const res = await fetch(url, { method: "GET", headers: { "Content-Type": "application/json" } });
+  const ps = new URLSearchParams();
+  if (opts.q) ps.set('q', String(opts.q));
+  if (opts.includeOutOfStock !== undefined) ps.set('includeOutOfStock', String(opts.includeOutOfStock));
+  if (opts.limit !== undefined) ps.set('limit', String(opts.limit));
+  if (opts.offset !== undefined) ps.set('offset', String(opts.offset));
+  if (opts.categoria_id !== undefined) ps.set('categoria_id', String(opts.categoria_id));
+  if (opts.marca_id !== undefined) ps.set('marca_id', String(opts.marca_id));
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  const url = `${API_URL}/productos/catalogo${qs}`;
+  const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const body = await res.json();
+  // Normalize: if backend returns { data: [...], total, page, per_page } or array
+  try {
+    if (body && typeof body === 'object') {
+      if (Array.isArray(body.data)) return { items: body.data, meta: { total: body.total ?? body.meta?.total ?? null, page: body.page ?? null, per_page: body.per_page ?? null } };
+      if (Array.isArray(body.items)) return { items: body.items, meta: { total: body.total ?? body.meta?.total ?? null, page: body.page ?? null, per_page: body.per_page ?? null } };
+    }
+  } catch (e) { /* ignore */ }
+  if (Array.isArray(body)) return { items: body, meta: { total: body.length } };
+  return body;
 }
 export async function getProducto(id: number) {
   return apiFetch(`/productos/${id}`);
