@@ -52,6 +52,43 @@ export default function ProduccionPage() {
     const venta = ventaAlmacenes.find((a) => a.tipo === 'Venta') || ventaAlmacenes[0];
     setSelectedAlmacen(venta ? venta.id : null);
     setModalOpen(true);
+    // Enriquecer nombres de materias primas y nombre del producto terminado si faltan
+    (async () => {
+      try {
+        const comps = Array.isArray(formula.componentes) ? formula.componentes : [];
+        const missing = comps.filter((c: any) => !(c.materia_prima_nombre || c.nombre || c.producto_nombre));
+        const lookups: Array<Promise<any>> = [];
+
+        // Fetch missing materia prima names
+        for (const c of missing) {
+          const id = Number(c.materia_prima_id ?? c.producto_id ?? c.id);
+          if (id && !isNaN(id)) lookups.push(getProducto(id).then((p) => ({ id, name: p?.nombre || p?.producto_nombre || p?.nombre_producto || null })).catch(() => ({ id, name: null })));
+        }
+
+        // Also fetch producto terminado name if missing
+        const prodId = Number(formula.producto_terminado_id ?? formula.producto_id);
+        let prodLookup: Promise<any> | null = null;
+        if (prodId && !isNaN(prodId) && !(formula.producto_terminado_nombre || formula.producto_nombre)) {
+          prodLookup = getProducto(prodId).then((p) => ({ id: prodId, name: p?.nombre || p?.producto_nombre || p?.nombre_producto || null })).catch(() => ({ id: prodId, name: null }));
+        }
+
+        const fetched = await Promise.all(lookups.concat(prodLookup ? [prodLookup] : []));
+        const nameMap = new Map<number, string | null>();
+        fetched.forEach((f: any) => { if (f && f.id) nameMap.set(Number(f.id), f.name || null); });
+
+        const enriched = {
+          ...formula,
+          producto_terminado_nombre: formula.producto_terminado_nombre || nameMap.get(prodId) || formula.producto_terminado_nombre,
+          componentes: comps.map((c: any) => ({
+            ...c,
+            materia_prima_nombre: c.materia_prima_nombre || c.nombre || c.producto_nombre || nameMap.get(Number(c.materia_prima_id ?? c.producto_id ?? c.id)) || undefined,
+          })),
+        };
+        setSelectedFormula(enriched);
+      } catch (e) {
+        console.error('Error enriqueciendo nombres de materias primas/producto terminado', e);
+      }
+    })();
   }
 
   async function handleProduce() {
@@ -160,7 +197,7 @@ export default function ProduccionPage() {
                   {Array.isArray(f.componentes) && f.componentes.length > 0 ? (
                     <ul className="text-sm list-disc pl-4">
                       {f.componentes.map((c: any) => (
-                        <li key={c.id || c.producto_id}>{c.nombre || c.producto_nombre} — {c.cantidad_por_unidad || c.cantidad || '-'} {c.unidad || ''}</li>
+                        <li key={c.id || c.producto_id}>{c.materia_prima_nombre || c.nombre || c.producto_nombre || c.materia_prima_id} — {c.cantidad_por_unidad || c.cantidad || '-'} {c.unidad || ''}</li>
                       ))}
                     </ul>
                   ) : (
@@ -183,7 +220,10 @@ export default function ProduccionPage() {
               <div className="p-2 space-y-3">
               <div>
                 <div className="text-sm text-muted-foreground">Fórmula</div>
-                <div className="text-2xl font-extrabold text-copper-900">{selectedFormula?.nombre ?? selectedFormula?.titulo ?? `#${selectedFormula?.id}`}</div>
+                  <div className="text-2xl font-extrabold text-copper-900">{selectedFormula?.nombre ?? selectedFormula?.titulo ?? `#${selectedFormula?.id}`}</div>
+                  {selectedFormula?.producto_terminado_nombre ? (
+                    <div className="text-sm text-muted-foreground">Producto a crear: <span className="font-medium">{selectedFormula.producto_terminado_nombre}</span></div>
+                  ) : null}
               </div>
 
               <div>

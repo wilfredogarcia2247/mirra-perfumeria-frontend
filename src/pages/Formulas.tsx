@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes } from "@/integrations/api";
+import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto } from "@/integrations/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -29,7 +29,8 @@ export default function Formulas() {
     // Cargar también almacenes para filtrar productos por existencia en almacenes de materia prima
     Promise.all([getFormulas(), getProductos(), getAlmacenes()])
       .then(([fres, pres, ares]) => {
-        setFormulas(Array.isArray(fres) ? fres : []);
+        // Enriquecer fórmulas para mostrar nombres en lugar de ids cuando sea necesario
+        enrichAndSetFormulas(Array.isArray(fres) ? fres : []);
         setProductos(Array.isArray(pres) ? pres : []);
         setAlmacenes(Array.isArray(ares) ? ares : []);
       })
@@ -41,6 +42,7 @@ export default function Formulas() {
   }, []);
 
   function addComponente() {
+    // Al agregar una fila nueva, inicializar sin unidad (se llenará al seleccionar materia prima)
     setComponentes((c) => [...c, { materia_prima_id: null, cantidad: null, unidad: '' }]);
   }
 
@@ -103,6 +105,24 @@ export default function Formulas() {
   async function handleEdit(id: number) {
     try {
       const f = await getFormula(id);
+      // Enriquecer la fórmula individual para obtener nombres si faltan
+      try {
+        const ids = new Set<number>();
+        if (f && f.producto_terminado_id) ids.add(Number(f.producto_terminado_id));
+        if (Array.isArray(f.componentes)) for (const c of f.componentes) if (c && c.materia_prima_id) ids.add(Number(c.materia_prima_id));
+        const idArr = Array.from(ids);
+        const resolved: Record<number, string> = {};
+        if (idArr.length > 0) {
+          const res = await Promise.all(idArr.map((id) => getProducto(Number(id)).then((p: any) => ({ id: Number(id), name: p?.nombre || p?.name || p?.titulo || (`Producto #${id}`) })).catch(() => ({ id: Number(id), name: `Producto #${id}` }))));
+          for (const r of res) resolved[Number(r.id)] = r.name;
+        }
+        if (f.producto_terminado_id) f.producto_terminado_nombre = f.producto_terminado_nombre ?? resolved[Number(f.producto_terminado_id)];
+        if (Array.isArray(f.componentes)) f.componentes = f.componentes.map((c: any) => ({ ...c, materia_prima_nombre: c.materia_prima_nombre ?? resolved[Number(c.materia_prima_id)] }));
+      } catch (err) {
+        // ignore enrichment errors for single formula
+        console.warn('No se pudo enriquecer fórmula al editar', err);
+      }
+
       // prefill nombre
       setNombre(f.nombre ?? '');
       // Prefill form
@@ -152,6 +172,47 @@ export default function Formulas() {
 
   const materias = productos.filter((p) => isMateriaPrima(p));
   const terminados = productos.filter((p) => !isMateriaPrima(p));
+
+  // Enriquecer fórmulas con nombres de productos cuando la API sólo devuelve ids.
+  async function enrichAndSetFormulas(rawFormulas: any[]) {
+    try {
+      const list = Array.isArray(rawFormulas) ? rawFormulas : [];
+      // recolectar ids únicos que necesitamos resolver
+      const ids = new Set<number>();
+      for (const f of list) {
+        if (f && f.producto_terminado_id && !f.producto_terminado_nombre) ids.add(Number(f.producto_terminado_id));
+        if (Array.isArray(f.componentes)) {
+          for (const c of f.componentes) {
+            if (c && c.materia_prima_id && !c.materia_prima_nombre) ids.add(Number(c.materia_prima_id));
+          }
+        }
+      }
+
+      const idArr = Array.from(ids);
+      const resolvedMap: Record<number, string> = {};
+      if (idArr.length > 0) {
+        const promises = idArr.map((id) => getProducto(Number(id)).then((p: any) => ({ id: Number(id), name: p?.nombre || p?.name || p?.titulo || (`Producto #${id}`) })).catch(() => ({ id: Number(id), name: `Producto #${id}` })));
+        const results = await Promise.all(promises);
+        for (const r of results) resolvedMap[Number(r.id)] = r.name;
+      }
+
+      const enriched = list.map((f: any) => {
+        const nf = { ...f };
+        if (nf.producto_terminado_id) nf.producto_terminado_nombre = nf.producto_terminado_nombre ?? resolvedMap[Number(nf.producto_terminado_id)];
+        if (Array.isArray(nf.componentes)) {
+          nf.componentes = nf.componentes.map((c: any) => ({ ...c, materia_prima_nombre: c.materia_prima_nombre ?? resolvedMap[Number(c.materia_prima_id)] }));
+        }
+        return nf;
+      });
+      setFormulas(enriched);
+    } catch (e) {
+      console.error('Error enriqueciendo fórmulas', e);
+      // Fallback: set raw data
+      setFormulas(Array.isArray(rawFormulas) ? rawFormulas : []);
+    }
+  }
+
+  
 
   return (
     <Layout>
@@ -231,7 +292,9 @@ export default function Formulas() {
                         <label className="text-xs">Materia prima</label>
                         <select className="w-full rounded-md border px-2 py-2" value={comp.materia_prima_id ?? ''} onChange={(e) => {
                           const val = e.target.value ? Number(e.target.value) : null;
-                          setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: val } : it));
+                          const mat = materias.find((m) => Number(m.id) === Number(val));
+                          const unidadMat = mat?.unidad || mat?.unidad_medida || mat?.unidad_nombre || '';
+                          setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: val, unidad: unidadMat } : it));
                         }}>
                           <option value="">-- Seleccione materia prima --</option>
                           {materias.map((m) => (
@@ -250,14 +313,7 @@ export default function Formulas() {
 
                       <div className="col-span-3">
                         <label className="text-xs">Unidad</label>
-                        <select className="w-full rounded-md border px-2 py-2" value={comp.unidad ?? ''} onChange={(e) => setComponentes((c) => c.map((it, i) => i === idx ? { ...it, unidad: e.target.value } : it))}>
-                          <option value="">-- Seleccione unidad --</option>
-                          <option value="ml">ml</option>
-                          <option value="g">g</option>
-                          <option value="kg">kg</option>
-                          <option value="L">L</option>
-                          <option value="u">unidad</option>
-                        </select>
+                        <input readOnly value={comp.unidad ?? ''} className="w-full rounded-md border px-2 py-2 bg-gray-50" />
                       </div>
 
                       <div className="col-span-1">

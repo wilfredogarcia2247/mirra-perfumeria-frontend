@@ -31,7 +31,7 @@ import { parseApiError } from '@/lib/utils';
 import { createProducto, updateProducto } from "@/integrations/api";
 import ImageUpload from "@/components/ImageUpload";
 // Category and brand selects (no CRUD) - cargamos listas desde API
-import { getCategorias, getMarcas } from '@/integrations/api';
+import { getCategorias, getMarcas, getFormulas } from '@/integrations/api';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -52,6 +52,7 @@ export default function Productos() {
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [productDetalle, setProductDetalle] = useState<any | null>(null);
+  const [productFormula, setProductFormula] = useState<any | null>(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
@@ -115,7 +116,36 @@ export default function Productos() {
       }
       try {
         const m = await getMarcas();
-        const mlist = Array.isArray(m) ? m : (m?.data || []);
+                        {/* Lista de materiales (fórmula) para el producto terminado */}
+                        {productFormula ? (
+                          <div className="col-span-2 mt-6">
+                            <h4 className="text-sm font-semibold mb-2">Lista de materiales (Fórmula)</h4>
+                            {Array.isArray(productFormula.componentes) && productFormula.componentes.length > 0 ? (
+                              <div className="overflow-x-auto border rounded bg-white p-2">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-copper-700 text-xs">
+                                      <th className="px-2 py-1 text-left">Materia prima</th>
+                                      <th className="px-2 py-1 text-right">Cantidad</th>
+                                      <th className="px-2 py-1 text-left">Unidad</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {productFormula.componentes.map((c: any, i: number) => (
+                                      <tr key={i} className="border-t">
+                                        <td className="px-2 py-1">{c.materia_prima_nombre ?? c.materia_prima_id}</td>
+                                        <td className="px-2 py-1 text-right">{Number(c.cantidad || 0).toLocaleString('es-AR')}</td>
+                                        <td className="px-2 py-1">{c.unidad || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">No se encontró una fórmula asociada a este producto.</div>
+                            )}
+                          </div>
+                        ) : null}
         setMarcas(mlist);
         const mmap: Record<number, string> = {};
         mlist.forEach((it: any) => { if (it && it.id !== undefined) mmap[Number(it.id)] = it.nombre; });
@@ -399,7 +429,19 @@ export default function Productos() {
           </div>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2" variant="default">
+              <Button
+                className="gap-2"
+                variant="default"
+                onClick={() => {
+                  // Asegurar que al crear un nuevo producto el formulario esté en blanco
+                  setEditingProduct(null);
+                  form.reset();
+                  setImageUrl(null);
+                  setCategoriaId(null);
+                  setMarcaId(null);
+                  setProductDetalle(null);
+                }}
+              >
                 <Plus className="h-4 w-4" />
                 Nuevo Producto
               </Button>
@@ -681,9 +723,18 @@ export default function Productos() {
                       <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
                       <TableCell>{product.marca_nombre ?? marcasMap[product.marca_id] ?? '-'}</TableCell>
                       <TableCell>
-                        <span className={product.stock && product.stock < 20 ? "text-destructive font-semibold" : ""}>
-                          {product.stock}
-                        </span>
+                        {(() => {
+                          const inv = (product?.inventario) || [];
+                          const totalDisponible = Array.isArray(inv) && inv.length > 0
+                            ? inv.reduce((s: number, it: any) => s + (Number(it.stock_disponible || 0)), 0)
+                            : Number(product?.stock || 0);
+                          const warn = totalDisponible < 20;
+                          return (
+                            <span className={warn ? "text-destructive font-semibold" : ""}>
+                              {Number(totalDisponible).toLocaleString('es-AR')}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>{product.costo ?? "-"}</TableCell>
                       <TableCell>{product.precio_venta ?? "-"}</TableCell>
@@ -712,13 +763,38 @@ export default function Productos() {
                               // cargar detalle completo (incluye inventario por almacén)
                               setLoadingDetalle(true);
                               setProductDetalle(null);
+                              setProductFormula(null);
                               getProducto(product.id)
                                 .then((d) => setProductDetalle(d))
                                 .catch((e) => { console.error('Error cargando detalle producto:', e); toast.error('No se pudo cargar inventario'); })
                                 .finally(() => setLoadingDetalle(false));
+
+                              // Cargar fórmulas y buscar la que corresponde a este producto terminado
+                              (async () => {
+                                try {
+                                  const all = await getFormulas();
+                                  const list = Array.isArray(all) ? all : (all?.data || []);
+                                  const found = list.find((f: any) => Number(f.producto_terminado_id) === Number(product.id));
+                                  if (found) setProductFormula(found);
+                                } catch (e) {
+                                  console.error('Error cargando fórmulas', e);
+                                }
+                              })();
                             }}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Agregar existencia (almacén)"
+                            onClick={() => {
+                              setViewStockProduct(product);
+                              // Abrir modal de asignar/añadir almacén y cargar almacenes
+                              openAssignModal();
+                            }}
+                          >
+                            <Plus className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
