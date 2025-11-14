@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
-import CategoryFilter from '@/components/CategoryFilter';
-import { getCatalogoPaginated } from '@/integrations/api';
+import { getCategorias } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
@@ -35,49 +34,54 @@ export default function Hero() {
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
 
-  // Load full catalog once on mount
+  // Load categories (each category contains products with available stock in almacenes 'venta')
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getCatalogoPaginated(1, 1000)
+    getCategorias()
       .then((res: any) => {
-        const items = Array.isArray(res) ? res : res?.data ?? [];
-
-        const normalize = (item: any): Product => ({
-          id: item.id ?? item.producto_id ?? 0,
-          name: item.name ?? item.nombre ?? '',
-          image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
-          featured: Boolean(item.featured ?? item.destacado ?? (item.is_featured === 1)),
-          brand: item.brand ?? item.marca ?? '',
-          category: item.category ?? item.categoria ?? item.tipo ?? '',
-          description: item.description ?? item.descripcion ?? '',
-          price: Number(item.price ?? item.precio_venta ?? item.precio ?? 0) || 0,
-          stock: item.stock ?? item.cantidad ?? item.stock_actual ?? 0,
+        const list = Array.isArray(res) ? res : res?.data ?? [];
+        // list: array of categories, each with .productos array
+        const products: Product[] = [];
+        const cats: string[] = [];
+        list.forEach((cat: any) => {
+          const catName = cat.nombre ?? cat.name ?? '';
+          if (catName) cats.push(catName);
+          const prodArr = Array.isArray(cat.productos) ? cat.productos : [];
+          prodArr.forEach((item: any) => {
+            const normalized: Product = {
+              id: item.id ?? item.producto_id ?? 0,
+              name: item.nombre ?? item.name ?? '',
+              image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
+              featured: Boolean(item.destacado ?? item.featured ?? false),
+              brand: item.marca_nombre ?? item.marca ?? item.brand ?? '',
+              category: catName,
+              description: item.descripcion ?? item.description ?? '',
+              price: Number(item.precio_venta ?? item.price ?? 0) || 0,
+              stock: Number(item.stock_disponible ?? item.stock ?? 0) || 0,
+            } as Product;
+            products.push(normalized);
+          });
         });
 
         if (!mounted) return;
-        const normalized = items.map(normalize);
-
-        // Excluir productos de "Materia Prima" del catálogo público
+        // Excluir productos de "Materia Prima" por categoría nombre
         const isMateriaPrima = (cat?: string) => {
           if (!cat) return false;
           const s = String(cat).toLowerCase().replace(/\s+/g, '');
           return s === 'materiaprima' || s === 'materia' || s === 'materia_prima' || s.includes('materia');
         };
-
-        const filtered = normalized.filter((p) => !isMateriaPrima(p.category));
+        const filtered = products.filter((p) => !isMateriaPrima(p.category));
         setFullProducts(filtered);
       })
       .catch((err) => {
-        console.error('Error cargando catálogo:', err);
+        console.error('Error cargando categorías para catálogo:', err);
         toast.error('Error al cargar catálogo');
         setFullProducts([]);
       })
       .finally(() => mounted && setLoading(false));
 
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   // Obtener tasa pública cacheada para mostrar precios convertidos en el carrito público
@@ -122,7 +126,7 @@ export default function Hero() {
     setTotal(totalCount);
   }, [fullProducts, page, perPage, selectedCategory, search]);
 
-  const categories = Array.from(new Set((fullProducts ?? []).map((p) => (p.category || '').trim()).filter(Boolean)));
+  // not exposing categories selector on the public Hero
 
   function handleAddToCart(product: Product) {
     addItem(product, 1);
@@ -201,9 +205,7 @@ export default function Hero() {
             </div>
           </div>
 
-          <div className="w-full md:w-auto">
-            <CategoryFilter categories={categories} selectedCategory={selectedCategory} onSelectCategory={(c) => { setSelectedCategory(c === 'all' ? 'all' : c); setPage(1); }} />
-          </div>
+          {/* Category filter removed from Landing (Hero) */}
         </div>
 
         {loading ? (

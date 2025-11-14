@@ -74,12 +74,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             >
               Nosotros
             </Link>
-            <Link
-              to="/pedidos"
-              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
-            >
-              Pedidos
-            </Link>
+            
             <div className="relative group">
               <button className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
                 Productos
@@ -108,10 +103,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 </Link>
               </div>
             </div>
-            {/* Selector / CRUD de categorías */}
-            <div className="flex items-center">
-              <CategoryMenu />
-            </div>
+           
           </nav>
 
           {/* Botones de acción */}
@@ -181,7 +173,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           </Link>
           {/* CategoryMenu en móvil */}
           <div className="block px-4 py-3">
-            <CategoryMenu />
+            <CategoryMenu showManage={location.pathname !== '/'} />
           </div>
           <Link
             to="/"

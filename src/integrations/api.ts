@@ -147,10 +147,48 @@ export async function createFormaPago(data: any) {
 }
 
 // Categorías (CRUD)
-export async function getCategorias() {
-  return apiFetch('/categorias');
+export async function getCategorias(opts: { include_out_of_stock?: boolean } = {}) {
+  const params = new URLSearchParams();
+  if (opts.include_out_of_stock) params.set('include_out_of_stock', 'true');
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/categorias${qs}`);
 }
 
+export async function getProductosCatalogo(params: { page?: number; per_page?: number; q?: string; categoria_id?: number; marca_id?: number; in_stock?: boolean; sort?: string } = {}) {
+  const ps = new URLSearchParams();
+  if (params.page) ps.set('page', String(params.page));
+  if (params.per_page) ps.set('per_page', String(params.per_page));
+  if (params.q) ps.set('q', String(params.q));
+  if (params.categoria_id) ps.set('categoria_id', String(params.categoria_id));
+  if (params.marca_id) ps.set('marca_id', String(params.marca_id));
+  if (params.in_stock !== undefined) ps.set('in_stock', String(params.in_stock));
+  if (params.sort) ps.set('sort', params.sort);
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  const res = await apiFetch(`/productos/catalogo${qs}`);
+  // Normalizar: si backend devuelve { data: [...], page, per_page, total }
+  try {
+    if (res && typeof res === 'object') {
+      if (Array.isArray(res.data)) return { items: res.data, meta: { page: res.page ?? params.page ?? 1, per_page: res.per_page ?? params.per_page ?? 24, total: res.total ?? res.meta?.total ?? null } };
+      if (Array.isArray(res.items)) return { items: res.items, meta: { page: res.page ?? params.page ?? 1, per_page: res.per_page ?? params.per_page ?? 24, total: res.total ?? res.meta?.total ?? null } };
+    }
+  } catch (e) { /* ignore normalization errors */ }
+  // Fallbacks: si es array devuelve items directamente
+  if (Array.isArray(res)) return { items: res, meta: { page: params.page ?? 1, per_page: params.per_page ?? res.length, total: res.length } };
+  return res;
+}
+
+/**
+ * Obtener productos filtrados por categoría con paginación: GET /api/productos?categoria_id=X&in_stock=true&page=... 
+ */
+export async function getProductosByCategoria(categoria_id: number, opts: { in_stock?: boolean; page?: number; per_page?: number } = {}) {
+  const ps = new URLSearchParams();
+  if (categoria_id) ps.set('categoria_id', String(categoria_id));
+  if (opts.in_stock !== undefined) ps.set('in_stock', String(opts.in_stock));
+  if (opts.page) ps.set('page', String(opts.page));
+  if (opts.per_page) ps.set('per_page', String(opts.per_page));
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  return apiFetch(`/productos${qs}`);
+}
 export async function getCategoria(id: number) {
   return apiFetch(`/categorias/${id}`);
 }
@@ -600,7 +638,11 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     (err as any).status = res.status;
     if (res.status === 401) {
       try { localStorage.removeItem('jwt_token'); } catch (e) {}
-      if (typeof window !== 'undefined') window.location.href = '/login';
+      // No redirigir globalmente a /login desde la capa API: dejar que las rutas
+      // y componentes manejen 401 (por ejemplo ProtectedRoute). Evita forzar
+      // la navegación fuera de la página pública (Hero).
+      // eslint-disable-next-line no-console
+      console.warn('apiFetch: 401 Unauthorized - token cleared, no global redirect');
     }
     throw err;
   }

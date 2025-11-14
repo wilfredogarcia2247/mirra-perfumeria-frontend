@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { getCategorias, createCategoria, updateCategoria, deleteCategoria } from '@/integrations/api';
 import { toast } from 'sonner';
 
-export default function CategoryMenu({ value, onChange }: { value?: number | null; onChange?: (id: number | null) => void }) {
+export default function CategoryMenu({ value, onChange, showManage = true }: { value?: number | null; onChange?: (id: number | null) => void; showManage?: boolean }) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,7 +70,7 @@ export default function CategoryMenu({ value, onChange }: { value?: number | nul
         <option value="">-- Categoría --</option>
         {categories.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
       </select>
-      <Button variant="outline" size="sm" onClick={() => { setOpen(true); fetch(); }}>Gestionar</Button>
+      {showManage ? <Button variant="outline" size="sm" onClick={() => { setOpen(true); fetch(); }}>Gestionar</Button> : null}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -19,15 +19,14 @@ import useCart from "@/hooks/use-cart";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Productos", url: "/productos", icon: Package },
+  { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard },
+  { title: "Bancos", url: "/bancos", icon: Building2 },
+  { title: "Marcas", url: "/marcas", icon: Award },
+  { title: "Categorías", url: "/categorias", icon: Layers },
   { title: "Almacenes", url: "/almacenes", icon: Warehouse },
+  { title: "Productos", url: "/productos", icon: Package },
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
   { title: "Producción", url: "/produccion", icon: FlaskConical },
-  { title: "Pedidos", url: "/pedidos", icon: ShoppingCart },
-  { title: "Bancos", url: "/bancos", icon: Building2 },
-  { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard },
-  { title: "Categorías", url: "/categorias", icon: Layers },
-  { title: "Marcas", url: "/marcas", icon: Award },
 ];
 
 export function AppSidebar() {
