@@ -88,10 +88,9 @@ cp .env.example .env
 Notas:
 - No subas tu archivo `.env` al repositorio. El `.gitignore` ya contiene `.env` y `.env.*`.
 - Las variables encontradas en el proyecto son:
+- Las variables encontradas en el proyecto son:
 	- `VITE_API_URL` (URL base del API)
-	- `VITE_SUPABASE_URL`
-	- `VITE_SUPABASE_PUBLISHABLE_KEY` (solo la publishable key para uso en frontend)
 	- `VITE_CLOUDINARY_CLOUD_NAME`
 	- `VITE_CLOUDINARY_UPLOAD_PRESET`
 
-Si necesitas ayuda para obtener las credenciales de Supabase o Cloudinary, dime y te guío.
+Si necesitas ayuda para obtener las credenciales de Cloudinary u otros servicios, dime y te guío.
