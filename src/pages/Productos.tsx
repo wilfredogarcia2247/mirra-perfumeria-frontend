@@ -76,7 +76,6 @@ export default function Productos() {
   const form = useForm({
     defaultValues: {
       nombre: "",
-      tipo: "MateriaPrima",
       unidad: "unidad",
       stock: 0,
       costo: 0,
@@ -91,12 +90,40 @@ export default function Productos() {
   const [marcaId, setMarcaId] = useState<number | null>(null);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [marcas, setMarcas] = useState<any[]>([]);
+  const [categoriasMap, setCategoriasMap] = useState<Record<number, string>>({});
+  const [marcasMap, setMarcasMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
     getProductos()
       .then(setProductos)
       .catch(() => toast.error("Error al cargar productos"))
       .finally(() => setLoading(false));
+  }, []);
+
+  // Cargar categorías y marcas al montar para poder mostrar nombres en el listado
+  useEffect(() => {
+    (async () => {
+      try {
+        const c = await getCategorias();
+        const list = Array.isArray(c) ? c : (c?.data || []);
+        setCategorias(list);
+        const cmap: Record<number, string> = {};
+        list.forEach((it: any) => { if (it && it.id !== undefined) cmap[Number(it.id)] = it.nombre; });
+        setCategoriasMap(cmap);
+      } catch (e) {
+        setCategorias([]);
+      }
+      try {
+        const m = await getMarcas();
+        const mlist = Array.isArray(m) ? m : (m?.data || []);
+        setMarcas(mlist);
+        const mmap: Record<number, string> = {};
+        mlist.forEach((it: any) => { if (it && it.id !== undefined) mmap[Number(it.id)] = it.nombre; });
+        setMarcasMap(mmap);
+      } catch (e) {
+        setMarcas([]);
+      }
+    })();
   }, []);
 
   // Initialize image state when dialog opens (create/edit)
@@ -136,16 +163,13 @@ export default function Productos() {
     const term = searchTerm.toLowerCase();
     return (
       (product.nombre || "").toLowerCase().includes(term) ||
-      (product.tipo || "").toLowerCase().includes(term)
+      false
     );
   });
 
   async function onSubmit(values: any) {
     try {
-      // Normalizar 'tipo' a los valores que suele aceptar la API
-      let tipo = (values.tipo || "").toString().trim();
-      if (/materia/i.test(tipo)) tipo = "MateriaPrima";
-      else if (/producto/i.test(tipo)) tipo = "ProductoTerminado";
+      // Nota: el campo `tipo` fue removido del formulario.
 
       // El campo 'stock' no es editable desde el formulario. Para ediciones usamos el stock actual del producto
       // derivado del inventario por almacén (productDetalle) si está disponible, o del campo editingProduct.stock.
@@ -168,7 +192,6 @@ export default function Productos() {
 
       const payload = {
         nombre: (values.nombre || "").toString(),
-        tipo,
         unidad: (values.unidad || "").toString(),
         stock: Number.isNaN(stock) ? 0 : stock,
         costo: Number.isNaN(costo) ? null : costo,
@@ -210,9 +233,6 @@ export default function Productos() {
         const values = form.getValues();
 
         // Reconstruir payload siguiendo la lógica de onSubmit
-        let tipo = (values.tipo ?? editingProduct.tipo ?? '').toString().trim();
-        if (/materia/i.test(tipo)) tipo = 'MateriaPrima';
-        else if (/producto/i.test(tipo)) tipo = 'ProductoTerminado';
 
         // El campo stock no es editable: usar stock derivado de productDetalle/inventario o editingProduct.stock
         let stock: number;
@@ -234,7 +254,6 @@ export default function Productos() {
 
         const payload = {
           nombre: (values.nombre ?? editingProduct.nombre ?? '').toString(),
-          tipo,
           unidad: (values.unidad ?? editingProduct.unidad ?? '').toString(),
           stock: Number.isNaN(stock) ? 0 : stock,
           costo: Number.isNaN(costo as number) ? null : costo,
@@ -410,25 +429,19 @@ export default function Productos() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <FormItem>
-                            <FormLabel>Tipo</FormLabel>
+                            <FormLabel>Unidad</FormLabel>
                             <FormControl>
                               <select
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                {...form.register("tipo", { required: true })}
+                                {...form.register("unidad", { required: true })}
                               >
-                                <option value="MateriaPrima">Materia Prima</option>
-                                <option value="ProductoTerminado">Producto Terminado</option>
+                                <option value="unidad">unidad</option>
+                                <option value="kg">kg</option>
+                                <option value="g">g</option>
+                                <option value="litro">litro</option>
+                                <option value="ml">ml</option>
+                                <option value="m">m</option>
                               </select>
-                            </FormControl>
-                          </FormItem>
-
-                          <FormItem>
-                            <FormLabel>Unidad</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Ej: unidad, kg, litro" 
-                                {...form.register("unidad", { required: true })} 
-                              />
                             </FormControl>
                           </FormItem>
                         </div>
@@ -479,16 +492,7 @@ export default function Productos() {
                           </FormItem>
                         </div>
 
-                        <FormItem>
-                          <FormLabel>Proveedor ID</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="Opcional"
-                              {...form.register("proveedor_id", { valueAsNumber: true })} 
-                            />
-                          </FormControl>
-                        </FormItem>
+                        {/* Proveedor se mantiene en payload pero no es visible en el formulario */}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -647,14 +651,13 @@ export default function Productos() {
                     <TableHead>ID</TableHead>
                     <TableHead>Imagen</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Tipo</TableHead>
+                    {/* Tipo eliminado */}
                     <TableHead>Unidad</TableHead>
                     <TableHead>Categoría</TableHead>
                     <TableHead>Marca</TableHead>
                     <TableHead>Stock</TableHead>
                     <TableHead>Costo</TableHead>
                     <TableHead>Precio Venta</TableHead>
-                    <TableHead>Proveedor</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -673,10 +676,10 @@ export default function Productos() {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">{product.nombre}</TableCell>
-                      <TableCell>{product.tipo}</TableCell>
+                      {/* campo tipo eliminado */}
                       <TableCell>{product.unidad}</TableCell>
-                      <TableCell>{product.categoria_nombre ?? '-'}</TableCell>
-                      <TableCell>{product.marca_nombre ?? '-'}</TableCell>
+                      <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
+                      <TableCell>{product.marca_nombre ?? marcasMap[product.marca_id] ?? '-'}</TableCell>
                       <TableCell>
                         <span className={product.stock && product.stock < 20 ? "text-destructive font-semibold" : ""}>
                           {product.stock}
@@ -684,7 +687,6 @@ export default function Productos() {
                       </TableCell>
                       <TableCell>{product.costo ?? "-"}</TableCell>
                       <TableCell>{product.precio_venta ?? "-"}</TableCell>
-                      <TableCell>{product.proveedor_id ?? "-"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                          
@@ -696,7 +698,6 @@ export default function Productos() {
                               setEditingProduct(product);
                               form.reset({
                                 nombre: product.nombre,
-                                tipo: product.tipo,
                                 unidad: product.unidad,
                                 // stock no se setea porque no es editable en el formulario
                                 costo: product.costo,
