@@ -107,14 +107,14 @@ export default function Proveedores() {
             <p className="text-muted-foreground">Gestión de proveedores</p>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo Proveedor
-              </Button>
-            </DialogTrigger>
+          <div>
+            <Button className="gap-2" onClick={() => { setEditing(null); form.reset(); setIsOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              Nuevo Proveedor
+            </Button>
+          </div>
 
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editing ? "Editar Proveedor" : "Nuevo Proveedor"}</DialogTitle>

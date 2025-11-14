@@ -138,7 +138,6 @@ export default function Bancos() {
 
   async function openModal(id: number) {
     try {
-      setModalOpen(true);
       const b = await getBanco(id);
       setModalBanco(b || null);
       setModalMoneda(b?.moneda ?? '');
@@ -168,8 +167,16 @@ export default function Bancos() {
         result.push({ forma_pago_id: item.forma_pago_id, detalles: item.detalles });
       }
       ef = result;
+      // If there are no formas from backend, initialize one editable row to help the user
+      if (!ef || ef.length === 0) {
+        const defaultNonTransfer = formasPago.find((f) => !isTransferName(String(f.nombre)));
+        const defaultId = defaultNonTransfer ? defaultNonTransfer.id : (formasPago[0]?.id ?? 0);
+        ef = [{ forma_pago_id: defaultId, detalles: { banco: b?.nombre ?? '' } }];
+      }
       setEditingFormas(ef);
       setEditingFormasErrors(ef.map(() => ''));
+      // Abrir modal sólo después de tener datos preparados para evitar vistas vacías
+      setModalOpen(true);
     } catch (e) {
       console.error('Error cargando banco', e);
       toast.error('No se pudo cargar detalles del banco');
@@ -289,6 +296,25 @@ export default function Bancos() {
         <textarea className="w-full border rounded p-2" rows={3} value={JSON.stringify(detallesObj || {}, null, 2)} onChange={(e) => {
           try { const parsed = JSON.parse(e.target.value); updateFormaAt(i, { detalles: parsed }); } catch { updateFormaAt(i, { detalles: e.target.value }); }
         }} />
+      </div>
+    );
+  }
+
+  function renderDetallesView(detalles: any) {
+    const d = typeof detalles === 'string' ? (() => { try { return JSON.parse(detalles); } catch { return detalles; } })() : detalles || {};
+    if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return <div className="text-sm text-muted-foreground">No hay detalles.</div>;
+    if (typeof d !== 'object') return <pre className="text-xs mt-1 bg-gray-50 p-2 rounded overflow-auto">{String(d)}</pre>;
+    // Prefer common keys ordering
+    const keysOrder = ['numero_cuenta', 'documento', 'numero_telefono', 'titular', 'banco', 'referencia'];
+    const keys = [...keysOrder.filter(k => k in d), ...Object.keys(d).filter(k => !keysOrder.includes(k))];
+    return (
+      <div className="mt-1 space-y-1">
+        {keys.map((k) => (
+          <div key={k} className="flex items-start gap-2 text-sm">
+            <div className="w-36 font-medium text-gray-700">{k.replace(/_/g, ' ')}:</div>
+            <div className="flex-1 text-gray-800">{String((d as any)[k])}</div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -460,9 +486,23 @@ export default function Bancos() {
                     {dedupeFormasList(modalBanco.formas_pago).map((fp: any, idx: number) => (
                       <li key={idx} className="border rounded p-2">
                         <div className="font-medium">{fp.nombre}</div>
-                        <pre className="text-xs mt-1 bg-gray-50 p-2 rounded overflow-auto">{JSON.stringify(fp.detalles || {}, null, 2)}</pre>
+                        {renderDetallesView(fp.detalles)}
                       </li>
                     ))}
+                  </ul>
+                ) : editingFormas && editingFormas.length > 0 ? (
+                  // Fallback: si el backend no devuelve 'formas_pago' pero ya preparamos editingFormas,
+                  // mostrar esas formas para que el usuario las vea.
+                  <ul className="mt-2 space-y-2">
+                    {editingFormas.map((ef: any, idx: number) => {
+                      const meta = formasPago.find((p) => Number(p.id) === Number(ef.forma_pago_id));
+                      return (
+                        <li key={idx} className="border rounded p-2">
+                          <div className="font-medium">{meta?.nombre ?? `Forma ${ef.forma_pago_id}`}</div>
+                          {renderDetallesView(ef.detalles)}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <div className="text-sm text-muted-foreground mt-2">Sin formas de pago asociadas.</div>

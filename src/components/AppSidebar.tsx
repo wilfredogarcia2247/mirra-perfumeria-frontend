@@ -27,6 +27,7 @@ const menuItems = [
   { title: "Productos", url: "/productos", icon: Package },
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
   { title: "Producción", url: "/produccion", icon: FlaskConical },
+  { title: "Pedidos", url: "/pedidos", icon: Receipt },
 ];
 
 export function AppSidebar() {

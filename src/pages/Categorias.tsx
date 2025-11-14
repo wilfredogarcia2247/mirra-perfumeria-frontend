@@ -103,6 +103,13 @@ export default function Categorias() {
   const startCreate = () => { setEditing(null); form.reset(); setIsOpen(true); };
   const startEdit = (c: any) => { setEditing(c); form.reset({ nombre: c.nombre, descripcion: c.descripcion }); setIsOpen(true); };
 
+  // Asegurar que al abrir el modal en modo 'nuevo' el formulario esté vacío.
+  useEffect(() => {
+    if (isOpen && !editing) {
+      form.reset({ nombre: '', descripcion: '' });
+    }
+  }, [isOpen, editing]);
+
   const remove = async (c: any) => {
     try {
       await deleteCategoria(c.id);

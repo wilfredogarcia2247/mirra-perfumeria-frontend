@@ -56,6 +56,13 @@ export default function Almacenes() {
     },
   });
 
+  // Asegurar que al abrir el modal en modo 'nuevo' el formulario esté vacío.
+  useEffect(() => {
+    if (isOpen && !editing) {
+      form.reset({ nombre: '', tipo: 'venta', es_materia_prima: false, ubicacion: '', responsable: '' });
+    }
+  }, [isOpen, editing]);
+
   useEffect(() => {
     setLoading(true);
     getAlmacenes()
@@ -136,14 +143,14 @@ export default function Almacenes() {
             <p className="text-muted-foreground">Gestión de almacenes</p>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo Almacén
-              </Button>
-            </DialogTrigger>
+          <div>
+            <Button className="gap-2" onClick={() => { setEditing(null); form.reset(); setIsOpen(true); }}>
+              <Plus className="h-4 w-4" />
+              Nuevo Almacén
+            </Button>
+          </div>
 
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editing ? "Editar Almacén" : "Nuevo Almacén"}</DialogTitle>

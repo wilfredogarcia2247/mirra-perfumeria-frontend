@@ -47,6 +47,30 @@ export default function Pedidos() {
   };
   const navigate = useNavigate();
 
+  // Helper: ordenar pedidos por fecha descendente (más recientes primero)
+  const sortPedidosByDateDesc = (list: any[]) => {
+    const arr = Array.isArray(list) ? list.slice() : [];
+    arr.sort((a: any, b: any) => {
+      const da = Date.parse(a?.fecha || a?.created_at || a?.createdAt || '') || 0;
+      const db = Date.parse(b?.fecha || b?.created_at || b?.createdAt || '') || 0;
+      return db - da;
+    });
+    return arr;
+  };
+
+  const getRowClasses = (p: any) => {
+    const s = (p?.estado || p?.status || '').toString().toLowerCase();
+    let bg = 'bg-white';
+    let border = 'border-transparent';
+    if (s === 'pendiente') { bg = 'bg-yellow-50'; border = 'border-yellow-400'; }
+    else if (s === 'enviado') { bg = 'bg-sky-50'; border = 'border-sky-400'; }
+    else if (s === 'completado') { bg = 'bg-green-50'; border = 'border-green-400'; }
+    else if (s === 'cancelado') { bg = 'bg-red-50'; border = 'border-red-400'; }
+    const ts = Date.parse(p?.fecha || p?.created_at || p?.createdAt || '') || 0;
+    const recent = (Date.now() - ts) < (1000 * 60 * 60 * 24); // 24h
+    return `hover:bg-muted/50 transition-all rounded-md ${bg} ${border} border-l-4 ${recent ? 'shadow-md' : ''}`;
+  };
+
   useEffect(() => {
     setLoading(true);
     // Cargar pedidos y luego el mapa de pagos
@@ -54,14 +78,7 @@ export default function Pedidos() {
       try {
         const data = await getPedidos();
         const list = Array.isArray(data) ? data : (data && Array.isArray((data as any).data) ? (data as any).data : []);
-        // Ordenar por fecha más reciente primero
-        const withDates = list.slice();
-        withDates.sort((a: any, b: any) => {
-          const da = Date.parse(a?.fecha || a?.created_at || a?.createdAt || '') || 0;
-          const db = Date.parse(b?.fecha || b?.created_at || b?.createdAt || '') || 0;
-          return db - da;
-        });
-        setPedidos(withDates);
+        setPedidos(sortPedidosByDateDesc(list));
         // Construir mapa de pagos
         await refreshPagosMap();
       } catch (err) {
@@ -104,21 +121,22 @@ export default function Pedidos() {
       } catch (e) {
         // ignore
       }
-      polling = setInterval(async () => {
+        polling = setInterval(async () => {
         try {
           const fresh = await getPedidos();
           if (Array.isArray(fresh)) {
-            // Usar actualización funcional para comparar con el estado previo y evitar capturar `pedidos` en el closure
+            // Ordenar y usar actualización funcional para comparar con el estado previo
+            const sortedFresh = sortPedidosByDateDesc(fresh);
             setPedidos((prev) => {
               try {
-                if (fresh.length > (prev?.length || 0)) {
-                  setNewOrdersCount((c) => c + (fresh.length - (prev?.length || 0)));
-                  toast.success(`Hay ${fresh.length - (prev?.length || 0)} pedidos nuevos`);
+                if (sortedFresh.length > (prev?.length || 0)) {
+                  setNewOrdersCount((c) => c + (sortedFresh.length - (prev?.length || 0)));
+                  toast.success(`Hay ${sortedFresh.length - (prev?.length || 0)} pedidos nuevos`);
                 }
               } catch (err) {
                 // ignore
               }
-              return fresh;
+              return sortedFresh;
             });
             // refrescar pagosMap en background para mantener el listado sincronizado
             try { await refreshPagosMap(); } catch (e) { /* ignore */ }
@@ -489,14 +507,14 @@ export default function Pedidos() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visiblePedidos.map((p: any) => (
-                    <TableRow key={p.id || JSON.stringify(p)} className="hover:bg-muted/50">
+                  {sortPedidosByDateDesc(visiblePedidos).map((p: any) => (
+                    <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
                       <TableCell className="font-mono text-sm">{p.id ?? '-'}</TableCell>
                       <TableCell>{fmtCliente(p)}</TableCell>
                       <TableCell>{fmtFecha(p)}</TableCell>
                       <TableCell>
                         <div className="inline-flex items-center gap-2">
-                          <Badge variant={estadoColor(fmtEstado(p)) as any}>{fmtEstado(p)}</Badge>
+                          <Badge className="px-2 py-0.5" variant={estadoColor(fmtEstado(p)) as any}>{fmtEstado(p)}</Badge>
                             {fmtEstado(p).toString().toLowerCase() === 'completado' && (
                               isPedidoPaid(p) ? (
                                 <Badge className="ml-2 bg-green-600 text-white" variant="default">Pagado</Badge>

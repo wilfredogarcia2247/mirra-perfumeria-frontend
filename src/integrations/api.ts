@@ -638,11 +638,25 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     (err as any).status = res.status;
     if (res.status === 401) {
       try { localStorage.removeItem('jwt_token'); } catch (e) {}
-      // No redirigir globalmente a /login desde la capa API: dejar que las rutas
-      // y componentes manejen 401 (por ejemplo ProtectedRoute). Evita forzar
-      // la navegación fuera de la página pública (Hero).
-      // eslint-disable-next-line no-console
-      console.warn('apiFetch: 401 Unauthorized - token cleared, no global redirect');
+      // Si la 401 ocurre y NO estamos en la página pública (hero -> '/'),
+      // redirigimos al login para forzar re-autenticación. Si estamos en
+      // el landing público, no forzamos navegación (permitir vista pública).
+      try {
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname || '/';
+          const isHero = path === '/';
+          if (!isHero) {
+            // Reemplazar la entrada de navegación para evitar volver atrás
+            window.location.replace('/login');
+            // no continuar, lanzamos el error para que el caller también lo maneje
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn('apiFetch: 401 Unauthorized on public page - token cleared, no redirect');
+          }
+        }
+      } catch (e) {
+        // ignore navigation errors
+      }
     }
     throw err;
   }

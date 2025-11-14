@@ -116,36 +116,7 @@ export default function Productos() {
       }
       try {
         const m = await getMarcas();
-                        {/* Lista de materiales (fórmula) para el producto terminado */}
-                        {productFormula ? (
-                          <div className="col-span-2 mt-6">
-                            <h4 className="text-sm font-semibold mb-2">Lista de materiales (Fórmula)</h4>
-                            {Array.isArray(productFormula.componentes) && productFormula.componentes.length > 0 ? (
-                              <div className="overflow-x-auto border rounded bg-white p-2">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="text-copper-700 text-xs">
-                                      <th className="px-2 py-1 text-left">Materia prima</th>
-                                      <th className="px-2 py-1 text-right">Cantidad</th>
-                                      <th className="px-2 py-1 text-left">Unidad</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {productFormula.componentes.map((c: any, i: number) => (
-                                      <tr key={i} className="border-t">
-                                        <td className="px-2 py-1">{c.materia_prima_nombre ?? c.materia_prima_id}</td>
-                                        <td className="px-2 py-1 text-right">{Number(c.cantidad || 0).toLocaleString('es-AR')}</td>
-                                        <td className="px-2 py-1">{c.unidad || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground">No se encontró una fórmula asociada a este producto.</div>
-                            )}
-                          </div>
-                        ) : null}
+        const mlist = Array.isArray(m) ? m : (m?.data || []);
         setMarcas(mlist);
         const mmap: Record<number, string> = {};
         mlist.forEach((it: any) => { if (it && it.id !== undefined) mmap[Number(it.id)] = it.nombre; });
@@ -252,6 +223,17 @@ export default function Productos() {
     }
   }
 
+  // Asegurar que al abrir el modal en modo 'nuevo' el formulario esté vacío.
+  useEffect(() => {
+    if (isOpen && !editingProduct) {
+      form.reset({ nombre: '', unidad: 'unidad', stock: 0, costo: 0, precio_venta: 0, proveedor_id: null, categoria_id: null, marca_id: null });
+      setImageUrl(null);
+      setCategoriaId(null);
+      setMarcaId(null);
+      setProductDetalle(null);
+    }
+  }, [isOpen, editingProduct]);
+
   // Handle image upload from the ImageUpload component
   const handleImageUpload = async (url: string) => {
     setImageUrl(url);
@@ -273,13 +255,13 @@ export default function Productos() {
           stock = Number(editingProduct.stock ?? 0);
         }
 
-        const costoRaw = values.costo !== undefined && values.costo !== null && values.costo !== '' ? values.costo : (editingProduct.costo ?? null);
+        const costoRaw = values.costo !== undefined && values.costo !== null ? values.costo : (editingProduct?.costo ?? null);
         const costo = costoRaw !== null ? Number(costoRaw) : null;
 
-        const precioRaw = values.precio_venta !== undefined && values.precio_venta !== null && values.precio_venta !== '' ? values.precio_venta : (editingProduct.precio_venta ?? null);
+        const precioRaw = values.precio_venta !== undefined && values.precio_venta !== null ? values.precio_venta : (editingProduct?.precio_venta ?? null);
         const precio_venta = precioRaw !== null ? Number(precioRaw) : null;
 
-        const proveedorRaw = values.proveedor_id !== undefined && values.proveedor_id !== null && values.proveedor_id !== '' ? values.proveedor_id : (editingProduct.proveedor_id ?? null);
+        const proveedorRaw = values.proveedor_id !== undefined && values.proveedor_id !== null ? values.proveedor_id : (editingProduct?.proveedor_id ?? null);
         const proveedor_id = proveedorRaw !== null ? Number(proveedorRaw) : null;
 
         const payload = {
@@ -427,26 +409,27 @@ export default function Productos() {
           <div className="flex items-center gap-2">
             <a href="/docs/inventario-produccion.txt" target="_blank" rel="noreferrer" className="text-sm text-muted-foreground underline">Docs: Inventario/Producción</a>
           </div>
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="gap-2"
-                variant="default"
-                onClick={() => {
-                  // Asegurar que al crear un nuevo producto el formulario esté en blanco
-                  setEditingProduct(null);
-                  form.reset();
-                  setImageUrl(null);
-                  setCategoriaId(null);
-                  setMarcaId(null);
-                  setProductDetalle(null);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Nuevo Producto
-              </Button>
-            </DialogTrigger>
+          <div>
+            <Button
+              className="gap-2"
+              variant="default"
+              onClick={() => {
+                // Asegurar que al crear un nuevo producto el formulario esté en blanco
+                setEditingProduct(null);
+                form.reset();
+                setImageUrl(null);
+                setCategoriaId(null);
+                setMarcaId(null);
+                setProductDetalle(null);
+                setIsOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo Producto
+            </Button>
+          </div>
 
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogContent className="max-w-4xl">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Editar' : 'Nuevo'} Producto</DialogTitle>

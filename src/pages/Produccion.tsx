@@ -22,8 +22,39 @@ export default function ProduccionPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([getFormulas(), getAlmacenes()])
-      .then(([fres, ares]) => {
-        setFormulas(Array.isArray(fres) ? fres : []);
+      .then(async ([fres, ares]) => {
+        // Enriquecer fórmulas para resolver nombres de producto terminado y materias primas
+        try {
+          const list = Array.isArray(fres) ? fres : [];
+          const ids = new Set<number>();
+          for (const f of list) {
+            if (f && f.producto_terminado_id && !f.producto_terminado_nombre) ids.add(Number(f.producto_terminado_id));
+            if (Array.isArray(f.componentes)) {
+              for (const c of f.componentes) {
+                if (c && (c.materia_prima_id || c.producto_id) && !(c.materia_prima_nombre || c.nombre || c.producto_nombre)) ids.add(Number(c.materia_prima_id ?? c.producto_id));
+              }
+            }
+          }
+          const idArr = Array.from(ids);
+          const resolvedMap: Record<number, string> = {};
+          if (idArr.length > 0) {
+            const promises = idArr.map((id) => getProducto(Number(id)).then((p: any) => ({ id: Number(id), name: p?.nombre || p?.name || p?.titulo || (`Producto #${id}`) })).catch(() => ({ id: Number(id), name: `Producto #${id}` })));
+            const results = await Promise.all(promises);
+            for (const r of results) resolvedMap[Number(r.id)] = r.name;
+          }
+          const enriched = list.map((f: any) => {
+            const nf = { ...f };
+            if (nf.producto_terminado_id) nf.producto_terminado_nombre = nf.producto_terminado_nombre ?? resolvedMap[Number(nf.producto_terminado_id)];
+            if (Array.isArray(nf.componentes)) {
+              nf.componentes = nf.componentes.map((c: any) => ({ ...c, materia_prima_nombre: c.materia_prima_nombre ?? c.nombre ?? c.producto_nombre ?? resolvedMap[Number(c.materia_prima_id ?? c.producto_id ?? c.id)] }));
+            }
+            return nf;
+          });
+          setFormulas(enriched);
+        } catch (e) {
+          console.error('Error enriqueciendo fórmulas en Producción', e);
+          setFormulas(Array.isArray(fres) ? fres : []);
+        }
         setAlmacenes(Array.isArray(ares) ? ares : []);
       })
       .catch((e) => {
@@ -221,9 +252,7 @@ export default function ProduccionPage() {
               <div>
                 <div className="text-sm text-muted-foreground">Fórmula</div>
                   <div className="text-2xl font-extrabold text-copper-900">{selectedFormula?.nombre ?? selectedFormula?.titulo ?? `#${selectedFormula?.id}`}</div>
-                  {selectedFormula?.producto_terminado_nombre ? (
-                    <div className="text-sm text-muted-foreground">Producto a crear: <span className="font-medium">{selectedFormula.producto_terminado_nombre}</span></div>
-                  ) : null}
+                  <div className="text-sm text-muted-foreground">Producto a crear: <span className="font-medium">{selectedFormula?.producto_terminado_nombre ?? (selectedFormula?.producto_terminado_id ? `Producto #${selectedFormula.producto_terminado_id}` : '')}</span></div>
               </div>
 
               <div>
@@ -250,7 +279,7 @@ export default function ProduccionPage() {
                   <div className="text-sm text-muted-foreground">Materiales requeridos (resumen)</div>
                   <ul className="list-disc pl-5 text-sm">
                     {selectedFormula.componentes.map((c: any) => (
-                      <li key={c.id || c.producto_id}>{c.nombre || c.producto_nombre} — {Number(c.cantidad_por_unidad || c.cantidad || 0) * Number(cantidad || 0)} {c.unidad || ''}</li>
+                      <li key={c.id || c.producto_id || c.materia_prima_id}>{c.materia_prima_nombre || c.nombre || c.producto_nombre || c.materia_prima_id} — {Number(c.cantidad_por_unidad || c.cantidad || 0) * Number(cantidad || 0)} {c.unidad || ''}</li>
                     ))}
                   </ul>
                 </div>
