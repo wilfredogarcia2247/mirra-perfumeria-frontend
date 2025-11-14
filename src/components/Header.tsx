@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import CategoryMenu from '@/components/CategoryMenu';
+import { getCatalogoPaginated } from '@/integrations/api';
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -34,6 +34,54 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+
+  // Cache categories to avoid multiple requests across mounts
+  const [catGroups, setCatGroups] = useState<Record<string, any[]>>({});
+  const [catsLoading, setCatsLoading] = useState(false);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+
+  // simple in-memory cache
+  (Header as any)._catsCache = (Header as any)._catsCache || null;
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if ((Header as any)._catsCache) {
+        setCatGroups((Header as any)._catsCache);
+        return;
+      }
+      setCatsLoading(true);
+      try {
+        // fetch catalog public items and extract categories
+        const res = await getCatalogoPaginated({ q: undefined, limit: 200, offset: 0 });
+        const items = Array.isArray(res) ? res : (res?.items ?? res?.data ?? []);
+        const catsMap: Record<string, any> = {};
+        (Array.isArray(items) ? items : []).forEach((it: any) => {
+          const cat = it.categoria ?? it.categoria_obj ?? (it.categoria_nombre ? { nombre: it.categoria_nombre, slug: (it.categoria_nombre || '').toLowerCase().replace(/\s+/g, '-') } : null);
+          if (!cat) return;
+          const key = (cat.id ?? cat.nombre ?? cat.slug ?? JSON.stringify(cat)).toString();
+          if (!catsMap[key]) catsMap[key] = { ...cat, __key: key };
+        });
+
+        const cats = Object.values(catsMap) as any[];
+        // sort alphabetically
+        cats.sort((a: any, b: any) => ((a.nombre || a.name || '') > (b.nombre || b.name || '') ? 1 : -1));
+
+        if (!mounted) return;
+        // cache the flat list
+        (Header as any)._catsCache = cats;
+        setCategoriesList(cats);
+        // also keep catGroups for backward compatibility (empty)
+        setCatGroups({});
+      } catch (e) {
+        console.error('Error cargando categorías para el header', e);
+      } finally {
+        if (mounted) setCatsLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <header 
@@ -82,25 +130,22 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <Link
-                  to="/categoria/hombre"
-                  className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                >
-                  Hombres
-                </Link>
-                <Link
-                  to="/categoria/mujer"
-                  className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                >
-                  Mujeres
-                </Link>
-                <Link
-                  to="/categoria/unisex"
-                  className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                >
-                  Unisex
-                </Link>
+              <div className="absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                {catsLoading ? (
+                  <div className="px-4 py-2 text-gray-600">Cargando...</div>
+                ) : (
+                  <div className="px-2 py-1 max-h-64 overflow-auto">
+                    {categoriesList.map((c: any) => {
+                      const name = c.nombre ?? c.name ?? '';
+                      const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');
+                      return (
+                        <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-4 py-1 text-gray-700 hover:bg-gray-100 rounded">
+                          {name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
            
@@ -171,9 +216,23 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           >
             Nuestros Productos
           </Link>
-          {/* CategoryMenu en móvil */}
+          {/* Categorías en móvil (misma fuente que el dropdown 'Productos') */}
           <div className="block px-4 py-3">
-            <CategoryMenu showManage={location.pathname !== '/'} />
+            {catsLoading ? (
+              <div className="text-gray-600 px-2 py-1">Cargando categorías...</div>
+            ) : (
+              <div className="space-y-2">
+                {categoriesList.map((c: any) => {
+                  const name = c.nombre ?? c.name ?? '';
+                  const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');
+                  return (
+                    <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-2 py-2 text-gray-700 hover:bg-gray-100 rounded">
+                      {name}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <Link
             to="/"
