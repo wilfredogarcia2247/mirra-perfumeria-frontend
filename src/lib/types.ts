@@ -7,7 +7,10 @@ export interface Product {
   category?: string;
   description?: string;
   price?: number;
+  precio_venta?: number;
+  price_venta?: number;
   stock?: number;
+  tamanos?: Array<any>;
 }
 
 export type ProductListResponse =

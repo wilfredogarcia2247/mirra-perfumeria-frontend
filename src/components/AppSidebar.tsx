@@ -1,5 +1,5 @@
-import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award } from "lucide-react";
-import { useLocation } from 'react-router-dom';
+import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, Square } from "lucide-react";
+import { useLocation, Link } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -26,7 +26,6 @@ const menuItems = [
   { title: "Almacenes", url: "/almacenes", icon: Warehouse },
   { title: "Productos", url: "/productos", icon: Package },
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
-  { title: "Producción", url: "/produccion", icon: FlaskConical },
   { title: "Pedidos", url: "/pedidos", icon: Receipt },
 ];
 
@@ -98,6 +97,7 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+              
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

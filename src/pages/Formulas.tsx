@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto } from "@/integrations/api";
+import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto, createProduccion } from "@/integrations/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -22,7 +22,18 @@ export default function Formulas() {
   const [componentes, setComponentes] = useState<Array<{ materia_prima_id: number | null; cantidad: number | null; unidad: string }>>([
     { materia_prima_id: null, cantidad: null, unidad: '' },
   ]);
+  const [costo, setCosto] = useState<number | null>(null);
+  const [precioVenta, setPrecioVenta] = useState<number | null>(null);
+  const [precioManual, setPrecioManual] = useState(false);
+  // Nota: ya no manejamos tamaños aquí; las presentaciones/tamaños ahora son fórmulas.
   const [submitting, setSubmitting] = useState(false);
+  // Producción modal
+  const [produceOpen, setProduceOpen] = useState(false);
+  const [produceFormula, setProduceFormula] = useState<any | null>(null);
+  const [produceCantidad, setProduceCantidad] = useState<number>(1);
+  const [produceAlmacenId, setProduceAlmacenId] = useState<number | null>(null);
+  const [produceChecking, setProduceChecking] = useState<boolean>(false);
+  const [produceAvailability, setProduceAvailability] = useState<Array<{ materia_prima_id: number; nombre?: string; disponible: number; requerido: number }>>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -41,10 +52,39 @@ export default function Formulas() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Nota: no cargamos tamaños por producto aquí; las presentaciones ahora se modelan como fórmulas.
+
   function addComponente() {
     // Al agregar una fila nueva, inicializar sin unidad (se llenará al seleccionar materia prima)
     setComponentes((c) => [...c, { materia_prima_id: null, cantidad: null, unidad: '' }]);
   }
+
+  // Recalcular costo y precio estimado cuando cambian componentes o catálogo de productos
+  useEffect(() => {
+    async function recalc() {
+      try {
+        let totalCost = 0;
+        let totalPriceFromComponents = 0;
+        for (const c of componentes) {
+          const qty = Number(c.cantidad || 0);
+          if (!c.materia_prima_id || qty <= 0) continue;
+          const mat = productos.find((p) => Number(p.id) === Number(c.materia_prima_id));
+          const unitCost = Number(mat?.costo ?? mat?.cost ?? 0) || 0;
+          const unitPrice = Number(mat?.precio_venta ?? mat?.price ?? 0) || 0;
+          totalCost += unitCost * qty;
+          totalPriceFromComponents += unitPrice * qty;
+        }
+        // Si el precio a partir de componentes es 0, aplicamos un multiplicador por defecto (x2)
+        const estimatedPrice = totalPriceFromComponents > 0 ? totalPriceFromComponents : (totalCost > 0 ? totalCost * 2 : 0);
+        setCosto(totalCost > 0 ? Number(totalCost) : null);
+        // sólo sobrescribimos precio si el usuario no lo modificó manualmente
+        if (!precioManual) setPrecioVenta(estimatedPrice > 0 ? Number(estimatedPrice) : null);
+      } catch (e) {
+        // noop
+      }
+    }
+    recalc();
+  }, [componentes, productos, precioManual]);
 
   function removeComponente(idx: number) {
     setComponentes((c) => c.filter((_, i) => i !== idx));
@@ -55,6 +95,9 @@ export default function Formulas() {
     setProductoTerminadoId(null);
     setComponentes([{ materia_prima_id: null, cantidad: null, unidad: '' }]);
     setEditingId(null);
+    setCosto(null);
+    setPrecioVenta(null);
+    setPrecioManual(false);
   }
 
   async function handleCreate() {
@@ -73,11 +116,14 @@ export default function Formulas() {
 
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         nombre: cleanedName,
         producto_terminado_id: productoTerminadoId,
         componentes: componentes.map((c) => ({ materia_prima_id: Number(c.materia_prima_id), cantidad: Number(c.cantidad), unidad: c.unidad })),
       };
+      // incluir costo y precio_venta si están calculados o el usuario los editó
+      if (costo !== null && costo !== undefined) payload.costo = Number(costo);
+      if (precioVenta !== null && precioVenta !== undefined) payload.precio_venta = Number(precioVenta);
       if (editingId) {
         await updateFormula(editingId, payload);
         toast.success('Fórmula actualizada');
@@ -89,10 +135,8 @@ export default function Formulas() {
       const fres = await getFormulas();
       setFormulas(Array.isArray(fres) ? fres : []);
       setIsOpen(false);
-      // reset form
-      setProductoTerminadoId(null);
-      setComponentes([{ materia_prima_id: null, cantidad: null, unidad: '' }]);
-      setEditingId(null);
+      // reset form (incluye costo/precio)
+      resetForm();
     } catch (err) {
       console.error('Error creando/actualizando fórmula', err);
       const msg = parseApiError(err) || 'Error al crear/actualizar fórmula';
@@ -125,9 +169,15 @@ export default function Formulas() {
 
       // prefill nombre
       setNombre(f.nombre ?? '');
+      // prefill costo and precio if present; otherwise they'll be calculated by effect
+      setCosto(f.costo !== undefined && f.costo !== null ? Number(f.costo) : null);
+      setPrecioVenta(f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta) : null);
+      // if the API returned explicit precio_venta, consider it manual (don't overwrite on component changes)
+      setPrecioManual(f.precio_venta !== undefined && f.precio_venta !== null);
       // Prefill form
       setProductoTerminadoId(f.producto_terminado_id ?? null);
-      setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
+        setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
+        // ya no prefill de tamaño (legacy)
       setEditingId(id);
       setIsOpen(true);
     } catch (err) {
@@ -148,6 +198,88 @@ export default function Formulas() {
       console.error('Error eliminando fórmula', err);
       const msg = parseApiError(err) || 'Error al eliminar fórmula';
       toast.error(msg);
+    }
+  }
+
+  async function openProduceModal(formulaId: number) {
+    try {
+      setProduceChecking(true);
+      const f = await getFormula(formulaId);
+      if (!f) return toast.error('Fórmula no encontrada');
+      setProduceFormula(f);
+      // default almacen de venta: elegir el primer almacén que NO sea de materia prima
+      const ventaAlmacenes = (almacenes || []).filter((a: any) => !a.es_materia_prima && String(a.tipo).toLowerCase() !== 'interno');
+      setProduceAlmacenId(ventaAlmacenes.length > 0 ? Number(ventaAlmacenes[0].id) : (almacenes[0] ? Number(almacenes[0].id) : null));
+
+      // Calcular disponibilidad para cada componente (usamos getProducto para cada materia prima)
+      const comps = Array.isArray(f.componentes) ? f.componentes : [];
+      const availability: Array<{ materia_prima_id: number; nombre?: string; disponible: number; requerido: number }> = [];
+      for (const c of comps) {
+        const matId = Number(c.materia_prima_id);
+        const requerido = Number(c.cantidad || 0) * 1; // por 1 unidad
+        try {
+          const mp = await getProducto(matId);
+          // sumar inventario sólo en almacenes marcados como materia prima
+          let totalFis = 0;
+          let totalComp = 0;
+          if (Array.isArray(mp.inventario) && mp.inventario.length > 0) {
+            for (const row of mp.inventario) {
+              if (materiaAlmacenIds.has(Number(row.almacen_id))) {
+                totalFis += Number(row.stock_fisico || 0);
+                totalComp += Number(row.stock_comprometido || 0);
+              }
+            }
+          }
+          const disponible = Math.max(0, totalFis - totalComp);
+          availability.push({ materia_prima_id: matId, nombre: mp?.nombre || mp?.name || `#${matId}`, disponible, requerido });
+        } catch (e) {
+          availability.push({ materia_prima_id: matId, nombre: `#${matId}`, disponible: 0, requerido });
+        }
+      }
+      setProduceAvailability(availability);
+      setProduceCantidad(1);
+      setProduceOpen(true);
+    } catch (err) {
+      console.error('Error abriendo modal de producción', err);
+      toast.error('No se pudo preparar la producción');
+    } finally {
+      setProduceChecking(false);
+    }
+  }
+
+  async function handleProduce() {
+    if (!produceFormula) return;
+    if (!produceAlmacenId) return toast.error('Seleccione almacén de destino');
+    const qty = Number(produceCantidad || 0);
+    if (!Number.isFinite(qty) || qty <= 0) return toast.error('Cantidad inválida');
+
+    // Verificar disponibilidad multiplicando requerido por qty
+    const faltantes: string[] = [];
+    for (const a of produceAvailability) {
+      const need = Number(a.requerido || 0) * qty;
+      if (Number(a.disponible || 0) < need) {
+        faltantes.push(`${a.nombre || `#${a.materia_prima_id}`}: disponible ${a.disponible}, requiere ${need}`);
+      }
+    }
+    if (faltantes.length > 0) {
+      toast.error(`Materias primas insuficientes: ${faltantes.join(' ; ')}`);
+      return;
+    }
+
+    try {
+      setProduceChecking(true);
+      const resp = await createProduccion(Number(produceFormula.id), { cantidad: qty, almacen_venta_id: Number(produceAlmacenId) });
+      toast.success('Producción ejecutada correctamente');
+      // refresh formulas list (por si la API actualiza algo)
+      const fres = await getFormulas();
+      enrichAndSetFormulas(Array.isArray(fres) ? fres : []);
+      setProduceOpen(false);
+    } catch (err: any) {
+      console.error('Error ejecutando producción', err);
+      const msg = parseApiError(err) || 'Error al producir';
+      toast.error(msg);
+    } finally {
+      setProduceChecking(false);
     }
   }
 
@@ -245,6 +377,7 @@ export default function Formulas() {
                   <CardTitle className="flex items-center justify-between">
                     <span>{f.nombre || f.titulo || `Fórmula #${f.id}`}</span>
                     <div className="ml-4 flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => openProduceModal(f.id)}>Producir</Button>
                       <Button size="sm" variant="outline" onClick={() => handleEdit(f.id)}>Editar</Button>
                       <Button size="sm" variant="destructive" onClick={() => handleDelete(f.id)}>Eliminar</Button>
                     </div>
@@ -252,6 +385,10 @@ export default function Formulas() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground mb-2">Producto terminado: {f.producto_terminado_nombre ?? f.producto_terminado_id}</div>
+                  <div className="flex gap-4 mb-2 text-sm">
+                    <div>Costo: <strong>{f.costo !== undefined && f.costo !== null ? Number(f.costo).toFixed(2) : '-'}</strong></div>
+                    <div>Precio: <strong>{f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta).toFixed(2) : '-'}</strong></div>
+                  </div>
                   {Array.isArray(f.componentes) && f.componentes.length > 0 ? (
                     <ul className="text-sm list-disc pl-4">
                       {f.componentes.map((c: any) => (
@@ -292,6 +429,8 @@ export default function Formulas() {
                   )}
                 </select>
               </div>
+
+              {/* Se eliminó la selección de tamaño: las presentaciones ahora están modeladas como fórmulas. */}
 
               <div>
                 <div className="flex items-center justify-between">
@@ -337,12 +476,69 @@ export default function Formulas() {
                   ))}
                 </div>
               </div>
+
+              <div>
+                <label className="text-sm">Costo estimado (calculado)</label>
+                <Input readOnly value={costo !== null && costo !== undefined ? String(costo) : ''} />
+              </div>
+
+              <div>
+                <label className="text-sm">Precio de venta (editable)</label>
+                <Input type="number" step="0.01" value={precioVenta !== null && precioVenta !== undefined ? String(precioVenta) : ''} onChange={(e) => { setPrecioVenta(e.target.value === '' ? null : Number(e.target.value)); setPrecioManual(true); }} placeholder="Ingrese precio de venta" />
+              </div>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>Cancelar</Button>
               <Button disabled={submitting} onClick={handleCreate}>{submitting ? 'Creando...' : (editingId ? 'Guardar cambios' : 'Crear fórmula')}</Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Producción dialog */}
+        <Dialog open={produceOpen} onOpenChange={(open) => { setProduceOpen(open); if (!open) setProduceFormula(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Producir desde fórmula</DialogTitle>
+              <DialogDescription>Verifica materias primas y ejecuta la producción.</DialogDescription>
+            </DialogHeader>
+
+            {produceFormula ? (
+              <div className="space-y-4 p-2">
+                <div className="text-sm">Fórmula: <strong>{produceFormula.nombre}</strong></div>
+                <div>
+                  <label className="text-sm">Cantidad a producir</label>
+                  <Input type="number" min={1} value={produceCantidad} onChange={(e) => setProduceCantidad(Number(e.target.value || 1))} />
+                </div>
+                <div>
+                  <label className="text-sm">Almacén de venta (destino)</label>
+                  <select className="w-full rounded-md border px-2 py-2" value={produceAlmacenId ?? ''} onChange={(e) => setProduceAlmacenId(e.target.value ? Number(e.target.value) : null)}>
+                    <option value="">-- seleccione almacén destino --</option>
+                    {(almacenes || []).filter((a: any) => !a.es_materia_prima).map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.nombre || a.id}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <h4 className="font-medium">Disponibilidad de materias primas (por unidad)</h4>
+                  <ul className="text-sm list-disc pl-4">
+                    {produceAvailability.map((a) => (
+                      <li key={a.materia_prima_id} className={a.disponible < a.requerido ? 'text-red-600' : ''}>
+                        {a.nombre} — disponible: {a.disponible} — requerido por unidad: {a.requerido}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setProduceOpen(false); setProduceFormula(null); }}>Cancelar</Button>
+                  <Button disabled={produceChecking} onClick={handleProduce}>{produceChecking ? 'Procesando...' : 'Ejecutar producción'}</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4">Cargando...</div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

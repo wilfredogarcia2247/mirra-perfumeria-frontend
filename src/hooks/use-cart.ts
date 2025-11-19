@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import { Product } from '@/lib/types';
 
 export interface CartItem {
+  key: string; // composite key: `${productoId}:${tamanoId || ''}`
   product: Product;
   qty: number;
 }
 
 const STORAGE_KEY = 'cart_items_v1';
+
+function makeKey(product: Product) {
+  const pid = product?.id ?? '';
+  // Preferir formula id (nueva) luego tamano id (legacy)
+  const fid = (product as any)?.formula?.id ?? (product as any)?.formula_id ?? '';
+  const tid = (product as any)?.tamano?.id ?? (product as any)?.tamano_id ?? '';
+  const suffix = fid || tid || '';
+  return `${pid}:${suffix}`;
+}
 
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -29,21 +39,22 @@ export function useCart() {
   }, [items]);
 
   function addItem(product: Product, qty = 1) {
+    const key = makeKey(product);
     setItems((prev) => {
-      const idx = prev.findIndex((p) => p.product.id === product.id);
-      if (idx === -1) return [...prev, { product, qty }];
+      const idx = prev.findIndex((p) => p.key === key);
+      if (idx === -1) return [...prev, { key, product, qty }];
       const copy = [...prev];
-      copy[idx] = { ...copy[idx], qty: copy[idx].qty + qty };
+      copy[idx] = { ...copy[idx], qty: copy[idx].qty + qty, product };
       return copy;
     });
   }
 
-  function removeItem(productId: number) {
-    setItems((prev) => prev.filter((p) => p.product.id !== productId));
+  function removeItem(keyOrProductId: string) {
+    setItems((prev) => prev.filter((p) => p.key !== String(keyOrProductId)));
   }
 
-  function updateQty(productId: number, qty: number) {
-    setItems((prev) => prev.map((p) => p.product.id === productId ? { ...p, qty } : p));
+  function updateQty(keyOrProductId: string, qty: number) {
+    setItems((prev) => prev.map((p) => p.key === String(keyOrProductId) ? { ...p, qty } : p));
   }
 
   function clear() {

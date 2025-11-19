@@ -34,9 +34,64 @@ export async function getCatalogoPaginated(opts: { q?: string; includeOutOfStock
   if (opts.marca_id !== undefined) ps.set('marca_id', String(opts.marca_id));
   const qs = ps.toString() ? `?${ps.toString()}` : '';
   const url = `${API_URL}/productos/catalogo${qs}`;
-  const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-  if (!res.ok) throw new Error(await res.text());
-  const body = await res.json();
+  // Intentar endpoint público de catálogo. Si falla (p. ej. backend referencia tabla `tamanos`),
+  // hacemos fallback a `/productos` y combinamos con `/formulas` para reconstruir `tamanos`.
+  let body: any = null;
+  try {
+    const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    if (!res.ok) throw new Error(await res.text());
+    body = await res.json();
+  } catch (err) {
+    console.warn('getCatalogoPaginated: catalogo endpoint failed, attempting fallback to /productos + /formulas', err);
+    // Fallback: obtener productos genéricos y fórmulas (tamaños) y combinar
+    try {
+      const prodRes = await fetch(`${API_URL}/productos${qs}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!prodRes.ok) throw new Error(await prodRes.text());
+      const prodsBody = await prodRes.json();
+      // Normalizar lista de productos
+      const products = Array.isArray(prodsBody) ? prodsBody : (prodsBody?.data || prodsBody?.items || []);
+      // Intentar obtener formulas públicas para construir tamanos
+      let formulasList: any[] = [];
+      try {
+        const fRes = await fetch(`${API_URL}/formulas`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        if (fRes.ok) {
+          const fBody = await fRes.json();
+          formulasList = Array.isArray(fBody) ? fBody : (fBody?.data || fBody?.items || []);
+        }
+      } catch (e) {
+        // si no hay formulas públicas, continuar sin tamanos
+        console.warn('getCatalogoPaginated: could not fetch /formulas for tamanos fallback', e);
+      }
+
+      // Mapear formulas por producto_terminado_id (aceptar varios nombres de campo)
+      const mapFormulas = new Map<number, any[]>();
+      for (const f of formulasList) {
+        const pidRaw = f.producto_terminado_id ?? f.producto_id ?? f.producto?.id ?? null;
+        const pid = Number(pidRaw);
+        if (!Number.isFinite(pid)) continue;
+        const arr = mapFormulas.get(pid) || [];
+        arr.push({ id: f.id, nombre: f.nombre, cantidad: f.cantidad ?? undefined, unidad: f.unidad ?? undefined, costo: f.costo ?? undefined, precio_venta: f.precio_venta ?? undefined, raw: f });
+        mapFormulas.set(pid, arr);
+      }
+
+      // Attach tamanos to cada product element — tolerante a diferentes keys en el objeto producto
+      const merged = (products || []).map((p: any) => {
+        const pIdRaw = p.id ?? p.producto_id ?? p.producto_terminado_id ?? p.producto?.id ?? null;
+        const pid = Number(pIdRaw);
+        const tamanosArr = Number.isFinite(pid) ? (mapFormulas.get(pid) || []) : [];
+        return { ...p, tamanos: tamanosArr };
+      });
+      // Emular la estructura que getCatalogoPaginated espera (items + meta) si es posible
+      if (Array.isArray(prodsBody)) body = merged;
+      else {
+        body = { ...(prodsBody || {}), data: merged, items: merged };
+        if (!body.meta) body.meta = { total: merged.length };
+      }
+    } catch (e2) {
+      // último recurso: rethrow el error original para que el caller lo maneje
+      throw err;
+    }
+  }
   // Normalize: if backend returns { data: [...], total, page, per_page } or array
   try {
     if (body && typeof body === 'object') {
@@ -130,6 +185,55 @@ export async function deleteFormula(id: number) {
 // Crear fórmula (POST /api/formulas)
 export async function createFormula(data: { producto_terminado_id: number; componentes: Array<{ materia_prima_id: number; cantidad: number; unidad: string }> }) {
   return apiFetch(`/formulas`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+// Tamaños (formats / tamaños de venta)
+// Nota: el endpoint `/api/tamanos` fue removido en el backend y los "tamaños"
+// ahora se modelan como `formulas`. Para mantener compatibilidad con las
+// páginas administrativas que usan `getTamanos`/`createTamano` etc, aquí
+// hacemos wrappers que delegan en `/formulas` y mapean los campos necesarios.
+export async function getTamanos(params: { producto_id?: number; page?: number; limit?: number } = {}) {
+  const ps = new URLSearchParams();
+  if (params.producto_id) ps.set('producto_terminado_id', String(params.producto_id));
+  if (params.page) ps.set('page', String(params.page));
+  if (params.limit) ps.set('limit', String(params.limit));
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  // Llamar a /formulas; el backend incluye en la respuesta el objeto "tamano"
+  const res = await apiFetch(`/formulas${qs}`);
+  // Normalizar: /formulas normalmente devuelve array de fórmulas.
+  return res;
+}
+
+export async function getTamano(id: number) {
+  // /formulas/:id devuelve la fórmula que actúa como tamaño/presentación
+  return apiFetch(`/formulas/${id}`);
+}
+
+export async function createTamano(data: { producto_id: number; nombre: string; cantidad?: number; unidad?: string; costo?: number; precio_venta?: number; componentes?: any[] }) {
+  // Mapear payload de "tamaño" a la forma esperada por POST /formulas
+  const payload: any = {
+    producto_terminado_id: data.producto_id,
+    nombre: data.nombre,
+  };
+  if (data.costo !== undefined) payload.costo = data.costo;
+  if (data.precio_venta !== undefined) payload.precio_venta = data.precio_venta;
+  // crear con componentes vacíos por defecto si no se envían
+  if (data.componentes !== undefined) payload.componentes = data.componentes;
+  return apiFetch(`/formulas`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function updateTamano(id: number, data: { nombre?: string; cantidad?: number; unidad?: string; costo?: number; precio_venta?: number; componentes?: any[] }) {
+  const payload: any = {};
+  if (data.nombre !== undefined) payload.nombre = data.nombre;
+  if (data.costo !== undefined) payload.costo = data.costo;
+  if (data.precio_venta !== undefined) payload.precio_venta = data.precio_venta;
+  if (data.componentes !== undefined) payload.componentes = data.componentes;
+  // PUT /formulas/:id reemplaza componentes si se envían
+  return apiFetch(`/formulas/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export async function deleteTamano(id: number) {
+  return apiFetch(`/formulas/${id}`, { method: 'DELETE' });
 }
 
 // Crear/ejecutar producción desde una fórmula (POST /api/formulas/:id/produccion)
@@ -307,6 +411,19 @@ export async function createPedidoVenta(data: any) {
           nombre_producto: nombre_producto ?? undefined,
           subtotal: subtotal !== null ? Number(subtotal) : undefined,
         };
+        if (p.costo !== undefined && p.costo !== null) linea.costo = Number(p.costo);
+        // incluir referencia de fórmula/tamaño por línea si la proporcionó el frontend
+        if (p.formula_id !== undefined && p.formula_id !== null) {
+          const fid = Number(p.formula_id);
+          if (Number.isFinite(fid)) linea.formula_id = fid;
+        }
+        if (p.formula_nombre !== undefined && p.formula_nombre !== null) linea.formula_nombre = String(p.formula_nombre);
+        // legacy: aceptar tamano_id / tamano_nombre también
+        if (p.tamano_id !== undefined && p.tamano_id !== null) {
+          const tid = Number(p.tamano_id);
+          if (Number.isFinite(tid)) linea.tamano_id = tid;
+        }
+        if (p.tamano_nombre !== undefined && p.tamano_nombre !== null) linea.tamano_nombre = String(p.tamano_nombre);
         if (p.precio_convertido !== undefined) linea.precio_convertido = Number(p.precio_convertido);
         if (p.subtotal_convertido !== undefined) linea.subtotal_convertido = Number(p.subtotal_convertido);
         return linea;
@@ -509,6 +626,9 @@ export async function createPedidoVentaPublic(data: any) {
           precio_venta: p.precio_venta !== undefined ? Number(p.precio_venta) : undefined,
           costo: p.costo !== undefined ? Number(p.costo) : undefined,
           subtotal: p.subtotal !== undefined ? Number(p.subtotal) : undefined,
+          // preservar información de tamaño si existe
+          tamano_id: p.tamano_id !== undefined ? (Number.isFinite(Number(p.tamano_id)) ? Number(p.tamano_id) : undefined) : undefined,
+          tamano_nombre: p.tamano_nombre !== undefined ? String(p.tamano_nombre) : undefined,
         }));
         // dejar `productos` intacto para que el backend reciba los snapshots
       } else {
@@ -527,6 +647,18 @@ export async function createPedidoVentaPublic(data: any) {
             nombre_producto: nombre_producto ?? undefined,
             subtotal: subtotal !== null ? Number(subtotal) : undefined,
           };
+          if (p.costo !== undefined && p.costo !== null) linea.costo = Number(p.costo);
+          if (p.tamano_id !== undefined && p.tamano_id !== null) {
+            const tid = Number(p.tamano_id);
+            if (Number.isFinite(tid)) linea.tamano_id = tid;
+          }
+          if (p.tamano_nombre !== undefined && p.tamano_nombre !== null) linea.tamano_nombre = String(p.tamano_nombre);
+          // soportar formula_id/formula_nombre en productos con snapshot
+          if (p.formula_id !== undefined && p.formula_id !== null) {
+            const fid = Number(p.formula_id);
+            if (Number.isFinite(fid)) linea.formula_id = fid;
+          }
+          if (p.formula_nombre !== undefined && p.formula_nombre !== null) linea.formula_nombre = String(p.formula_nombre);
           if (p.precio_convertido !== undefined) linea.precio_convertido = Number(p.precio_convertido);
           if (p.subtotal_convertido !== undefined) linea.subtotal_convertido = Number(p.subtotal_convertido);
           return linea;
@@ -563,14 +695,32 @@ export async function createPedidoVentaPublic(data: any) {
   finalPayload.nombre_cliente = payload.nombre_cliente;
   finalPayload.telefono = payload.telefono;
   if (payload.cedula !== undefined) finalPayload.cedula = payload.cedula;
-  finalPayload.lineas = lines.map((l: any) => ({ producto_id: l.producto_id ?? l.productId ?? l.id, cantidad: Number(l.cantidad ?? 0) }));
+  finalPayload.lineas = lines.map((l: any) => {
+    const base: any = { producto_id: l.producto_id ?? l.productId ?? l.id, cantidad: Number(l.cantidad ?? 0) };
+    if (l.precio_unitario !== undefined && l.precio_unitario !== null) base.precio_unitario = Number(l.precio_unitario);
+    if (l.precio_venta !== undefined && l.precio_venta !== null) base.precio_venta = Number(l.precio_venta);
+    if (l.costo !== undefined && l.costo !== null) base.costo = Number(l.costo);
+    if (l.subtotal !== undefined && l.subtotal !== null) base.subtotal = Number(l.subtotal);
+    // Incluir referencia a fórmula (preferida) o tamaño (legacy)
+    if (l.formula_id !== undefined && l.formula_id !== null) {
+      const fid = Number(l.formula_id);
+      if (Number.isFinite(fid)) base.formula_id = fid;
+    }
+    if (l.formula_nombre !== undefined && l.formula_nombre !== null) base.formula_nombre = String(l.formula_nombre);
+    if (l.tamano_id !== undefined && l.tamano_id !== null) {
+      const tid = Number(l.tamano_id);
+      if (Number.isFinite(tid)) base.tamano_id = tid;
+    }
+    if (l.tamano_nombre !== undefined && l.tamano_nombre !== null) base.tamano_nombre = String(l.tamano_nombre);
+    return base;
+  });
   if (payload.tasa_cambio_monto !== undefined) finalPayload.tasa_cambio_monto = payload.tasa_cambio_monto;
 
   // Si el frontend solicita preservar snapshots (productos) y proporciona productos con snapshot data,
   // incluirlos y calcular total si es posible.
   if (payload._preserve_productos && Array.isArray(payload.productos) && payload.productos.length > 0) {
     // normalize numeric fields in productos
-    finalPayload.productos = payload.productos.map((p: any) => ({
+      finalPayload.productos = payload.productos.map((p: any) => ({
       id: p.id ?? undefined,
       pedido_venta_id: p.pedido_venta_id ?? undefined,
       producto_id: p.producto_id ?? p.productId ?? p.id,
@@ -580,6 +730,12 @@ export async function createPedidoVentaPublic(data: any) {
       costo: p.costo !== undefined ? Number(p.costo) : undefined,
       image_url: p.image_url ?? p.imagen ?? p.image ?? undefined,
       subtotal: p.subtotal !== undefined ? Number(p.subtotal) : undefined,
+      // preservar tamano en snapshot
+        // Preferir fórmula (nuevo) y mantener tamano por compatibilidad
+        formula_id: p.formula_id !== undefined ? (Number.isFinite(Number(p.formula_id)) ? Number(p.formula_id) : undefined) : undefined,
+        formula_nombre: p.formula_nombre !== undefined ? String(p.formula_nombre) : undefined,
+        tamano_id: p.tamano_id !== undefined ? (Number.isFinite(Number(p.tamano_id)) ? Number(p.tamano_id) : undefined) : undefined,
+        tamano_nombre: p.tamano_nombre !== undefined ? String(p.tamano_nombre) : undefined,
     }));
     // calcular total si no fue provisto
     if (finalPayload.total === undefined) {
