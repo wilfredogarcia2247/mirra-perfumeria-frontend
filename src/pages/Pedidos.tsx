@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos } from "@/integrations/api";
+import { getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye } from 'lucide-react';
@@ -45,6 +46,275 @@ export default function Pedidos() {
       console.error('Error cargando pagos para pagosMap', e);
     }
   };
+
+  // Helpers y acciones para producir desde una línea del pedido
+  function isMateriaAlmacen(a: any) {
+    if (!a) return false;
+    if (a.es_materia_prima === true) return true;
+    const tipo = (a.tipo || '').toString().toLowerCase();
+    if (!tipo) return false;
+    return tipo.includes('materia') || tipo.includes('materiaprima');
+  }
+
+  async function openProduceModalForLine(line: any) {
+    setProdLine(line);
+    setProdCantidad(Number(line?.cantidad ?? 1) || 1);
+    setProdSelectedAlmacen(null);
+    setProdAlmacenes([]);
+    setProdModalOpen(true);
+    try {
+      const ares = await getAlmacenes();
+      const list = Array.isArray(ares) ? ares : (ares?.data || []);
+      const ventaList = list.filter((a: any) => !isMateriaAlmacen(a));
+      setProdAlmacenes(ventaList);
+      // Preferir el almacén asociado al pedido/linea si existe
+      let preferido: number | null = null;
+      try {
+        const cand = line?.almacen_id ?? line?.almacenVentaId ?? line?.almacen_venta_id ?? selectedPedido?.almacen_id ?? selectedPedido?.almacen_venta_id ?? selectedPedido?.almacenId ?? null;
+        if (cand) preferido = Number(cand);
+      } catch (e) { console.debug(e); }
+      const venta = ventaList.find((a: any) => Number(a.id) === Number(preferido)) || ventaList.find((a: any) => a.tipo === 'Venta') || ventaList[0];
+      setProdSelectedAlmacen(venta ? venta.id : null);
+      // Si la línea no trae componentes, intentar cargar la fórmula asociada para mostrar componentes
+      let fetchedFormula: any = null;
+      try {
+        const fid = Number(line?.formula_id ?? line?.formula?.id ?? 0);
+        if (fid && (!Array.isArray(line?.componentes) || line.componentes.length === 0)) {
+          try {
+            fetchedFormula = await getFormula(fid);
+            if (fetchedFormula) setProdLine((prev: any) => ({ ...prev, formula_fetched: fetchedFormula }));
+          } catch (err) {
+            console.debug('Error fetching formula', err);
+          }
+        }
+      } catch (e) { console.debug(e); }
+
+      // Preparar componentes editables para el modal (usar los de la línea o los de la fórmula fetch)
+      try {
+        const comps = Array.isArray(line?.componentes) && line.componentes.length > 0
+          ? line.componentes
+          : (fetchedFormula?.componentes ?? line?.formula?.componentes ?? []);
+        let initial = (Array.isArray(comps) ? comps : []).map((c: any) => {
+          const unit = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
+          const cantidad_init = unit * (Number(line?.cantidad ?? prodCantidad) || 1);
+          return {
+            materia_prima_id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
+            nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
+            unidad: c?.unidad ?? c?.u ?? '',
+            cantidad_por_unidad: unit,
+            cantidad_editable: Number(Number(cantidad_init).toFixed(2)),
+          };
+        });
+
+        // Resolver nombres faltantes consultando getProducto y poblar materiasCostMap
+        try {
+          const missingIds = Array.from(new Set(initial.filter((c) => (!c.nombre || c.nombre === null) && c.materia_prima_id).map((c) => Number(c.materia_prima_id))));
+          if (missingIds.length > 0) {
+            const fetched = await Promise.all(missingIds.map((id) => getProducto(id).catch(() => null)));
+            const fetchedMap: Record<number, any> = {};
+            fetched.forEach((res: any, i: number) => {
+              const id = missingIds[i];
+              if (res) fetchedMap[id] = { nombre: res.nombre ?? res.name ?? null };
+            });
+            if (Object.keys(fetchedMap).length > 0) setMateriasCostMap((prev) => ({ ...(prev || {}), ...(fetchedMap || {}) }));
+            // Aplicar nombres resueltas a la lista local
+            initial = initial.map((c) => {
+              const id = Number(c.materia_prima_id ?? 0) || 0;
+              if ((!c.nombre || c.nombre === null) && fetchedMap[id] && fetchedMap[id].nombre) {
+                return { ...c, nombre: fetchedMap[id].nombre };
+              }
+              return c;
+            });
+          }
+        } catch (err) {
+          console.debug('Error resolviendo nombres de materias en modal', err);
+        }
+
+        setProdComponents(initial);
+      } catch (e) { console.debug(e); }
+    } catch (e) {
+      console.debug('No se pudieron cargar almacenes para producción', e);
+    }
+  }
+
+  async function handleProduceFromLine() {
+    if (!prodLine) return;
+    const formulaId = Number(prodLine?.formula_id ?? prodLine?.formula?.id ?? 0);
+    if (!formulaId || Number.isNaN(formulaId) || formulaId <= 0) {
+      toast.error('La línea no tiene asociado una fórmula válida para producir');
+      return;
+    }
+    if (!prodSelectedAlmacen) { toast.error('No se pudo determinar el almacén destino para esta producción'); return; }
+    if (!prodCantidad || Number(prodCantidad) <= 0) { toast.error('Ingrese una cantidad válida (>0)'); return; }
+    setProdSubmitting(true);
+      try {
+      // Intentar crear orden de producción con componentes personalizados (según lo editado en el modal)
+      const payload: any = {
+        formula_id: formulaId,
+        cantidad: Number(prodCantidad),
+        almacen_venta_id: Number(prodSelectedAlmacen),
+      };
+      // intentar derivar el producto terminado desde la fórmula/linea
+      try {
+        const prodTerm = Number(prodLine?.formula?.producto_terminado_id ?? prodLine?.formula_fetched?.producto_terminado_id ?? prodLine?.producto_terminado_id ?? prodLine?.producto_id ?? prodLine?.producto?.id ?? prodLine?.productoId ?? 0) || null;
+        if (prodTerm) payload.producto_terminado_id = prodTerm;
+      } catch (e) { /* noop */ }
+      // Validar componentes: ninguna cantidad puede ser 0 o menor
+      if (Array.isArray(prodComponents) && prodComponents.length > 0) {
+        const bad = prodComponents.find((c: any) => !Number.isFinite(Number(c?.cantidad_editable)) || Number(c.cantidad_editable) <= 0);
+        if (bad) {
+          toast.error('Las cantidades de los componentes deben ser mayores que 0');
+          setProdSubmitting(false);
+          return;
+        }
+      }
+      if (Array.isArray(prodComponents) && prodComponents.length > 0) {
+        payload.componentes = prodComponents.map((c: any) => ({
+          materia_prima_id: c.materia_prima_id,
+          cantidad: Number(c.cantidad_editable),
+          unidad: c.unidad,
+        }));
+      }
+      try {
+        // intentar crear y capturar la respuesta (para obtener id de orden)
+        let createdResp: any = null;
+        let creationPath = 'none';
+        // Preferir endpoint específico para crear orden desde línea de pedido si disponemos de pedido y línea
+        if (selectedPedido?.id && prodLine?.id) {
+          try {
+            createdResp = await apiFetch(`/pedidos-venta/${selectedPedido.id}/lineas/${prodLine.id}/ordenes-produccion`, { method: 'POST' });
+            creationPath = 'line';
+          } catch (errLine: any) {
+            // Intentar interpretar errores esperados del backend
+            try {
+              const txt = String(errLine?.message || errLine || '');
+              const parsed = JSON.parse(txt);
+              if (parsed && parsed.code === 'MISSING_FORMULA') {
+                toast.error('La línea no tiene fórmula asociada (MISSING_FORMULA)');
+                setProdSubmitting(false);
+                return;
+              }
+              if (parsed && parsed.code === 'ALREADY_CREATED') {
+                toast.error('La línea ya tiene una orden creada (ALREADY_CREATED)');
+                setProdSubmitting(false);
+                return;
+              }
+            } catch (e) {
+              // no-op: no pudimos parsear JSON, continuar con fallback
+            }
+            // si el endpoint de línea falló por otra razón, seguiremos con creación general abajo
+          }
+        }
+
+        if (!createdResp) {
+          try {
+            createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
+            creationPath = 'general';
+          } catch (errPost) {
+            // si el endpoint no acepta el payload, fallback a la API helper existente
+            try {
+              createdResp = await createProduccion(formulaId, { cantidad: Number(prodCantidad), almacen_venta_id: Number(prodSelectedAlmacen) });
+              creationPath = 'helper';
+            } catch (err2) {
+              // última opción: rethrow
+              throw err2 ?? errPost;
+            }
+          }
+        }
+
+        toast.success('Producción creada');
+        // extraer id de la respuesta en varias formas posibles y actualizar UI según la ruta usada
+        try {
+          // Si la creación fue por endpoint de línea, el backend puede devolver { orden_produccion, linea_actualizada }
+          if (creationPath === 'line') {
+            const ordenObj = createdResp?.orden_produccion ?? createdResp?.orden ?? createdResp?.orden_produccion ?? null;
+            const linea = createdResp?.linea_actualizada ?? createdResp?.linea ?? createdResp?.linea_actual ?? null;
+            const ordenId = Number(ordenObj?.id ?? ordenObj?.orden_id ?? null) || null;
+            if (selectedPedido && prodLine) {
+              const updatedProductos = (selectedPedido.productos || []).map((p: any) => {
+                // preferir match por id de línea (linea.id), luego por producto+cantidad
+                if (linea && Number(linea.id) && Number(p.id) && Number(p.id) === Number(linea.id)) {
+                  return { ...p, produccion_creada: true, orden_id: linea.orden_produccion_id ?? ordenId ?? p.orden_id ?? p.orden_produccion_id ?? null };
+                }
+                // fallback: si prodLine coincide con p según heurística previa
+                const matchLine = (a: any, b: any) => {
+                  try {
+                    if (!a || !b) return false;
+                    if (a.id && b.id && Number(a.id) === Number(b.id)) return true;
+                    const aPid = a.producto_id ?? a.productoId ?? a.producto ?? a.producto_id;
+                    const bPid = b.producto_id ?? b.productoId ?? b.producto ?? b.producto_id;
+                    if (aPid && bPid && Number(aPid) === Number(bPid)) {
+                      const aq = Number(a.cantidad ?? a.qty ?? 0);
+                      const bq = Number(b.cantidad ?? b.qty ?? 0);
+                      if (Number.isFinite(aq) && Number.isFinite(bq) && aq === bq) return true;
+                    }
+                    if (a.nombre && b.nombre && String(a.nombre) === String(b.nombre)) {
+                      const aq = Number(a.cantidad ?? a.qty ?? 0);
+                      const bq = Number(b.cantidad ?? b.qty ?? 0);
+                      if (Number.isFinite(aq) && Number.isFinite(bq) && aq === bq) return true;
+                    }
+                    return false;
+                  } catch (e) { return false; }
+                };
+                if (matchLine(p, prodLine)) {
+                  return { ...p, produccion_creada: true, orden_id: linea?.orden_produccion_id ?? ordenId ?? p.orden_id ?? p.orden_produccion_id ?? null };
+                }
+                return p;
+              });
+              const newSelected = { ...selectedPedido, productos: updatedProductos };
+              setSelectedPedido(newSelected);
+              setPedidos((list) => (Array.isArray(list) ? list.map((pp: any) => (pp.id === newSelected.id ? { ...pp, productos: updatedProductos } : pp)) : list));
+            }
+          } else {
+            // creación general: createdResp puede ser la orden creada
+            const ordenId = Number(createdResp?.id ?? createdResp?.orden_id ?? createdResp?.orden?.id ?? null) || null;
+            if (selectedPedido && prodLine) {
+              const matchLine = (a: any, b: any) => {
+                try {
+                  if (!a || !b) return false;
+                  if (a.id && b.id && Number(a.id) === Number(b.id)) return true;
+                  const aPid = a.producto_id ?? a.productoId ?? a.producto ?? a.producto_id;
+                  const bPid = b.producto_id ?? b.productoId ?? b.producto ?? b.producto_id;
+                  if (aPid && bPid && Number(aPid) === Number(bPid)) {
+                    const aq = Number(a.cantidad ?? a.qty ?? 0);
+                    const bq = Number(b.cantidad ?? b.qty ?? 0);
+                    if (Number.isFinite(aq) && Number.isFinite(bq) && aq === bq) return true;
+                  }
+                  if (a.nombre && b.nombre && String(a.nombre) === String(b.nombre)) {
+                    const aq = Number(a.cantidad ?? a.qty ?? 0);
+                    const bq = Number(b.cantidad ?? b.qty ?? 0);
+                    if (Number.isFinite(aq) && Number.isFinite(bq) && aq === bq) return true;
+                  }
+                  return false;
+                } catch (e) { return false; }
+              };
+
+              const updatedProductos = (selectedPedido.productos || []).map((p: any) => {
+                if (matchLine(p, prodLine)) {
+                  return { ...p, produccion_creada: true, orden_id: ordenId ?? p.orden_id ?? p.ordenes_produccion_id ?? p.orden_produccion_id ?? null };
+                }
+                return p;
+              });
+              const newSelected = { ...selectedPedido, productos: updatedProductos };
+              setSelectedPedido(newSelected);
+              setPedidos((list) => (Array.isArray(list) ? list.map((pp: any) => (pp.id === newSelected.id ? { ...pp, productos: updatedProductos } : pp)) : list));
+            }
+          }
+        } catch (e) { console.debug('Error actualizando UI tras crear producción', e); }
+
+        setProdModalOpen(false);
+        // refrescar detalle abierto para que aparezcan las órdenes/componentes (opcional)
+        if (selectedPedido?.id) await openDetalle(selectedPedido.id);
+      } catch (err) {
+        throw err;
+      }
+    } catch (err) {
+      console.error('Error creando producción desde pedido', err);
+      toast.error(parseApiError(err) || 'No se pudo crear la producción');
+    } finally {
+      setProdSubmitting(false);
+    }
+  }
   const navigate = useNavigate();
 
   // Helper: ordenar pedidos por fecha descendente (más recientes primero)
@@ -93,7 +363,7 @@ export default function Pedidos() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [navigate]);
 
   // Filtrado local por estado
   const visiblePedidos = selectedStatus ? pedidos.filter((p: any) => (p.estado || p.status || '').toString() === selectedStatus) : pedidos;
@@ -122,28 +392,28 @@ export default function Pedidos() {
         // ignore
       }
         polling = setInterval(async () => {
-        try {
-          const fresh = await getPedidos();
-          if (Array.isArray(fresh)) {
-            // Ordenar y usar actualización funcional para comparar con el estado previo
-            const sortedFresh = sortPedidosByDateDesc(fresh);
-            setPedidos((prev) => {
-              try {
-                if (sortedFresh.length > (prev?.length || 0)) {
-                  setNewOrdersCount((c) => c + (sortedFresh.length - (prev?.length || 0)));
-                  toast.success(`Hay ${sortedFresh.length - (prev?.length || 0)} pedidos nuevos`);
-                }
-              } catch (err) {
-                // ignore
+            try {
+              const fresh = await getPedidos();
+              if (Array.isArray(fresh)) {
+                // Ordenar y usar actualización funcional para comparar con el estado previo
+                const sortedFresh = sortPedidosByDateDesc(fresh);
+                setPedidos((prev) => {
+                  try {
+                    if (sortedFresh.length > (prev?.length || 0)) {
+                      setNewOrdersCount((c) => c + (sortedFresh.length - (prev?.length || 0)));
+                      toast.success(`Hay ${sortedFresh.length - (prev?.length || 0)} pedidos nuevos`);
+                    }
+                  } catch (err) {
+                    console.debug(err);
+                  }
+                  return sortedFresh;
+                });
+                // refrescar pagosMap en background para mantener el listado sincronizado
+                try { await refreshPagosMap(); } catch (e) { console.debug(e); }
               }
-              return sortedFresh;
-            });
-            // refrescar pagosMap en background para mantener el listado sincronizado
-            try { await refreshPagosMap(); } catch (e) { /* ignore */ }
-          }
-        } catch (e) {
-          // ignore
-        }
+            } catch (e) {
+              console.debug(e);
+            }
       }, 15000);
     })();
 
@@ -273,6 +543,23 @@ export default function Pedidos() {
       return false;
     }
   }
+  // Detectar si el pedido tiene líneas que requieren producción pero aún no tienen orden creada
+  const hasPendingProductionLines = (p: any) => {
+    try {
+      if (!p) return false;
+      const prods = Array.isArray(p.productos) ? p.productos : (Array.isArray(p.lineas) ? p.lineas : []);
+      for (const it of prods) {
+        const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
+        if (fid && fid > 0) {
+          const created = (it?.produccion_creada === true) || Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.orden_produccion_id);
+          if (!created) return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -291,13 +578,46 @@ export default function Pedidos() {
   const [directBancoId, setDirectBancoId] = useState<number | null>(null);
   const [directFormaId, setDirectFormaId] = useState<number | null>(null);
   const [directLoading, setDirectLoading] = useState(false);
+  // Ordenes de producción detalladas asociadas al pedido abierto
+  const [ordenesDetailed, setOrdenesDetailed] = useState<any[]>([]);
+  // Mapa por id de orden -> detalle (para lookup rápido cuando la línea referencia una orden_id)
+  const [ordenDetailsMap, setOrdenDetailsMap] = useState<Record<number, any>>({});
+  // Cache de info de materias primas (opcional)
+  const [materiasCostMap, setMateriasCostMap] = useState<Record<number, any>>({});
+
+  // Estados para modal de producir desde línea del pedido
+  const [prodModalOpen, setProdModalOpen] = useState(false);
+  const [prodLine, setProdLine] = useState<any | null>(null);
+  const [prodCantidad, setProdCantidad] = useState<number>(1);
+  const [prodAlmacenes, setProdAlmacenes] = useState<any[]>([]);
+  const [prodSelectedAlmacen, setProdSelectedAlmacen] = useState<number | null>(null);
+  const [prodSubmitting, setProdSubmitting] = useState(false);
+  const [prodComponents, setProdComponents] = useState<any[]>([]);
+  // Cuando cambie la cantidad a producir, recalcular las cantidades sugeridas
+  // Cuando cambie la cantidad a producir, recalcular las cantidades sugeridas
+  useEffect(() => {
+    // Usar el updater de estado para evitar leer `prodComponents` desde el closure
+    setProdComponents((prev) => {
+      try {
+        if (!Array.isArray(prev) || prev.length === 0) return prev;
+        const qty = Number(prodCantidad || 0);
+        return prev.map((c) => {
+          const unit = Number(c?.cantidad_por_unidad ?? 0) || 0;
+          const newVal = Number((unit * qty).toFixed(2));
+          return { ...c, cantidad_editable: newVal };
+        });
+      } catch (e) {
+        console.debug('prodComponents recalc error', e);
+        return prev;
+      }
+    });
+  }, [prodCantidad]);
   const makeClientUid = () => {
     try {
-      // @ts-ignore
-      if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof (globalThis.crypto as any).randomUUID === 'function') return (globalThis.crypto as any).randomUUID();
-      // eslint-disable-next-line no-undef
+      // cross-env global crypto typings — runtime-guarded
+      if (typeof globalThis !== 'undefined' && (globalThis as any).crypto && typeof (globalThis as any).crypto.randomUUID === 'function') return (globalThis as any).crypto.randomUUID();
       if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') return (crypto as any).randomUUID();
-    } catch (e) {}
+    } catch (e) { console.debug('makeClientUid error', e); }
     return `cu_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
   };
   // Guard para evitar crear pagos duplicados desde el formulario directo
@@ -375,9 +695,108 @@ export default function Pedidos() {
         // attach for UI
         (detalle as any).__computedPaid = computedPaid;
         // debug log
-        // eslint-disable-next-line no-console
+         
         console.debug('detalle-pago-check', { id, base, tasaVal, sumEq, sumRaw, pagosCount: pagosList.length, computedPaid });
         setSelectedPedido(detalle);
+        // Cargar órdenes de producción detalladas asociadas a este pedido
+        (async () => {
+          try {
+            let ordResp: any = null;
+            try {
+              ordResp = await apiFetch(`/ordenes-produccion/detailed?pedido_id=${encodeURIComponent(String(id))}`);
+            } catch (errQuery: any) {
+              // fallback: intentar listado general y luego filtrar por pedido
+              try { ordResp = await apiFetch('/ordenes-produccion/detailed'); } catch (e) { ordResp = []; }
+            }
+            let ordList = Array.isArray(ordResp) ? ordResp : (ordResp?.data || []);
+            ordList = ordList || [];
+            // Asegurar traer detalles por id referenciados en las líneas del pedido
+            try {
+              const referencedIds = new Set<number>();
+              if (Array.isArray(detalle?.productos)) {
+                for (const it of detalle.productos) {
+                  const cand = it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? null;
+                  const asNum = Number(cand);
+                  if (Number.isFinite(asNum) && asNum > 0) referencedIds.add(asNum);
+                  if (Array.isArray(it?.ordenes)) {
+                    for (const o of it.ordenes) {
+                      const oid = Number(o?.id ?? o);
+                      if (Number.isFinite(oid) && oid > 0) referencedIds.add(oid);
+                    }
+                  }
+                }
+              }
+              const present = new Set<number>();
+              for (const o of ordList) {
+                const oid = Number(o?.orden?.id ?? o?.id ?? null);
+                if (Number.isFinite(oid) && oid > 0) present.add(oid);
+              }
+              const missing = Array.from(referencedIds).filter((i) => !present.has(i));
+              for (const mid of missing) {
+                try {
+                  const one = await getOrdenProduccionDetailed(mid);
+                  if (one) {
+                    if (Array.isArray(one)) ordList = ordList.concat(one);
+                    else ordList.push(one);
+                  }
+                } catch (e) { console.debug(e); }
+              }
+            } catch (e) { console.debug(e); }
+            setOrdenesDetailed(ordList || []);
+            // Resolver nombres de materias primas referenciadas en las líneas/órdenes para mostrar nombres en el detalle
+            try {
+              const referencedMaterias = new Set<number>();
+              if (Array.isArray(detalle?.productos)) {
+                for (const it of detalle.productos) {
+                  // componentes en la línea
+                  if (Array.isArray(it?.componentes)) {
+                    for (const c of it.componentes) {
+                      const mid = Number(c?.materia_prima_id ?? c?.id ?? 0);
+                      if (Number.isFinite(mid) && mid > 0) referencedMaterias.add(mid);
+                    }
+                  }
+                  // componentes en órdenes referenciadas
+                  const cand = it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? null;
+                  const oid = Number(cand);
+                  if (Number.isFinite(oid) && oid > 0) {
+                    const od = ordList.find((o: any) => Number(o?.orden?.id ?? o?.id ?? 0) === oid) || ordenDetailsMap[oid];
+                    const compList = Array.isArray(od?.componentes) ? od.componentes : (Array.isArray(od?.orden?.componentes) ? od.orden.componentes : []);
+                    if (Array.isArray(compList)) {
+                      for (const c of compList) {
+                        const mid = Number(c?.materia_prima_id ?? c?.id ?? 0);
+                        if (Number.isFinite(mid) && mid > 0) referencedMaterias.add(mid);
+                      }
+                    }
+                  }
+                }
+              }
+              const missing = Array.from(referencedMaterias).filter((id) => !materiasCostMap || !materiasCostMap[id]);
+              if (missing.length > 0) {
+                const fetched = await Promise.all(missing.map((id) => getProducto(id).catch(() => null)));
+                const addMap: Record<number, any> = {};
+                fetched.forEach((res: any, i: number) => {
+                  const id = missing[i];
+                  if (res) addMap[id] = { nombre: res.nombre ?? res.name ?? null };
+                });
+                if (Object.keys(addMap).length > 0) setMateriasCostMap((prev) => ({ ...(prev || {}), ...addMap }));
+              }
+            } catch (e) {
+              console.debug('Error resolviendo nombres de materias en detalle', e);
+            }
+            // poblar mapa por id
+            try {
+              const mapUpdate: Record<number, any> = {};
+              for (const o of ordList) {
+                const oid = Number(o?.orden?.id ?? o?.id ?? null);
+                if (Number.isFinite(oid) && oid > 0) mapUpdate[oid] = o;
+              }
+              if (Object.keys(mapUpdate).length > 0) setOrdenDetailsMap((prev) => ({ ...prev, ...mapUpdate }));
+            } catch (e) { console.debug(e); }
+          } catch (e) {
+            console.debug('No se pudo cargar órdenes producción detailed', e);
+            setOrdenesDetailed([]);
+          }
+        })();
         // Si el pedido trae pagos, abrir la vista de pagos automáticamente
         try {
           const hasPagos = Array.isArray(detalle?.pagos) && detalle.pagos.length > 0;
@@ -418,6 +837,11 @@ export default function Pedidos() {
 
   async function completarSinPago() {
     if (!selectedPedido?.id) return;
+    // bloquear completar si hay líneas pendientes por producir
+    if (hasPendingProductionLines(selectedPedido)) {
+      toast.error('Hay líneas pendientes por producir. No se puede completar el pedido hasta crear las órdenes de producción.');
+      return;
+    }
     const ok = window.confirm('¿Seguro que deseas marcar este pedido como COMPLETADO sin registrar pago?');
     if (!ok) return;
     setCompleting(true);
@@ -586,7 +1010,71 @@ export default function Pedidos() {
                                 <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => { const t = e.currentTarget as HTMLImageElement; t.onerror = null; t.src = getImageUrl(undefined) as string; }} />
                               </div>
                             </td>
-                            <td className="py-2">{it.producto_nombre || it.nombre || '-'}</td>
+                            <td className="py-2 align-top">
+                              <div className="font-medium">{it.producto_nombre || it.nombre || '-'}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {(() => {
+                                  // Mostrar componentes asociados a la línea (si vienen) y/o componentes de la orden de producción referenciada
+                                  const compsFromLine = Array.isArray(it?.componentes) ? it.componentes.map((c: any) => {
+                                    const unit = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
+                                    const total = Number(c?.cantidad_total ?? (unit * Number(it?.cantidad ?? 1))) || 0;
+                                    return {
+                                      id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
+                                      nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
+                                      unidad: c?.unidad ?? c?.u ?? '',
+                                      cantidad: total,
+                                    };
+                                  }) : [];
+
+                                  const refId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? null);
+                                  let compsFromOrder: any[] = [];
+                                  if (Number.isFinite(refId) && refId > 0) {
+                                    const od = ordenDetailsMap[refId];
+                                    const ordObj = od?.orden ?? od ?? {};
+                                    const compList = Array.isArray(od?.componentes) ? od.componentes : (Array.isArray(ordObj?.componentes) ? ordObj.componentes : []);
+                                    if (Array.isArray(compList) && compList.length > 0) {
+                                      compsFromOrder = compList.map((c: any) => {
+                                        const cantidadPorUnidad = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
+                                        const cantidadTotal = Number(c?.cantidad_total ?? (cantidadPorUnidad * Number(ordObj?.cantidad ?? 0))) || 0;
+                                        return {
+                                          id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
+                                          nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
+                                          unidad: c?.unidad ?? c?.u ?? '',
+                                          cantidad: cantidadTotal,
+                                        };
+                                      });
+                                    }
+                                  }
+
+                                  const combined = [...(compsFromLine || []), ...(compsFromOrder || [])];
+                                  if (combined.length > 0) {
+                                    return (
+                                      <div className="mt-1 text-xs space-y-1">
+                                        {combined.map((c: any) => {
+                                          const cid = Number(c?.id ?? c?.materia_prima_id ?? 0) || 0;
+                                          const fallbackName = c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null;
+                                          const resolvedName = (cid && materiasCostMap && materiasCostMap[cid] && (materiasCostMap[cid].nombre || materiasCostMap[cid].nombre)) ? (materiasCostMap[cid].nombre) : (fallbackName ?? null);
+                                          const displayName = resolvedName ?? `ID ${cid || ''}`;
+                                          return (
+                                            <div key={String(cid || displayName)} className="flex justify-between">
+                                              <div className="break-words">{displayName}</div>
+                                              <div className="text-right">{Number(c.cantidad || 0).toFixed(2)} {c.unidad ?? ''}</div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  }
+
+                                  // No hay componentes disponibles: mostrar botón para producir
+                                  return (
+                                    <div className="mt-2">
+                                      <Button size="sm" variant="outline" onClick={() => openProduceModalForLine(it)}>Producir</Button>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </td>
                             <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
                             <td className="py-2">{typeof it.costo === 'number' ? `$${it.costo.toFixed(2)}` : it.costo}</td>
                             <td className="py-2">{it.cantidad}</td>
@@ -751,7 +1239,7 @@ export default function Pedidos() {
                                             if (Number.isFinite(Number(it.monto)) && Number(it.monto) > 0) { hasTasa = true; break; }
                                           }
                                         }
-                                      } catch (e) { /* ignore */ }
+                                      } catch (e) { console.debug(e); }
                                     }
                                   }
                                   if (!hasTasa) {
@@ -796,7 +1284,7 @@ export default function Pedidos() {
                                           monedaDetected = detalles?.moneda ?? detalles?.simbolo ?? detalles?.symbol ?? null;
                                         }
                                       }
-                                    } catch (e) { /* ignore */ }
+                                    } catch (e) { console.debug(e); }
                                     // Si no hay moneda en la forma, fallback a la del banco
                                     if (!monedaDetected && payload.banco_id) {
                                       const banco = directBancos.find((b: any) => Number(b.id) === Number(payload.banco_id));
@@ -816,9 +1304,9 @@ export default function Pedidos() {
                                         payload.tasa_monto = Number(tobj.monto);
                                       }
                                     }
-                                  } catch (e) { /* ignore */ }
+                                  } catch (e) { console.debug(e); }
                                   // Log payload to console for debugging
-                                  // eslint-disable-next-line no-console
+                                   
                                   console.debug('create-pago-payload', payload);
                                   // Evitar crear duplicados idénticos en vuelo
                                   const key = JSON.stringify(payload);
@@ -843,13 +1331,10 @@ export default function Pedidos() {
                                         }
                                       }
                                     } finally {
-                                      try { directInFlight.current.delete(key); } catch (e) { /* ignore */ }
+                                      try { directInFlight.current.delete(key); } catch (e) { console.debug(e); }
                                     }
                                   }
-                                } catch (err: any) {
-                                  // rethrow to outer catch
-                                  throw err;
-                                }
+                                  } catch (err: any) { console.debug(err); }
                                 toast.success('Pago registrado');
                                 // refrescar detalle y obtener pagos por pedido
                                 const fresh = await getPedidoVenta(selectedPedido.id);
@@ -858,11 +1343,11 @@ export default function Pedidos() {
                                   if (Array.isArray(pagos)) fresh.pagos = pagos;
                                   else if (pagos && Array.isArray((pagos as any).data)) fresh.pagos = (pagos as any).data;
                                 } catch (e) {
-                                  // ignore if endpoint missing
+                                  console.debug(e);
                                 }
                                 setSelectedPedido(fresh);
                                 // Actualizar el mapa de pagos global para que el listado refleje el nuevo pago
-                                try { await refreshPagosMap(); } catch (e) { /* ignore */ }
+                                try { await refreshPagosMap(); } catch (e) { console.debug(e); }
                               } catch (err: any) {
                                 console.error('Error creando pago', err);
                                 toast.error(parseApiError(err) || (err?.message ?? 'Error creando pago'));
@@ -892,7 +1377,7 @@ export default function Pedidos() {
                   pedidoId={selectedPedido?.id ?? 0}
                   onSuccess={async (data: any) => {
                     // Asegurar que actualizamos pagosMap para que el listado muestre 'Pagado'
-                    try { await refreshPagosMap(); } catch (e) { /* ignore */ }
+                    try { await refreshPagosMap(); } catch (e) { console.debug(e); }
                     toast.success('Pedido completado y pago registrado');
                     setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
                     setPedidos((list) => list.map((p) => (p.id === selectedPedido?.id ? { ...p, estado: 'Completado' } : p)));
@@ -907,7 +1392,14 @@ export default function Pedidos() {
             <DialogFooter>
               <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
                 <div className="flex gap-2">
-                    <Button size="lg" variant="default" onClick={() => setShowPaymentInline(true)} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido)}>
+                    <Button size="lg" variant="default" onClick={() => {
+                        // abrir formulario de pago pero bloquear si hay líneas pendientes por producir
+                        if (hasPendingProductionLines(selectedPedido)) {
+                          toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+                          return;
+                        }
+                        setShowPaymentInline(true);
+                      }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido)}>
                         Registrar pago y completar
                       </Button>
                     {selectedPedido?.estado === 'Completado' && (
@@ -915,7 +1407,7 @@ export default function Pedidos() {
                         Ver pagos
                       </Button>
                     )}
-                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'}>
+                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido)}>
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>
@@ -926,6 +1418,83 @@ export default function Pedidos() {
                   <Button variant="ghost" onClick={closeDetalle}>Cerrar</Button>
                 </div>
               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* Modal para producir desde una línea del pedido */}
+        <Dialog open={prodModalOpen} onOpenChange={setProdModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Producir</DialogTitle>
+              <DialogDescription>Crear producción a partir de la fórmula asociada a la línea.</DialogDescription>
+            </DialogHeader>
+            <div className="p-2 space-y-3">
+              <div>
+                <div className="text-sm text-muted-foreground">Producto / Fórmula</div>
+                <div className="text-lg font-semibold">{prodLine?.producto_nombre ?? prodLine?.nombre ?? prodLine?.formula_nombre ?? `#${prodLine?.formula_id ?? prodLine?.id ?? ''}`}</div>
+              </div>
+              <div>
+                <label className="text-sm">Cantidad a producir</label>
+                <input
+                  type="number"
+                  readOnly
+                  aria-readonly="true"
+                  value={prodCantidad.toFixed(2)}
+                  className="w-full mt-1 border rounded px-2 py-1 bg-gray-100"
+                />
+                
+              </div>
+              {/* Componentes editables (según fórmula). Se cargan en prodComponents al abrir el modal */}
+              {Array.isArray(prodComponents) && prodComponents.length > 0 ? (
+                <div>
+                  
+                  <ul className="list-none text-sm mt-2 space-y-2">
+                    {prodComponents.map((c: any, idx: number) => {
+                      const cid = Number(c?.materia_prima_id ?? c?.id ?? 0) || 0;
+                      const fallbackName = c?.nombre ?? c?.materia_prima_nombre ?? c?.materia_nombre ?? null;
+                      const resolvedName = (cid && materiasCostMap && materiasCostMap[cid] && (materiasCostMap[cid].nombre || materiasCostMap[cid].nombre)) ? (materiasCostMap[cid].nombre) : (fallbackName ?? null);
+                      const displayName = resolvedName ?? `ID ${cid || idx}`;
+                      return (
+                      <li key={String(cid || idx)} className="flex items-center justify-between gap-2">
+                        <div className="flex-1 break-words text-sm">{displayName}</div>
+                        <div className="w-40 flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0.01}
+                            step={0.01}
+                            className="w-24 text-right border rounded px-2 py-1"
+                            value={(Number(c.cantidad_editable ?? 0)).toFixed(2)}
+                            onChange={(e) => {
+                              const raw = String(e.target.value).replace(',', '.');
+                              const parsed = Number(raw);
+                              const val = Number.isFinite(parsed) ? Math.max(0.01, Math.round(parsed * 100) / 100) : 0.01;
+                              setProdComponents((prev) => {
+                                const copy = prev.slice();
+                                copy[idx] = { ...copy[idx], cantidad_editable: val };
+                                return copy;
+                              });
+                            }}
+                          />
+                          <div className="text-xs text-muted-foreground">{c.unidad || ''}</div>
+                        </div>
+                      </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+              <div>
+                <label className="text-sm">Almacén destino (venta)</label>
+                {prodAlmacenes.length === 0 ? (
+                  <div className="text-sm text-red-600">No hay almacenes de venta disponibles.</div>
+                ) : (
+                  <div className="text-sm mt-1">{(prodAlmacenes.find((a) => Number(a.id) === Number(prodSelectedAlmacen))?.nombre) ?? '—'}</div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProdModalOpen(false)}>Cancelar</Button>
+              <Button disabled={prodSubmitting} onClick={handleProduceFromLine}>{prodSubmitting ? 'Generando...' : 'Producir'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

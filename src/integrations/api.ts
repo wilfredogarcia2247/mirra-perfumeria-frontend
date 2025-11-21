@@ -241,6 +241,28 @@ export async function createProduccion(formulaId: number, data: { cantidad: numb
   return apiFetch(`/formulas/${formulaId}/produccion`, { method: "POST", body: JSON.stringify(data) });
 }
 
+// Obtener una orden de producción por id (entidad simple)
+export async function getOrdenProduccion(id: number) {
+  return apiFetch(`/ordenes-produccion/${id}`);
+}
+
+// Obtener detalle extendido de una orden de producción (incluye componentes).
+// Intenta llamar al endpoint /ordenes-produccion/detailed?id=123 que algunos backends exponen.
+export async function getOrdenProduccionDetailed(id: number) {
+  try {
+    return await apiFetch(`/ordenes-produccion/detailed?id=${encodeURIComponent(String(id))}`);
+  } catch (e) {
+    // Fallback: intentar el endpoint simple y devolver en formato compatible
+    try {
+      const ord = await apiFetch(`/ordenes-produccion/${id}`);
+      // Estimar formato detailed como { orden: ord, componentes: [] }
+      return { orden: ord, componentes: ord?.componentes || [] };
+    } catch (e2) {
+      throw e;
+    }
+  }
+}
+
 // Bancos
 export async function getBancos() {
   return apiFetch("/bancos");
