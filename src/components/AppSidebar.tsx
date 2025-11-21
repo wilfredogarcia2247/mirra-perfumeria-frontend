@@ -1,5 +1,7 @@
 import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, Square } from "lucide-react";
 import { useLocation, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+// no module-based menu filtering — keep menu visible for all users except the Usuarios link which remains admin-only
 import {
   Sidebar,
   SidebarContent,
@@ -34,13 +36,12 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
-  const { token } = useAuth();
+  const { logout, token } = useAuth();
   const { clear: clearCart } = useCart();
 
-  // Determine role from JWT token (if available). We attempt to decode the token payload
-  // without adding a dependency. The token payload may contain 'rol' or 'role'.
+  // Determine role from JWT token (if available).
   let isAdmin = false;
+  let userId: number | null = null;
   try {
     if (token) {
       const parts = token.split('.');
@@ -52,12 +53,19 @@ export function AppSidebar() {
         } else if (Array.isArray(role)) {
           isAdmin = role.map((r: any) => String(r).toLowerCase()).includes('admin');
         }
+        const idClaim = payload?.id ?? payload?.sub ?? payload?.usuario_id ?? payload?.user_id ?? null;
+        if (idClaim !== undefined && idClaim !== null) {
+          const n = Number(idClaim);
+          if (Number.isFinite(n)) userId = n;
+        }
       }
     }
   } catch (e) {
-    // ignore parse errors and treat as non-admin
     isAdmin = false;
+    userId = null;
   }
+
+  // Note: menu visibility is not driven by backend module flags. We keep the sidebar simple.
 
   const handleLogout = () => {
     // Ejecuta la limpieza local de sesión y redirige al login
@@ -98,9 +106,11 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems
-                .filter((item) => item.title !== 'Usuarios' || isAdmin)
-                .map((item) => {
+              {menuItems.map((item) => {
+                // Usuarios only visible to admins
+                if (item.title === 'Usuarios' && !isAdmin) return null;
+                return item;
+              }).filter(Boolean).map((item: any) => {
                 const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
                 return (
                   <SidebarMenuItem key={item.title}>

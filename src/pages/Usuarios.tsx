@@ -17,10 +17,29 @@ export default function Usuarios() {
   const [userForm, setUserForm] = useState<{ nombre?: string; email?: string; password?: string; rol?: string }>({});
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [permisosModalOpen, setPermisosModalOpen] = useState(false);
+  const [availableModules, setAvailableModules] = useState<Array<string | { key: string; label?: string }>>([]);
 
   useEffect(() => {
     loadUsers();
+    loadAvailableModules();
   }, []);
+
+  async function loadAvailableModules() {
+    try {
+      const res = await apiFetch('/users/available-modulos');
+      // backend may return array of strings or objects
+      if (Array.isArray(res)) {
+        setAvailableModules(res as any);
+      } else if (res && Array.isArray(res.data)) {
+        setAvailableModules(res.data as any);
+      } else {
+        setAvailableModules([]);
+      }
+    } catch (e) {
+      console.debug('Could not load available modules', e);
+      setAvailableModules([]);
+    }
+  }
 
   async function loadUsers() {
     setLoading(true);
@@ -125,13 +144,26 @@ export default function Usuarios() {
     try {
       // GET /api/users/:id/modulos (según documentación)
       const data = await apiFetch(`/users/${user.id}/modulos`);
-      setPermisos(data);
+      // API puede devolver { modulos: {...}, available_modulos: [...] }
+      if (data && typeof data === 'object' && data.modulos) {
+        setPermisos(data.modulos || {});
+        if (Array.isArray(data.available_modulos) && data.available_modulos.length > 0) setAvailableModules(data.available_modulos as any);
+      } else {
+        setPermisos(data || {});
+      }
       setSelectedUser(user);
       setPermisosModalOpen(true);
     } catch (e: any) {
       console.error('Error cargando permisos', e);
       // Si no existe fila de permisos (404), abrir modal con permisos vacíos para crear
       if ((e as any)?.status === 404) {
+        // intentar parsear available_modulos desde el body del error si viene en JSON
+        try {
+          const parsed = JSON.parse(String(e.message || '{}'));
+          if (parsed && Array.isArray(parsed.available_modulos)) setAvailableModules(parsed.available_modulos);
+        } catch (pe) {
+          // ignore
+        }
         setPermisos({});
         setSelectedUser(user);
         setPermisosModalOpen(true);
@@ -298,12 +330,16 @@ export default function Usuarios() {
               <DialogDescription>Asignar permisos por módulo al usuario.</DialogDescription>
             </DialogHeader>
             <div className="space-y-2 mt-2">
-              {['dashboard','tasas_cambio','bancos','marcas','categorias','almacenes','productos','formulas','pedidos'].map((k) => (
-                <div key={k} className="flex items-center justify-between">
-                  <div className="capitalize text-sm">{k.replace('_',' ')}</div>
-                  <input type="checkbox" checked={!!permisos?.[k]} onChange={(e) => setPermisos((p:any)=>({...(p||{}),[k]: e.target.checked}))} />
-                </div>
-              ))}
+              {(availableModules && availableModules.length > 0 ? availableModules : ['dashboard','tasas_cambio','bancos','marcas','categorias','almacenes','productos','formulas','pedidos']).map((m) => {
+                const key = typeof m === 'string' ? m : (m as any).key;
+                const label = typeof m === 'string' ? (m as string).replace('_', ' ') : ((m as any).label || (m as any).key.replace('_', ' '));
+                return (
+                  <div key={String(key)} className="flex items-center justify-between">
+                    <div className="capitalize text-sm">{label}</div>
+                    <input type="checkbox" checked={!!permisos?.[key]} onChange={(e) => setPermisos((p:any)=>({...(p||{}),[key]: e.target.checked}))} />
+                  </div>
+                );
+              })}
             </div>
             <DialogFooter>
               <div className="flex gap-2 mt-4">

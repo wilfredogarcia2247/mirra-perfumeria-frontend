@@ -23,6 +23,7 @@ import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -40,21 +41,61 @@ const App = () => (
           
           {/* Rutas protegidas */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/productos" element={<Productos />} />
+            <Route element={<ModuleProtectedRoute moduleKey="dashboard" />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="productos" />}>
+              <Route path="/productos" element={<Productos />} />
+            </Route>
+
             <Route path="/proveedores" element={<Proveedores />} />
-            <Route path="/almacenes" element={<Almacenes />} />
-            <Route path="/formulas" element={<Formulas />} />
-            <Route path="/produccion" element={<Produccion />} />
-            <Route path="/tamanos" element={<Tamanos />} />
-            <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/tasas-cambio" element={<TasasCambio />} />
-            <Route path="/usuarios" element={<Usuarios />} />
-            <Route path="/marcas" element={<Marcas />} />
+
+            <Route element={<ModuleProtectedRoute moduleKey="almacenes" />}>
+              <Route path="/almacenes" element={<Almacenes />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="formulas" />}>
+              <Route path="/formulas" element={<Formulas />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="almacenes" />}>
+              <Route path="/produccion" element={<Produccion />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="tamanos" />}>
+              <Route path="/tamanos" element={<Tamanos />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="pedidos" />}>
+              <Route path="/pedidos" element={<Pedidos />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="tasas_cambio" />}>
+              <Route path="/tasas-cambio" element={<TasasCambio />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
+              <Route path="/usuarios" element={<Usuarios />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="marcas" />}>
+              <Route path="/marcas" element={<Marcas />} />
+            </Route>
+
             <Route path="/contactos" element={<Contactos />} />
-            <Route path="/bancos" element={<Bancos />} />
-            <Route path="/categorias" element={<Categorias />} />
-            <Route path="/pagos" element={<Pagos />} />
+
+            <Route element={<ModuleProtectedRoute moduleKey="bancos" />}>
+              <Route path="/bancos" element={<Bancos />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="categorias" />}>
+              <Route path="/categorias" element={<Categorias />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="pagos" />}>
+              <Route path="/pagos" element={<Pagos />} />
+            </Route>
           </Route>
           
           {/* Ruta 404 leo se perdio*/}
