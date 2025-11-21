@@ -27,6 +27,7 @@ const menuItems = [
   { title: "Productos", url: "/productos", icon: Package },
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical },
   { title: "Pedidos", url: "/pedidos", icon: Receipt },
+  { title: "Usuarios", url: "/usuarios", icon: Users },
 ];
 
 export function AppSidebar() {
@@ -34,7 +35,29 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+  const { token } = useAuth();
   const { clear: clearCart } = useCart();
+
+  // Determine role from JWT token (if available). We attempt to decode the token payload
+  // without adding a dependency. The token payload may contain 'rol' or 'role'.
+  let isAdmin = false;
+  try {
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const role = payload?.rol ?? payload?.role ?? payload?.role_name ?? payload?.roles ?? null;
+        if (typeof role === 'string') {
+          isAdmin = role.toLowerCase() === 'admin';
+        } else if (Array.isArray(role)) {
+          isAdmin = role.map((r: any) => String(r).toLowerCase()).includes('admin');
+        }
+      }
+    }
+  } catch (e) {
+    // ignore parse errors and treat as non-admin
+    isAdmin = false;
+  }
 
   const handleLogout = () => {
     // Ejecuta la limpieza local de sesión y redirige al login
@@ -75,7 +98,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {menuItems
+                .filter((item) => item.title !== 'Usuarios' || isAdmin)
+                .map((item) => {
                 const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
                 return (
                   <SidebarMenuItem key={item.title}>

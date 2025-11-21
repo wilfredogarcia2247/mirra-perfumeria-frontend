@@ -13,6 +13,7 @@ import Produccion from "./pages/Produccion";
 import Pedidos from "./pages/Pedidos";
 import Tamanos from "./pages/Tamanos";
 import TasasCambio from "./pages/TasasCambio";
+import Usuarios from "./pages/Usuarios";
 import Contactos from "./pages/Contactos";
 import Bancos from "./pages/Bancos";
 import Marcas from "./pages/Marcas";
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/tamanos" element={<Tamanos />} />
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/tasas-cambio" element={<TasasCambio />} />
+            <Route path="/usuarios" element={<Usuarios />} />
             <Route path="/marcas" element={<Marcas />} />
             <Route path="/contactos" element={<Contactos />} />
             <Route path="/bancos" element={<Bancos />} />
