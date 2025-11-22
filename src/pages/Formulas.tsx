@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto, createProduccion } from "@/integrations/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,9 +22,9 @@ export default function Formulas() {
   const [componentes, setComponentes] = useState<Array<{ materia_prima_id: number | null; cantidad: number | null; unidad: string }>>([
     { materia_prima_id: null, cantidad: null, unidad: '' },
   ]);
-  const [costo, setCosto] = useState<number | null>(null);
-  const [precioVenta, setPrecioVenta] = useState<number | null>(null);
-  const [precioManual, setPrecioManual] = useState(false);
+  const [costo, setCosto] = useState<number>(0);
+  const [computedCosto, setComputedCosto] = useState<number>(0);
+  const [precioVenta, setPrecioVenta] = useState<number>(0);
   // Nota: ya no manejamos tamaños aquí; las presentaciones/tamaños ahora son fórmulas.
   const [submitting, setSubmitting] = useState(false);
   // Producción modal
@@ -69,22 +69,51 @@ export default function Formulas() {
           const qty = Number(c.cantidad || 0);
           if (!c.materia_prima_id || qty <= 0) continue;
           const mat = productos.find((p) => Number(p.id) === Number(c.materia_prima_id));
-          const unitCost = Number(mat?.costo ?? mat?.cost ?? 0) || 0;
+          const unitCost = Number(mat?.costo ?? mat?.cost ?? mat?.costo_promedio ?? 0) || 0;
           const unitPrice = Number(mat?.precio_venta ?? mat?.price ?? 0) || 0;
           totalCost += unitCost * qty;
           totalPriceFromComponents += unitPrice * qty;
         }
         // Si el precio a partir de componentes es 0, aplicamos un multiplicador por defecto (x2)
         const estimatedPrice = totalPriceFromComponents > 0 ? totalPriceFromComponents : (totalCost > 0 ? totalCost * 2 : 0);
-        setCosto(totalCost > 0 ? Number(totalCost) : null);
-        // sólo sobrescribimos precio si el usuario no lo modificó manualmente
-        if (!precioManual) setPrecioVenta(estimatedPrice > 0 ? Number(estimatedPrice) : null);
+        // actualizar computedCosto siempre para mostrar preview
+        setComputedCosto(totalCost);
+        // actualizar costo y precio automáticamente (siempre se recalculan al cambiar componentes/productos)
+        setCosto(totalCost > 0 ? Number(totalCost) : 0);
+        setPrecioVenta(estimatedPrice > 0 ? Number(estimatedPrice) : 0);
       } catch (e) {
         // noop
       }
     }
     recalc();
-  }, [componentes, productos, precioManual]);
+  }, [componentes, productos]);
+
+  // helper síncrono para calcular total de costo desde componentes (sin depender del effect)
+  function computeTotalCostFromComponents(compList = componentes) {
+    let tot = 0;
+    for (const c of compList) {
+      const qty = Number(c.cantidad || 0);
+      if (!c.materia_prima_id || qty <= 0) continue;
+      const mat = productos.find((p) => Number(p.id) === Number(c.materia_prima_id));
+      const unitCost = Number(mat?.costo ?? mat?.cost ?? mat?.costo_promedio ?? 0) || 0;
+      tot += unitCost * qty;
+    }
+    return tot;
+  }
+
+  // Helper para obtener costo unitario de una materia prima (usado en UI por fila)
+  function getUnitCost(materia_prima_id: number | null) {
+    if (!materia_prima_id) return 0;
+    const mat = productos.find((p) => Number(p.id) === Number(materia_prima_id));
+    return Number(mat?.costo ?? mat?.cost ?? mat?.costo_promedio ?? 0) || 0;
+  }
+
+  // Helper para obtener precio unitario de una materia prima (usado en UI por fila)
+  function getUnitPrice(materia_prima_id: number | null) {
+    if (!materia_prima_id) return 0;
+    const mat = productos.find((p) => Number(p.id) === Number(materia_prima_id));
+    return Number(mat?.precio_venta ?? mat?.price ?? 0) || 0;
+  }
 
   function removeComponente(idx: number) {
     setComponentes((c) => c.filter((_, i) => i !== idx));
@@ -95,9 +124,8 @@ export default function Formulas() {
     setProductoTerminadoId(null);
     setComponentes([{ materia_prima_id: null, cantidad: null, unidad: '' }]);
     setEditingId(null);
-    setCosto(null);
-    setPrecioVenta(null);
-    setPrecioManual(false);
+    setCosto(0);
+    setPrecioVenta(0);
   }
 
   async function handleCreate() {
@@ -170,10 +198,8 @@ export default function Formulas() {
       // prefill nombre
       setNombre(f.nombre ?? '');
       // prefill costo and precio if present; otherwise they'll be calculated by effect
-      setCosto(f.costo !== undefined && f.costo !== null ? Number(f.costo) : null);
-      setPrecioVenta(f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta) : null);
-      // if the API returned explicit precio_venta, consider it manual (don't overwrite on component changes)
-      setPrecioManual(f.precio_venta !== undefined && f.precio_venta !== null);
+      setCosto(f.costo !== undefined && f.costo !== null ? Number(f.costo) : 0);
+      setPrecioVenta(f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta) : 0);
       // Prefill form
       setProductoTerminadoId(f.producto_terminado_id ?? null);
         setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
@@ -439,52 +465,73 @@ export default function Formulas() {
                 </div>
 
                 <div className="space-y-2 mt-2">
-                  {componentes.map((comp, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-5">
-                        <label className="text-xs">Materia prima</label>
-                        <select className="w-full rounded-md border px-2 py-2" value={comp.materia_prima_id ?? ''} onChange={(e) => {
-                          const val = e.target.value ? Number(e.target.value) : null;
-                          const mat = materias.find((m) => Number(m.id) === Number(val));
-                          const unidadMat = mat?.unidad || mat?.unidad_medida || mat?.unidad_nombre || '';
-                          setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: val, unidad: unidadMat } : it));
-                        }}>
-                          <option value="">-- Seleccione materia prima --</option>
-                          {materias.map((m) => (
-                            <option key={m.id} value={m.id}>{m.nombre || m.id}</option>
-                          ))}
-                        </select>
-                      </div>
+                  {componentes.map((comp, idx) => {
+                    const unitCost = getUnitCost(comp.materia_prima_id ?? null);
+                    const unitPrice = getUnitPrice(comp.materia_prima_id ?? null);
+                    const qty = Number(comp.cantidad || 0);
+                    const compCost = unitCost * qty;
+                    const compPrice = unitPrice * qty;
+                    return (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5">
+                          <label className="text-xs">Materia prima</label>
+                          <select className="w-full rounded-md border px-2 py-2" value={comp.materia_prima_id ?? ''} onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            const mat = materias.find((m) => Number(m.id) === Number(val));
+                            const unidadMat = mat?.unidad || mat?.unidad_medida || mat?.unidad_nombre || '';
+                            setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: val, unidad: unidadMat } : it));
+                          }}>
+                            <option value="">-- Seleccione materia prima --</option>
+                            {materias.map((m) => (
+                              <option key={m.id} value={m.id}>{m.nombre || m.id}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <div className="col-span-3">
-                        <label className="text-xs">Cantidad</label>
-                        <Input type="number" min={0} value={comp.cantidad ?? ''} onChange={(e) => {
-                          const val = e.target.value ? Number(e.target.value) : null;
-                          setComponentes((c) => c.map((it, i) => i === idx ? { ...it, cantidad: val } : it));
-                        }} />
-                      </div>
+                        <div className="col-span-3">
+                          <label className="text-xs">Cantidad</label>
+                          <Input type="number" min={0} value={comp.cantidad ?? ''} onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            setComponentes((c) => c.map((it, i) => i === idx ? { ...it, cantidad: val } : it));
+                          }} />
+                        </div>
 
-                      <div className="col-span-3">
-                        <label className="text-xs">Unidad</label>
-                        <input readOnly value={comp.unidad ?? ''} className="w-full rounded-md border px-2 py-2 bg-gray-50" />
-                      </div>
+                        <div className="col-span-3">
+                          <label className="text-xs">Unidad</label>
+                          <input readOnly value={comp.unidad ?? ''} className="w-full rounded-md border px-2 py-2 bg-gray-50" />
+                        </div>
 
-                      <div className="col-span-1">
-                        <Button variant="ghost" onClick={() => removeComponente(idx)}>X</Button>
+                        <div className="col-span-1">
+                          <Button variant="ghost" onClick={() => removeComponente(idx)}>X</Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
               <div>
-                <label className="text-sm">Costo estimado (calculado)</label>
-                <Input readOnly value={costo !== null && costo !== undefined ? String(costo) : ''} />
+                <label className="text-sm">Costo estimado</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={String(costo ?? 0)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const cleaned = v === '' ? 0 : parseFloat(String(v).replace(/[,]/g, '.'));
+                      const n = Number.isFinite(cleaned) ? cleaned : 0;
+                      setCosto(n);
+                    }}
+                    placeholder="calcula automáticamente"
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Calculado automáticamente · Calculado: ${computedCosto.toFixed(2)}</div>
               </div>
 
               <div>
                 <label className="text-sm">Precio de venta (editable)</label>
-                <Input type="number" step="0.01" value={precioVenta !== null && precioVenta !== undefined ? String(precioVenta) : ''} onChange={(e) => { setPrecioVenta(e.target.value === '' ? null : Number(e.target.value)); setPrecioManual(true); }} placeholder="Ingrese precio de venta" />
+                <Input type="number" step="0.01" value={String(precioVenta ?? 0)} onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : Number(v); setPrecioVenta(Number.isFinite(n) ? n : 0); }} placeholder="Ingrese precio de venta" />
               </div>
             </div>
 
