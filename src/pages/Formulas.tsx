@@ -34,6 +34,7 @@ export default function Formulas() {
   const [produceAlmacenId, setProduceAlmacenId] = useState<number | null>(null);
   const [produceChecking, setProduceChecking] = useState<boolean>(false);
   const [produceAvailability, setProduceAvailability] = useState<Array<{ materia_prima_id: number; nombre?: string; disponible: number; requerido: number }>>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     setLoading(true);
@@ -309,6 +310,17 @@ export default function Formulas() {
     }
   }
 
+  // Filtrar fórmulas por término de búsqueda
+  const filteredFormulas = React.useMemo(() => {
+    if (!searchTerm.trim()) return formulas;
+    const term = searchTerm.toLowerCase();
+    return formulas.filter(f => 
+      (f.nombre || '').toLowerCase().includes(term) ||
+      (f.producto_terminado_nombre || '').toLowerCase().includes(term) ||
+      String(f.id).includes(term)
+    );
+  }, [formulas, searchTerm]);
+
   // Construir set de ids de almacenes marcados como materia prima
   const materiaAlmacenIds = new Set<number>((almacenes || []).filter((a: any) => a.es_materia_prima || String(a.tipo).toLowerCase() === 'interno').map((a: any) => a.id));
 
@@ -385,48 +397,117 @@ export default function Formulas() {
   return (
     <Layout>
       <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Fórmulas</h1>
-          <div className="flex gap-2">
-            <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva fórmula</Button>
+        <div className="space-y-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold">Fórmulas</h1>
+            <div className="flex gap-2">
+              <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva fórmula</Button>
+            </div>
+          </div>
+          
+          <div className="relative max-w-md">
+            <input
+              type="text"
+              placeholder="Buscar por nombre de fórmula..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 pl-10 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-copper-500 focus:border-transparent"
+            />
+            <svg
+              className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                clipRule="evenodd"
+              />
+            </svg>
           </div>
         </div>
 
         {loading ? (
           <div>Cargando fórmulas...</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {formulas.length === 0 && <div className="text-muted-foreground">No hay fórmulas definidas.</div>}
-            {formulas.map((f) => (
-              <Card key={f.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{f.nombre || f.titulo || `Fórmula #${f.id}`}</span>
-                    <div className="ml-4 flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => openProduceModal(f.id)}>Producir</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(f.id)}>Editar</Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(f.id)}>Eliminar</Button>
-                    </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredFormulas.length === 0 ? (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                {searchTerm ? 'No se encontraron fórmulas que coincidan con la búsqueda.' : 'No hay fórmulas definidas.'}
+              </div>
+            ) : (
+              filteredFormulas.map((f) => (
+              <Card key={f.id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">
+                    {f.nombre || f.titulo || `Fórmula #${f.id}`}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-sm text-muted-foreground mb-2">Producto terminado: {f.producto_terminado_nombre ?? f.producto_terminado_id}</div>
-                  <div className="flex gap-4 mb-2 text-sm">
-                    <div>Costo: <strong>{f.costo !== undefined && f.costo !== null ? Number(f.costo).toFixed(2) : '-'}</strong></div>
-                    <div>Precio: <strong>{f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta).toFixed(2) : '-'}</strong></div>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={() => openProduceModal(f.id)}
+                      className="flex-1 min-w-[80px]"
+                    >
+                      Producir
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => handleEdit(f.id)}
+                      className="flex-1 min-w-[70px]"
+                    >
+                      Editar
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      onClick={() => handleDelete(f.id)}
+                      className="flex-1 min-w-[80px]"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    <div className="flex items-center gap-1 truncate" title={String(f.producto_terminado_nombre ?? f.producto_terminado_id)}>
+                      <span className="font-medium whitespace-nowrap">Producto:</span>
+                      <span className="truncate">{f.producto_terminado_nombre ?? f.producto_terminado_id}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 mb-2 text-xs bg-gray-50 p-1.5 rounded">
+                    <div className="text-center">
+                      <div className="font-medium text-gray-500">Costo</div>
+                      <div className="font-semibold text-amber-700">
+                        {f.costo !== undefined && f.costo !== null ? 
+                          `$${Number(f.costo).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-medium text-gray-500">Precio</div>
+                      <div className="font-semibold text-green-700">
+                        {f.precio_venta !== undefined && f.precio_venta !== null ? 
+                          `$${Number(f.precio_venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </div>
+                    </div>
                   </div>
                   {Array.isArray(f.componentes) && f.componentes.length > 0 ? (
-                    <ul className="text-sm list-disc pl-4">
+                    <ul className="text-xs space-y-1 pl-3">
                       {f.componentes.map((c: any) => (
-                        <li key={c.id || `${c.materia_prima_id}-${c.cantidad}`}>{c.nombre || c.materia_prima_nombre || c.materia_prima_id} — {c.cantidad} {c.unidad}</li>
+                        <li key={c.id || `${c.materia_prima_id}-${c.cantidad}`}>
+                          {c.nombre || c.materia_prima_nombre || c.materia_prima_id} — {c.cantidad} {c.unidad}
+                        </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="text-sm text-muted-foreground">Sin componentes definidos.</div>
+                    <div className="text-xs text-muted-foreground">Sin componentes</div>
                   )}
                 </CardContent>
               </Card>
-            ))}
+              ))
+            )}
           </div>
         )}
 
