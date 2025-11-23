@@ -55,25 +55,26 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
-      <div className="relative bg-white rounded-lg shadow-lg max-w-3xl w-full z-10 overflow-hidden">
-        <div className="flex justify-between items-start p-4 border-b">
-          <h3 className="text-xl font-semibold">{product.name}</h3>
+      <div className="relative bg-white rounded-none sm:rounded-lg shadow-lg max-w-5xl w-full h-full sm:h-auto sm:max-h-[90vh] z-10 overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-3 sm:p-4 border-b sticky top-0 bg-white z-10">
+          <h3 className="text-lg font-semibold line-clamp-1 text-gray-900">{product.name}</h3>
           <button 
             onClick={onClose} 
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-1.5 -mr-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
             aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-          <div className="flex items-center justify-center">
-            <div className="relative w-full max-w-md mx-auto">
-              <div className="aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-y-auto sm:overflow-visible flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 p-4 sm:p-6">
+          {/* Imagen del producto */}
+          <div className="flex items-center justify-center bg-gray-50 rounded-xl p-2 sm:p-4">
+            <div className="w-full max-w-xs">
+              <div className="aspect-square bg-gradient-to-br from-white to-gray-50 rounded-lg p-4 sm:p-8 shadow-sm border border-gray-100">
                 <img
                   src={getImageUrl(product)}
                   alt={product.name}
@@ -88,17 +89,19 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
             </div>
           </div>
           
-          <div className="flex flex-col justify-between h-full">
-            <div>
-              <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-gray-900 mb-3">{product.name}</h2>
-                <div className="flex items-center gap-2 mb-6">
-                  <span className="px-3 py-1 bg-green-50 text-green-700 text-sm font-medium rounded-full">
+          {/* Contenido del lado derecho */}
+          <div className="flex flex-col">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{product.name}</h2>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${(product.stock ?? 0) > 0 ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
                     {(product.stock ?? 0) > 0 ? 'En stock' : 'Consultar disponibilidad'}
                   </span>
                 </div>
-                <div className="mb-4">
-                  <h4 className="text-3xl font-bold text-copper-600">
+              </div>
+              <div className="mb-2">
+                <h4 className="text-2xl sm:text-3xl font-bold text-copper-600">
                     {(() => {
                       const pm = getPrecioMostrar(product, selectedTamano ?? undefined);
                       if (pm.precio != null && Number(pm.precio) > 0) {
@@ -120,19 +123,19 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                       return pa - pb; // menor -> mayor
                     });
                     return (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {display.map((t: any) => {
                           const active = selectedTamano && Number(selectedTamano.id) === Number(t.id);
                           return (
                             <button
                               key={t.id}
                               onClick={() => setSelectedTamano(t)}
-                              className={`px-3 py-2 rounded-lg text-sm inline-flex items-center justify-between gap-3 w-full border transition-all duration-150 ${active ? 'bg-gradient-to-r from-copper-700/95 to-copper-800 text-cream-50 shadow-xl scale-102 ring-2 ring-copper-200 border-copper-700' : 'bg-cream-50 text-copper-700 border-gray-100 hover:shadow-sm hover:scale-102'}`}
+                              className={`px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm inline-flex items-center justify-between gap-2 w-full border transition-all duration-150 ${active ? 'bg-gradient-to-r from-copper-700/95 to-copper-800 text-cream-50 shadow-lg scale-[1.02] ring-1 ring-copper-200 border-copper-700' : 'bg-cream-50 text-copper-700 border-gray-100 hover:shadow-sm hover:scale-[1.02]'}`}
                               aria-pressed={active}
                             >
                               <div className="text-left">
                                 <div className="font-medium">{t.nombre}</div>
-                                <div className="text-xs text-muted-foreground">{t.cantidad ?? ''}{t.unidad ? t.unidad : ''}</div>
+                                <div className="text-xs text-muted-foreground">{t.cantidad ? `${t.cantidad}${t.unidad || ''}` : ''}</div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {active ? <Check className="w-4 h-4 text-cream-50" /> : null}
@@ -146,6 +149,7 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                 </div>
               </div>
               
+              {/* Sección de detalles del producto comentada temporalmente
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mt-6">
                 <div className="flex items-center gap-2 mb-3 text-gray-800">
                   <Info className="h-5 w-5 text-copper-600" />
@@ -159,11 +163,12 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                   <p className="text-sm text-gray-500 italic">Este producto no tiene una descripción detallada.</p>
                 )}
               </div>
-            </div>
-
-                <div className="pt-4">
-              <div className="flex flex-col gap-4">
-                {/* Resumen: tamaño seleccionado y precio que se añadirá */}
+              */}
+            
+            {/* Sección de acciones fijas en la parte inferior */}
+            <div className={`mt-6 pt-4 border-t ${window.innerWidth >= 768 ? '' : 'sticky bottom-0 bg-white pb-1'}`}>
+              <div className="space-y-3">
+                {/* Resumen del tamaño seleccionado */}
                 <div className="px-3 py-2 rounded-md bg-cream-50 border border-gray-100">
                   {selectedTamano ? (
                     (() => {
@@ -174,7 +179,7 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                         <div className="flex items-center justify-between gap-4">
                           <div>
                             <div className="text-sm text-muted-foreground">Tamaño seleccionado</div>
-                            <div className="font-medium">{selectedTamano.nombre} {selectedTamano.cantidad ? `· ${selectedTamano.cantidad}${selectedTamano.unidad ?? ''}` : null}</div>
+                            <div className="font-medium">{selectedTamano.nombre} {selectedTamano.cantidad ? `· ${selectedTamano.cantidad}${selectedTamano.unidad ?? ''}` : ''}</div>
                           </div>
                           <div className="text-right">
                             <div className="text-sm text-muted-foreground">Precio (tamaño)</div>
@@ -189,6 +194,8 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                 </div>
 
                 <Button 
+                  size="lg"
+                  className="w-full py-3 text-base font-semibold bg-amber-500 text-black hover:bg-amber-600 transition-all duration-200 hover:shadow-md shadow-sm"
                   onClick={() => { 
                     const pm = getPrecioMostrar(product, selectedTamano ?? undefined);
                     const item = { ...product, tamano: selectedTamano ?? undefined, precio_snapshot: pm.precio ?? undefined };
@@ -196,12 +203,10 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                     onClose();
                   }}
                   disabled={(getPrecioMostrar(product, selectedTamano ?? undefined).precio == null)}
-                  className="w-full py-4 text-base font-semibold bg-copper-700 text-black hover:bg-copper-800 transition-all duration-200 hover:shadow-md hover:shadow-copper-100"
                 >
                   <ShoppingCart className="mr-2 h-5 w-5" />
                   Agregar al carrito
                 </Button>
-
               </div>
             </div>
           </div>
