@@ -60,6 +60,8 @@ export default function Formulas() {
   // Nota: no cargamos tamaños por producto aquí; las presentaciones ahora se modelan como fórmulas.
 
   const componentesEndRef = useRef<HTMLDivElement>(null);
+  // Ref to prevent overwriting stored prices with calculated ones when loading a formula
+  const ignoreNextPriceUpdate = useRef(false);
 
   function scrollToBottom() {
     componentesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -91,6 +93,13 @@ export default function Formulas() {
         const estimatedPrice = totalPriceFromComponents > 0 ? totalPriceFromComponents : (totalCost > 0 ? totalCost * 2 : 0);
         // actualizar computedCosto siempre para mostrar preview
         setComputedCosto(totalCost);
+
+        // Si se indicó ignorar la actualización (ej. al cargar editar), saltar
+        if (ignoreNextPriceUpdate.current) {
+          ignoreNextPriceUpdate.current = false;
+          return;
+        }
+
         // actualizar costo y precio automáticamente (siempre se recalculan al cambiar componentes/productos)
         setCosto(totalCost > 0 ? Number(totalCost) : 0);
         setPrecioVenta(estimatedPrice > 0 ? Number(estimatedPrice) : 0);
@@ -215,6 +224,10 @@ export default function Formulas() {
       setPrecioVenta(f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta) : 0);
       // Prefill form
       setProductoTerminadoId(f.producto_terminado_id ?? null);
+
+      // Prevent effect from overwriting these values with calculated ones
+      ignoreNextPriceUpdate.current = true;
+
       setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
       // ya no prefill de tamaño (legacy)
       setEditingId(id);
