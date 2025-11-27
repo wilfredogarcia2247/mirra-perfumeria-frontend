@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { parseApiError } from '@/lib/utils';
+import { Combobox } from "@/components/ui/combobox";
 
 export default function Formulas() {
   const [formulas, setFormulas] = useState<any[]>([]);
@@ -389,6 +390,17 @@ export default function Formulas() {
   // Mostrar solo productos terminados que tengan almacén también
   const terminados = productos.filter((p) => !isMateriaPrima(p) && hasAnyAlmacen(p));
 
+  // Prepare options for Combobox
+  const terminadosOptions = React.useMemo(() => terminados.map(p => ({
+    value: String(p.id),
+    label: `${p.nombre || `Producto #${p.id}`} ${p.codigo ? `(${p.codigo})` : ''}`
+  })), [terminados]);
+
+  const materiasOptions = React.useMemo(() => materias.map(m => ({
+    value: String(m.id),
+    label: `${m.nombre || m.id} ${m.codigo ? `(${m.codigo})` : ''}`
+  })), [materias]);
+
   // Optimized enrichment: try to get names from productos array first, only call API if needed
   async function enrichAndSetFormulas(rawFormulas: any[]) {
     try {
@@ -626,22 +638,13 @@ export default function Formulas() {
                   <label className="text-sm font-medium leading-none">
                     Producto terminado <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    value={productoTerminadoId ?? ''}
-                    onChange={(e) => setProductoTerminadoId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">-- Seleccione producto terminado --</option>
-                    {terminados.length === 0 ? (
-                      <option value="" disabled>-- No hay productos disponibles --</option>
-                    ) : (
-                      terminados.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre || `Producto #${p.id}`} {p.codigo ? `(${p.codigo})` : ''}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <Combobox
+                    options={terminadosOptions}
+                    value={productoTerminadoId ? String(productoTerminadoId) : ""}
+                    onChange={(val) => setProductoTerminadoId(val ? Number(val) : null)}
+                    placeholder="Seleccione producto terminado"
+                    emptyText="No se encontraron productos"
+                  />
                 </div>
               </div>
 
@@ -678,23 +681,19 @@ export default function Formulas() {
                       <div key={idx} className="grid grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg mb-2">
                         <div className="col-span-12 md:col-span-6">
                           <label className="text-xs font-medium text-gray-600 block mb-1">Materia prima</label>
-                          <select
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            value={comp.materia_prima_id ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value ? Number(e.target.value) : null;
-                              const mat = materias.find((m) => Number(m.id) === Number(val));
+                          <Combobox
+                            options={materiasOptions}
+                            value={comp.materia_prima_id ? String(comp.materia_prima_id) : ""}
+                            onChange={(val) => {
+                              const value = val ? Number(val) : null;
+                              const mat = materias.find((m) => Number(m.id) === Number(value));
                               const unidadMat = mat?.unidad || mat?.unidad_medida || mat?.unidad_nombre || '';
-                              setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: val, unidad: unidadMat } : it));
+                              setComponentes((c) => c.map((it, i) => i === idx ? { ...it, materia_prima_id: value, unidad: unidadMat } : it));
                             }}
-                          >
-                            <option value="">-- Seleccionar --</option>
-                            {materias.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.nombre || m.id} {m.codigo ? `(${m.codigo})` : ''}
-                              </option>
-                            ))}
-                          </select>
+                            placeholder="Seleccionar materia prima"
+                            emptyText="No se encontraron materias primas"
+                            className="w-full"
+                          />
                         </div>
 
                         <div className="col-span-6 sm:col-span-2">
