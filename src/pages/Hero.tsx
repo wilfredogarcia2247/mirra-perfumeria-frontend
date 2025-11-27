@@ -180,10 +180,12 @@ export default function Hero() {
         </div>
       </section>
 
-      {/* Featured Products Carousel */}
-      <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
-        {products.length > 0 && <ProductCarousel products={products} isMobile={isMobile} />}
-      </div>
+      {/* Featured Products Carousel - Commented out for now */}
+      {/* {!search.trim() && (
+        <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
+          {products.length > 0 && <ProductCarousel products={fullProducts || products} isMobile={isMobile} />}
+        </div>
+      )} */}
 
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
