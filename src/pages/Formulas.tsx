@@ -36,13 +36,17 @@ export default function Formulas() {
   const [produceAvailability, setProduceAvailability] = useState<Array<{ materia_prima_id: number; nombre?: string; disponible: number; requerido: number }>>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // Pagination state
+  const [page, setPage] = useState<number>(1);
+  const [perPage] = useState<number>(12);
+
   useEffect(() => {
     setLoading(true);
-    // Cargar también almacenes para filtrar productos por existencia en almacenes de materia prima
+    // Load formulas, productos, and almacenes without enrichment (faster initial load)
     Promise.all([getFormulas(), getProductos(), getAlmacenes()])
       .then(([fres, pres, ares]) => {
-        // Enriquecer fórmulas para mostrar nombres en lugar de ids cuando sea necesario
-        enrichAndSetFormulas(Array.isArray(fres) ? fres : []);
+        // Set raw formulas without enrichment to speed up initial load
+        setFormulas(Array.isArray(fres) ? fres : []);
         setProductos(Array.isArray(pres) ? pres : []);
         setAlmacenes(Array.isArray(ares) ? ares : []);
       })
@@ -211,8 +215,8 @@ export default function Formulas() {
       setPrecioVenta(f.precio_venta !== undefined && f.precio_venta !== null ? Number(f.precio_venta) : 0);
       // Prefill form
       setProductoTerminadoId(f.producto_terminado_id ?? null);
-        setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
-        // ya no prefill de tamaño (legacy)
+      setComponentes(Array.isArray(f.componentes) && f.componentes.length > 0 ? f.componentes.map((c: any) => ({ materia_prima_id: c.materia_prima_id, cantidad: c.cantidad, unidad: c.unidad })) : [{ materia_prima_id: null, cantidad: null, unidad: '' }]);
+      // ya no prefill de tamaño (legacy)
       setEditingId(id);
       setIsOpen(true);
     } catch (err) {
@@ -322,12 +326,23 @@ export default function Formulas() {
   const filteredFormulas = React.useMemo(() => {
     if (!searchTerm.trim()) return formulas;
     const term = searchTerm.toLowerCase();
-    return formulas.filter(f => 
+    return formulas.filter(f =>
       (f.nombre || '').toLowerCase().includes(term) ||
       (f.producto_terminado_nombre || '').toLowerCase().includes(term) ||
       String(f.id).includes(term)
     );
   }, [formulas, searchTerm]);
+
+  // Calculate paginated formulas
+  const paginatedFormulas = React.useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredFormulas.slice(start, start + perPage);
+  }, [filteredFormulas, page, perPage]);
+
+  // Reset page to 1 when search changes
+  React.useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   // Construir set de ids de almacenes marcados como materia prima
   const materiaAlmacenIds = new Set<number>((almacenes || []).filter((a: any) => a.es_materia_prima || String(a.tipo).toLowerCase() === 'interno').map((a: any) => a.id));
@@ -361,34 +376,54 @@ export default function Formulas() {
   // Mostrar solo productos terminados que tengan almacén también
   const terminados = productos.filter((p) => !isMateriaPrima(p) && hasAnyAlmacen(p));
 
-  // Enriquecer fórmulas con nombres de productos cuando la API sólo devuelve ids.
+  // Optimized enrichment: try to get names from productos array first, only call API if needed
   async function enrichAndSetFormulas(rawFormulas: any[]) {
     try {
       const list = Array.isArray(rawFormulas) ? rawFormulas : [];
-      // recolectar ids únicos que necesitamos resolver
-      const ids = new Set<number>();
+
+      // First pass: try to fill names from productos array (already loaded)
+      const productosMap = new Map<number, string>();
+      for (const p of productos) {
+        if (p && p.id) {
+          productosMap.set(Number(p.id), p.nombre || p.name || p.titulo || `Producto #${p.id}`);
+        }
+      }
+
+      // Collect IDs that still need resolution (not found in productos array)
+      const idsToFetch = new Set<number>();
       for (const f of list) {
-        if (f && f.producto_terminado_id && !f.producto_terminado_nombre) ids.add(Number(f.producto_terminado_id));
+        if (f && f.producto_terminado_id && !f.producto_terminado_nombre && !productosMap.has(Number(f.producto_terminado_id))) {
+          idsToFetch.add(Number(f.producto_terminado_id));
+        }
         if (Array.isArray(f.componentes)) {
           for (const c of f.componentes) {
-            if (c && c.materia_prima_id && !c.materia_prima_nombre) ids.add(Number(c.materia_prima_id));
+            if (c && c.materia_prima_id && !c.materia_prima_nombre && !productosMap.has(Number(c.materia_prima_id))) {
+              idsToFetch.add(Number(c.materia_prima_id));
+            }
           }
         }
       }
 
-      const idArr = Array.from(ids);
+      const idArr = Array.from(idsToFetch);
       const resolvedMap: Record<number, string> = {};
+
+      // Only fetch products not in the productos array
       if (idArr.length > 0) {
         const promises = idArr.map((id) => getProducto(Number(id)).then((p: any) => ({ id: Number(id), name: p?.nombre || p?.name || p?.titulo || (`Producto #${id}`) })).catch(() => ({ id: Number(id), name: `Producto #${id}` })));
         const results = await Promise.all(promises);
         for (const r of results) resolvedMap[Number(r.id)] = r.name;
       }
 
+      // Merge productosMap and resolvedMap
+      const finalMap: Record<number, string> = {};
+      productosMap.forEach((name, id) => finalMap[id] = name);
+      Object.assign(finalMap, resolvedMap);
+
       const enriched = list.map((f: any) => {
         const nf = { ...f };
-        if (nf.producto_terminado_id) nf.producto_terminado_nombre = nf.producto_terminado_nombre ?? resolvedMap[Number(nf.producto_terminado_id)];
+        if (nf.producto_terminado_id) nf.producto_terminado_nombre = nf.producto_terminado_nombre ?? finalMap[Number(nf.producto_terminado_id)];
         if (Array.isArray(nf.componentes)) {
-          nf.componentes = nf.componentes.map((c: any) => ({ ...c, materia_prima_nombre: c.materia_prima_nombre ?? resolvedMap[Number(c.materia_prima_id)] }));
+          nf.componentes = nf.componentes.map((c: any) => ({ ...c, materia_prima_nombre: c.materia_prima_nombre ?? finalMap[Number(c.materia_prima_id)] }));
         }
         return nf;
       });
@@ -400,7 +435,7 @@ export default function Formulas() {
     }
   }
 
-  
+
 
   return (
     <Layout>
@@ -412,7 +447,7 @@ export default function Formulas() {
               <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva fórmula</Button>
             </div>
           </div>
-          
+
           <div className="relative max-w-md">
             <input
               type="text"
@@ -439,84 +474,113 @@ export default function Formulas() {
         {loading ? (
           <div>Cargando fórmulas...</div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredFormulas.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                {searchTerm ? 'No se encontraron fórmulas que coincidan con la búsqueda.' : 'No hay fórmulas definidas.'}
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {paginatedFormulas.length === 0 ? (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  {searchTerm ? 'No se encontraron fórmulas que coincidan con la búsqueda.' : 'No hay fórmulas definidas.'}
+                </div>
+              ) : (
+                paginatedFormulas.map((f) => (
+                  <Card key={f.id} className="overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">
+                        {f.nombre || f.titulo || `Fórmula #${f.id}`}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openProduceModal(f.id)}
+                          className="flex-1 min-w-[80px]"
+                        >
+                          Producir
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(f.id)}
+                          className="flex-1 min-w-[70px]"
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDelete(f.id)}
+                          className="flex-1 min-w-[80px]"
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        <div className="flex items-center gap-1 truncate" title={String(f.producto_terminado_nombre ?? f.producto_terminado_id)}>
+                          <span className="font-medium whitespace-nowrap">Producto:</span>
+                          <span className="truncate">{f.producto_terminado_nombre ?? f.producto_terminado_id}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 mb-2 text-xs bg-gray-50 p-1.5 rounded">
+                        <div className="text-center">
+                          <div className="font-medium text-gray-500">Costo</div>
+                          <div className="font-semibold text-amber-700">
+                            {f.costo !== undefined && f.costo !== null ?
+                              `$${Number(f.costo).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium text-gray-500">Precio</div>
+                          <div className="font-semibold text-green-700">
+                            {f.precio_venta !== undefined && f.precio_venta !== null ?
+                              `$${Number(f.precio_venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                          </div>
+                        </div>
+                      </div>
+                      {Array.isArray(f.componentes) && f.componentes.length > 0 ? (
+                        <ul className="text-xs space-y-1 pl-3">
+                          {f.componentes.map((c: any) => (
+                            <li key={c.id || `${c.materia_prima_id}-${c.cantidad}`}>
+                              {c.nombre || c.materia_prima_nombre || c.materia_prima_id} — {c.cantidad} {c.unidad}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">Sin componentes</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+
+            {/* Pagination controls */}
+            {filteredFormulas.length > perPage && (
+              <div className="flex flex-col sm:flex-row items-center justify-between mt-8 gap-4 pt-6 border-t">
+                <div className="text-sm text-gray-600">
+                  Mostrando página {page} de {Math.ceil(filteredFormulas.length / perPage)} — {filteredFormulas.length} fórmulas
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page >= Math.ceil(filteredFormulas.length / perPage)}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
-            ) : (
-              filteredFormulas.map((f) => (
-              <Card key={f.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">
-                    {f.nombre || f.titulo || `Fórmula #${f.id}`}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Button 
-                      size="sm" 
-                      variant="secondary" 
-                      onClick={() => openProduceModal(f.id)}
-                      className="flex-1 min-w-[80px]"
-                    >
-                      Producir
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => handleEdit(f.id)}
-                      className="flex-1 min-w-[70px]"
-                    >
-                      Editar
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive" 
-                      onClick={() => handleDelete(f.id)}
-                      className="flex-1 min-w-[80px]"
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-2">
-                    <div className="flex items-center gap-1 truncate" title={String(f.producto_terminado_nombre ?? f.producto_terminado_id)}>
-                      <span className="font-medium whitespace-nowrap">Producto:</span>
-                      <span className="truncate">{f.producto_terminado_nombre ?? f.producto_terminado_id}</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 mb-2 text-xs bg-gray-50 p-1.5 rounded">
-                    <div className="text-center">
-                      <div className="font-medium text-gray-500">Costo</div>
-                      <div className="font-semibold text-amber-700">
-                        {f.costo !== undefined && f.costo !== null ? 
-                          `$${Number(f.costo).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-medium text-gray-500">Precio</div>
-                      <div className="font-semibold text-green-700">
-                        {f.precio_venta !== undefined && f.precio_venta !== null ? 
-                          `$${Number(f.precio_venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                      </div>
-                    </div>
-                  </div>
-                  {Array.isArray(f.componentes) && f.componentes.length > 0 ? (
-                    <ul className="text-xs space-y-1 pl-3">
-                      {f.componentes.map((c: any) => (
-                        <li key={c.id || `${c.materia_prima_id}-${c.cantidad}`}>
-                          {c.nombre || c.materia_prima_nombre || c.materia_prima_id} — {c.cantidad} {c.unidad}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">Sin componentes</div>
-                  )}
-                </CardContent>
-              </Card>
-              ))
             )}
-          </div>
+          </>
         )}
 
         <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
@@ -536,11 +600,11 @@ export default function Formulas() {
                   <label className="text-sm font-medium leading-none">
                     Nombre de la fórmula <span className="text-red-500">*</span>
                   </label>
-                  <Input 
-                    value={nombre} 
-                    onChange={(e) => setNombre(e.target.value)} 
-                    maxLength={200} 
-                    placeholder="Ej: Perfume Floral N°5 - Fórmula A" 
+                  <Input
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    maxLength={200}
+                    placeholder="Ej: Perfume Floral N°5 - Fórmula A"
                     className="w-full"
                   />
                 </div>
@@ -549,9 +613,9 @@ export default function Formulas() {
                   <label className="text-sm font-medium leading-none">
                     Producto terminado <span className="text-red-500">*</span>
                   </label>
-                  <select 
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" 
-                    value={productoTerminadoId ?? ''} 
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    value={productoTerminadoId ?? ''}
                     onChange={(e) => setProductoTerminadoId(e.target.value ? Number(e.target.value) : null)}
                   >
                     <option value="">-- Seleccione producto terminado --</option>
@@ -576,9 +640,9 @@ export default function Formulas() {
                     <h4 className="text-sm font-medium">Componentes</h4>
                     <p className="text-xs text-muted-foreground">Agrega las materias primas necesarias</p>
                   </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={addComponente}
                     className="gap-1 hover:bg-primary/10"
                     type="button"
@@ -601,9 +665,9 @@ export default function Formulas() {
                       <div key={idx} className="grid grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg mb-2">
                         <div className="col-span-12 md:col-span-6">
                           <label className="text-xs font-medium text-gray-600 block mb-1">Materia prima</label>
-                          <select 
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                            value={comp.materia_prima_id ?? ''} 
+                          <select
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={comp.materia_prima_id ?? ''}
                             onChange={(e) => {
                               const val = e.target.value ? Number(e.target.value) : null;
                               const mat = materias.find((m) => Number(m.id) === Number(val));
@@ -623,11 +687,11 @@ export default function Formulas() {
                         <div className="col-span-6 sm:col-span-2">
                           <label className="text-xs font-medium text-gray-600 block mb-1">Cantidad</label>
                           <div className="relative">
-                            <Input 
-                              type="number" 
-                              min={0} 
+                            <Input
+                              type="number"
+                              min={0}
                               step="0.01"
-                              value={comp.cantidad ?? ''} 
+                              value={comp.cantidad ?? ''}
                               onChange={(e) => {
                                 const val = e.target.value ? Number(e.target.value) : null;
                                 setComponentes((c) => c.map((it, i) => i === idx ? { ...it, cantidad: val } : it));
@@ -650,8 +714,8 @@ export default function Formulas() {
                         </div>
 
                         <div className="col-span-6 sm:col-span-1 flex items-end justify-end">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             className="text-red-500 hover:bg-red-50 h-9 w-9"
                             onClick={() => removeComponente(idx)}
@@ -696,16 +760,16 @@ export default function Formulas() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Precio de venta</label>
                   <div className="relative">
-                    <Input 
+                    <Input
                       className="w-full pl-8"
-                      type="number" 
-                      step="0.01" 
-                      value={String(precioVenta ?? 0)} 
-                      onChange={(e) => { 
-                        const v = e.target.value; 
-                        const n = v === '' ? 0 : Number(v); 
-                        setPrecioVenta(Number.isFinite(n) ? n : 0); 
-                      }} 
+                      type="number"
+                      step="0.01"
+                      value={String(precioVenta ?? 0)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const n = v === '' ? 0 : Number(v);
+                        setPrecioVenta(Number.isFinite(n) ? n : 0);
+                      }}
                       placeholder="0.00"
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -720,14 +784,14 @@ export default function Formulas() {
             </div>
 
             <DialogFooter className="pt-4 border-t">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => { setIsOpen(false); resetForm(); }}
                 disabled={submitting}
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 onClick={handleCreate}
                 disabled={submitting || !nombre || !productoTerminadoId}
                 className="gap-2"
