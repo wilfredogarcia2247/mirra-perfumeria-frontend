@@ -233,12 +233,15 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
   }, [selectedBancoId, bancos, globalFormas]);
 
   useEffect(() => {
-    // Cuando cambia banco/forma (su moneda) o monto, obtener la tasa y calcular conversión para mostrar al usuario
+    // Cuando cambia banco/forma (su moneda), obtener la tasa. NO depende de monto.
     const banco = bancos.find((x) => x.id === selectedBancoId) as any | undefined;
     const formaSeleccionada = availableFormas.find((f) => f.id === selectedFormaId) as any | undefined;
+
     async function loadTasa() {
-      setTasa(null);
-      setConverted(null);
+      // No limpiar tasa inmediatamente para evitar parpadeo al cambiar monto (aunque monto ya no es dep)
+      // Solo limpiar si cambiamos de banco/forma explícitamente y queremos feedback de carga, 
+      // pero mejor dejar el valor anterior hasta que llegue el nuevo o se determine que no hay.
+
       try {
         // Priorizar moneda definida en la forma (detalles) si existe; sino usar la moneda del banco
         let moneda: string | undefined | null = null;
@@ -260,7 +263,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         if (!moneda) {
           moneda = banco?.moneda ?? banco?.moneda?.toString?.();
         }
-        if (!moneda) return;
+        if (!moneda) {
+          setTasa(null);
+          setResolvedMoneda(null);
+          return;
+        }
         moneda = String(moneda).trim();
         setResolvedMoneda(moneda);
 
@@ -270,12 +277,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
           const t = { monto: 1, simbolo: 'USD' };
           setTasa(t);
           setResolvedSource('direct');
-          const m = Number(String(monto || '').replace(',', '.'));
-          if (Number.isFinite(m) && m > 0) {
-            setConverted(`USD ${m.toFixed(2)}`);
-          } else {
-            setConverted(null);
-          }
           return;
         }
         // Preparar candidatos a símbolo: original, upper, sin caracteres, y mapeos comunes
@@ -336,21 +337,24 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         } else {
           setResolvedSource(found ? 'fuzzy' : 'none');
         }
-        const m = Number(String(monto || '').replace(',', '.'));
-        const t = found;
-        if (t && Number.isFinite(m) && m > 0 && typeof t.monto === 'number') {
-          // mostrar conversión aproximada: monto * tasa.monto
-          const conv = (m * Number(t.monto));
-          setConverted(`${t.simbolo ?? foundSym ?? moneda} ${conv.toFixed(2)}`);
-        } else {
-          setConverted(null);
-        }
       } catch (e) {
         console.warn('No se pudo obtener tasa para banco/forma', e);
       }
     }
     loadTasa();
-  }, [selectedBancoId, bancos, monto, selectedFormaId, availableFormas]);
+  }, [selectedBancoId, bancos, selectedFormaId, availableFormas]);
+
+  // Effect separado para calcular conversión cuando cambia monto o tasa
+  useEffect(() => {
+    const m = Number(String(monto || '').replace(',', '.'));
+    if (tasa && Number.isFinite(m) && m > 0 && typeof tasa.monto === 'number') {
+      // mostrar conversión aproximada: monto * tasa.monto
+      const conv = (m * Number(tasa.monto));
+      setConverted(`${tasa.simbolo ?? resolvedMoneda ?? 'USD'} ${conv.toFixed(2)}`);
+    } else {
+      setConverted(null);
+    }
+  }, [monto, tasa, resolvedMoneda]);
 
   // Calcular referencia en la moneda del banco (si tiene moneda propia distinta)
   useEffect(() => {
@@ -1473,34 +1477,32 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               </div>
             </div>
 
-            {(tasa || resolvedMoneda) && (
-              <div className="mb-4 p-3 bg-gray-50 rounded text-sm text-gray-700 border shadow-sm transition-all duration-300 ease-out">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-gray-500">Tasa</div>
-                    <div className="text-base font-medium">{tasa?.simbolo ?? resolvedMoneda ?? '—'} — {tasa?.monto ?? '—'}</div>
-                  </div>
-                  {converted && <div className="text-sm text-gray-600">Aproximado: <strong>{converted}</strong></div>}
+            <div className="mb-4 p-3 bg-gray-50 rounded text-sm text-gray-700 border shadow-sm transition-all duration-300 ease-out">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-gray-500">Tasa</div>
+                  <div className="text-base font-medium">{tasa?.simbolo ?? resolvedMoneda ?? '—'} — {tasa?.monto ?? '—'}</div>
                 </div>
-
-
-                <div className="mt-3 p-3 bg-white rounded-lg border">
-                  <div className="text-xs text-gray-500">Equivalencia (monto / tasa)</div>
-                  <div className="mt-1 text-2xl font-bold text-sky-700">
-                    {(() => {
-                      const m = Number(String(monto || '').replace(',', '.'));
-                      const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
-                      if (!Number.isFinite(m) || !Number.isFinite(t) || t === 0) return '—';
-                      const eq = m / t;
-                      return `${(eq).toFixed(2)}`;
-                    })()}
-                  </div>
-                  <div className="mt-1 text-xs text-gray-400">Este valor se usará para validar contra el total del pedido.</div>
-                </div>
-
-
+                {converted && <div className="text-sm text-gray-600">Aproximado: <strong>{converted}</strong></div>}
               </div>
-            )}
+
+
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <div className="text-xs text-gray-500">Equivalencia (monto / tasa)</div>
+                <div className="mt-1 text-2xl font-bold text-sky-700">
+                  {(() => {
+                    const m = Number(String(monto || '').replace(',', '.'));
+                    const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
+                    if (!Number.isFinite(m) || !Number.isFinite(t) || t === 0) return '—';
+                    const eq = m / t;
+                    return `${(eq).toFixed(2)}`;
+                  })()}
+                </div>
+                <div className="mt-1 text-xs text-gray-400">Este valor se usará para validar contra el total del pedido.</div>
+              </div>
+
+
+            </div>
 
 
           </div>
@@ -1606,13 +1608,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               </div>
             )}
 
-            {(tasa || resolvedMoneda) && (
-              <div className="p-3 bg-gray-50 rounded border text-sm text-gray-700">
-                <div className="text-xs text-gray-500">Tasa</div>
-                <div className="text-base font-medium">{tasa?.simbolo ?? resolvedMoneda ?? '—'} — {tasa?.monto ?? '—'}</div>
 
-              </div>
-            )}
           </aside>
         </div>
 
