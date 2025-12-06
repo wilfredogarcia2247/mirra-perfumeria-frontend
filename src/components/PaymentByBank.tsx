@@ -263,11 +263,26 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         if (!moneda) return;
         moneda = String(moneda).trim();
         setResolvedMoneda(moneda);
+
+        // Detectar si es USD para forzar tasa 1 (base del sistema es USD)
+        const isUsd = /USD|USDT|USDC|DOLAR|US\$/.test(String(moneda).toUpperCase().replace(/[^A-Z0-9]/g, ''));
+        if (isUsd) {
+          const t = { monto: 1, simbolo: 'USD' };
+          setTasa(t);
+          setResolvedSource('direct');
+          const m = Number(String(monto || '').replace(',', '.'));
+          if (Number.isFinite(m) && m > 0) {
+            setConverted(`USD ${m.toFixed(2)}`);
+          } else {
+            setConverted(null);
+          }
+          return;
+        }
         // Preparar candidatos a símbolo: original, upper, sin caracteres, y mapeos comunes
         const candidates = [] as string[];
         if (moneda) candidates.push(moneda);
-        try { candidates.push(moneda.toUpperCase()); } catch (e) {}
-        try { candidates.push(String(moneda).replace(/[^A-Za-z]/g, '').toUpperCase()); } catch (e) {}
+        try { candidates.push(moneda.toUpperCase()); } catch (e) { }
+        try { candidates.push(String(moneda).replace(/[^A-Za-z]/g, '').toUpperCase()); } catch (e) { }
         // heurísticos simples para monedas locales (ej. 'bs', 'bol')
         if (/bs|bol/i.test(moneda)) candidates.push('VES');
         if (/vef/i.test(moneda)) candidates.push('VEF');
@@ -322,7 +337,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
           setResolvedSource(found ? 'fuzzy' : 'none');
         }
         const m = Number(String(monto || '').replace(',', '.'));
-  const t = found;
+        const t = found;
         if (t && Number.isFinite(m) && m > 0 && typeof t.monto === 'number') {
           // mostrar conversión aproximada: monto * tasa.monto
           const conv = (m * Number(t.monto));
@@ -421,12 +436,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
             }
             if (!found) {
               // intentar getTasaBySimbolo por si hay coincidencia directa aparte
-              try { found = await getTasaBySimbolo(bm); } catch (err) {}
+              try { found = await getTasaBySimbolo(bm); } catch (err) { }
             }
             if (found) {
               map[b.id] = found;
               if (pedidoTotal !== null && typeof found.monto === 'number') {
-                  totals[b.id] = Number((pedidoTotal * Number(found.monto)).toFixed(2));
+                totals[b.id] = Number((pedidoTotal * Number(found.monto)).toFixed(2));
               }
             }
           } catch (err) {
@@ -602,19 +617,19 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
       pago.tasa_simbolo = normalizeSymbol(tasaObj?.simbolo ?? tasa?.simbolo ?? monedaClean ?? null);
       if (pago.tasa !== null && pago.tasa !== undefined) pago.tasa_monto = pago.tasa;
       pago.moneda = monedaClean;
-    // Adjuntar información de tasa usada para este pago (importante: enviar al backend)
-    try {
-      const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
-      pago.tasa = tasa && (typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa?.monto ? Number(String(tasa.monto).replace(',', '.')) : null));
-      pago.tasa_simbolo = normalizeSymbol(tasa?.simbolo ?? resolvedMoneda ?? null);
-      // compatibilidad con campos alternativos que el backend pueda leer
-      if (pago.tasa !== null && pago.tasa !== undefined) pago.tasa_monto = pago.tasa;
+      // Adjuntar información de tasa usada para este pago (importante: enviar al backend)
+      try {
+        const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+        pago.tasa = tasa && (typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa?.monto ? Number(String(tasa.monto).replace(',', '.')) : null));
+        pago.tasa_simbolo = normalizeSymbol(tasa?.simbolo ?? resolvedMoneda ?? null);
+        // compatibilidad con campos alternativos que el backend pueda leer
+        if (pago.tasa !== null && pago.tasa !== undefined) pago.tasa_monto = pago.tasa;
+      } catch (e) {
+        // ignore
+      }
     } catch (e) {
-      // ignore
+      // ignore outer computation errors
     }
-  } catch (e) {
-    // ignore outer computation errors
-  }
     try {
       // Añadir la moneda detectada para este pago (si aún no está definida).
       // No sobrescribir una moneda ya determinada arriba (priorizamos detalles/resolvedMoneda).
@@ -626,10 +641,10 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
       // ignore
     }
 
-  // persistir nombre de forma y banco para evitar confusiones si el usuario cambia selección luego
-  pago.forma_nombre = getFormaNameById(selectedFormaId);
-  pago.banco_nombre = getBancoNameById(selectedBancoId);
-  setPayments((p) => [...p, pago]);
+    // persistir nombre de forma y banco para evitar confusiones si el usuario cambia selección luego
+    pago.forma_nombre = getFormaNameById(selectedFormaId);
+    pago.banco_nombre = getBancoNameById(selectedBancoId);
+    setPayments((p) => [...p, pago]);
     // limpiar campos para siguiente pago: empezar desde cero (banco, forma, monto, referencia, fecha)
     setMonto('');
     setReferencia('');
@@ -671,7 +686,18 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
   const paymentsEquivalenciaSum = payments.reduce((s, p) => s + deriveEquivalencia(p), 0);
   // mostrar also raw sum for reference
   const paymentsRawSum = payments.reduce((s, p) => s + (Number(p.monto || 0)), 0);
-  const remaining = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum).toFixed(2))) : null;
+
+  // Calcular equivalencia del input actual para descontarlo del restante en tiempo real
+  const currentInputEquiv = (() => {
+    const m = Number(String(monto || '').replace(',', '.'));
+    const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
+    if (Number.isFinite(m) && Number.isFinite(t) && t !== 0) {
+      return m / t;
+    }
+    return 0;
+  })();
+
+  const remaining = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum - currentInputEquiv).toFixed(2))) : null;
   // monto bruto en la moneda de la tasa necesario para cubrir el restante (raw = remaining * tasa.monto)
   const amountToPayInCurrency = (tasa && typeof tasa.monto === 'number' && remaining !== null) ? Number((Number(tasa.monto) * Number(remaining)).toFixed(2)) : null;
 
@@ -707,7 +733,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     setLoading(true);
     setErrors(null);
     try {
-        if (payments && payments.length > 0) {
+      if (payments && payments.length > 0) {
         let createdCount = 0;
         const createdPayments: any[] = [];
         for (const p of payments) {
@@ -734,7 +760,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               return;
             }
           }
-            try {
+          try {
             // Debug: log payload sent for pago (incluye client_uid)
             // eslint-disable-next-line no-console
             console.debug('create-pago-payload', body);
@@ -907,12 +933,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
             try {
               const formaSel = availableFormas.find((f) => Number(f.id) === Number(selectedFormaId));
               symbolFromFormaOrBanco = extractMonedaFromDetalles(formaSel?.detalles) || null;
-            } catch (e) {}
+            } catch (e) { }
             if (!symbolFromFormaOrBanco && selectedBancoId) {
               try {
                 const bancoForPayload = bancos.find((b) => b.id === selectedBancoId) as any | undefined;
                 symbolFromFormaOrBanco = bancoForPayload?.moneda ?? bancoForPayload?.currency ?? null;
-              } catch (e) {}
+              } catch (e) { }
             }
             if (symbolFromFormaOrBanco) {
               const symClean = normalizeSymbol(symbolFromFormaOrBanco);
@@ -1031,7 +1057,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         } catch (e: any) {
           console.error('Error completando pedido', e);
           setErrors(e?.message ?? 'Error completando pedido');
-          try { toast.error(e?.message || 'Error completando pedido'); } catch (err) {}
+          try { toast.error(e?.message || 'Error completando pedido'); } catch (err) { }
           return;
         } finally {
           setLoading(false);
@@ -1087,45 +1113,37 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         pago.fecha_transaccion = new Date().toISOString();
       }
 
+      try {
+        // comprobar tasa del banco antes de enviar
+        if (pago.banco_id) {
+          const ok = await checkTasaForBanco(pago.banco_id);
+          if (!ok) { setLoading(false); return; }
+        }
+        // Asegurar que el pago que vamos a enviar contiene client_uid y la tasa correcta
+        try {
+          pago.client_uid = pago.client_uid ?? makeClientUid();
+          // Prefer symbol declared in the forma de pago details, then banco, then UI `tasa`.
           try {
-            // comprobar tasa del banco antes de enviar
-            if (pago.banco_id) {
-              const ok = await checkTasaForBanco(pago.banco_id);
-              if (!ok) { setLoading(false); return; }
-            }
-          // Asegurar que el pago que vamos a enviar contiene client_uid y la tasa correcta
-          try {
-            pago.client_uid = pago.client_uid ?? makeClientUid();
-            // Prefer symbol declared in the forma de pago details, then banco, then UI `tasa`.
+            const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+            let symbolFromFormaOrBanco: string | null = null;
             try {
-              const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
-              let symbolFromFormaOrBanco: string | null = null;
+              const formaSel = availableFormas.find((f) => Number(f.id) === Number(pago.forma_pago_id));
+              symbolFromFormaOrBanco = extractMonedaFromDetalles(formaSel?.detalles) || null;
+            } catch (e) { }
+            if (!symbolFromFormaOrBanco && pago.banco_id) {
               try {
-                const formaSel = availableFormas.find((f) => Number(f.id) === Number(pago.forma_pago_id));
-                symbolFromFormaOrBanco = extractMonedaFromDetalles(formaSel?.detalles) || null;
-              } catch (e) {}
-              if (!symbolFromFormaOrBanco && pago.banco_id) {
-                try {
-                  const bancoForP = bancos.find((b) => b.id === pago.banco_id) as any | undefined;
-                  symbolFromFormaOrBanco = bancoForP?.moneda ?? bancoForP?.currency ?? null;
-                } catch (e) {}
-              }
-              if (symbolFromFormaOrBanco) {
-                const symClean = normalizeSymbol(symbolFromFormaOrBanco);
-                const tasaObjForSym = await getTasaBySimbolo(symClean as string);
-                if (tasaObjForSym && Number.isFinite(Number(tasaObjForSym.monto))) {
-                  const n = Number(tasaObjForSym.monto);
-                  pago.tasa = n;
-                  pago.tasa_monto = n;
-                  pago.tasa_simbolo = normalizeSymbol(tasaObjForSym.simbolo ?? symClean ?? null);
-                } else {
-                  if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
-                    const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
-                    pago.tasa = pago.tasa ?? tasaVal;
-                    pago.tasa_monto = pago.tasa ?? tasaVal;
-                    pago.tasa_simbolo = normalizeSymbol(pago.tasa_simbolo ?? tasa?.simbolo ?? resolvedMoneda ?? null);
-                  }
-                }
+                const bancoForP = bancos.find((b) => b.id === pago.banco_id) as any | undefined;
+                symbolFromFormaOrBanco = bancoForP?.moneda ?? bancoForP?.currency ?? null;
+              } catch (e) { }
+            }
+            if (symbolFromFormaOrBanco) {
+              const symClean = normalizeSymbol(symbolFromFormaOrBanco);
+              const tasaObjForSym = await getTasaBySimbolo(symClean as string);
+              if (tasaObjForSym && Number.isFinite(Number(tasaObjForSym.monto))) {
+                const n = Number(tasaObjForSym.monto);
+                pago.tasa = n;
+                pago.tasa_monto = n;
+                pago.tasa_simbolo = normalizeSymbol(tasaObjForSym.simbolo ?? symClean ?? null);
               } else {
                 if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
                   const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
@@ -1134,8 +1152,16 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
                   pago.tasa_simbolo = normalizeSymbol(pago.tasa_simbolo ?? tasa?.simbolo ?? resolvedMoneda ?? null);
                 }
               }
-            } catch (e) { /* ignore */ }
+            } else {
+              if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
+                const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
+                pago.tasa = pago.tasa ?? tasaVal;
+                pago.tasa_monto = pago.tasa ?? tasaVal;
+                pago.tasa_simbolo = normalizeSymbol(pago.tasa_simbolo ?? tasa?.simbolo ?? resolvedMoneda ?? null);
+              }
+            }
           } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
         // Forzar uso de la forma/banco seleccionados antes de enviar en add-and-complete
         try {
           pago.forma_pago_id = Number(pago.forma_pago_id) || Number(selectedFormaId) || pago.forma_pago_id;
@@ -1180,7 +1206,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     } catch (e: any) {
       console.error('Error en AddAndComplete', e);
       setErrors(e?.message ?? 'Error registrando pago');
-      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) {}
+      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { }
     } finally {
       setLoading(false);
     }
@@ -1205,7 +1231,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     Object.entries(bankTotalsMap).forEach(([bankId, amt]) => {
       const idNum = Number(bankId);
       const tasaForBank = bankTasasMap[idNum];
-      const symbol = (tasaForBank?.simbolo ?? tasaForBank?.symbol ?? String(((bancos.find(b => b.id === idNum) as any)?.moneda ?? '') || '') ) || String(tasaForBank?.simbolo ?? tasaForBank?.symbol ?? '');
+      const symbol = (tasaForBank?.simbolo ?? tasaForBank?.symbol ?? String(((bancos.find(b => b.id === idNum) as any)?.moneda ?? '') || '')) || String(tasaForBank?.simbolo ?? tasaForBank?.symbol ?? '');
       const key = String(symbol || `BANK_${bankId}`);
       if (!currencyTotals[key]) {
         currencyTotals[key] = { symbol: key, amount: 0, banks: [], bankNames: [] };
@@ -1225,13 +1251,13 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
       if (!pedidoVal || pedidoVal === 0) return false;
       const tol = 0.01;
       for (const [sym, v] of Object.entries(currencyTotals)) {
-            const s = String(sym || '').toUpperCase();
-            // considerar variantes USD (USDT, US$, DOLAR) — normalizar para detectar familia USD
-            const sNorm = String(s).replace(/[^A-Z0-9]/g, '');
-            if (!/USD|USDT|USDC|DOLAR|US\$/.test(sNorm) && !sNorm.includes('USD')) continue;
-            if (Math.abs(Number(v.amount || 0) - pedidoVal) <= tol) return true;
+        const s = String(sym || '').toUpperCase();
+        // considerar variantes USD (USDT, US$, DOLAR) — normalizar para detectar familia USD
+        const sNorm = String(s).replace(/[^A-Z0-9]/g, '');
+        if (!/USD|USDT|USDC|DOLAR|US\$/.test(sNorm) && !sNorm.includes('USD')) continue;
+        if (Math.abs(Number(v.amount || 0) - pedidoVal) <= tol) return true;
       }
-    } catch (e) {}
+    } catch (e) { }
     return false;
   })();
 
@@ -1268,26 +1294,26 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
   try {
     // eslint-disable-next-line no-console
     console.debug('payment-debug', { pedidoTotal, baseSymbol, currencyTotals, symbolTasaMap, hideUsdIfBase });
-  } catch (e) {}
+  } catch (e) { }
 
   function renderConversions(baseValue: number | null) {
     if (baseValue === null) return null;
     const items: any[] = [];
     try {
-  Object.entries(symbolTasaMap).forEach(([sym, tm]) => {
-    if (!tm || !Number.isFinite(tm)) return;
-    const symUp = String(sym || '').toUpperCase();
-    // Ocultar conversiones a USD-family por política de UX (no mostrar USD redundante)
-    if (isUsdFamily(symUp)) return;
+      Object.entries(symbolTasaMap).forEach(([sym, tm]) => {
+        if (!tm || !Number.isFinite(tm)) return;
+        const symUp = String(sym || '').toUpperCase();
+        // Ocultar conversiones a USD-family por política de UX (no mostrar USD redundante)
+        if (isUsdFamily(symUp)) return;
         const normalize = (s: string) => String(s || '').replace(/[^A-Z0-9]/g, '').toUpperCase();
         const baseNorm = normalize(baseSymbol || '');
-  const symNorm = normalize(symUp || '');
-  // Si la moneda base coincide con la conversión (o son variantes de USD), ocultar para evitar redundancia
-  if (baseNorm && (baseNorm === symNorm)) return;
-  // Si la moneda base coincide con BS-family, anotarlo (se mostrará normalmente)
-  // Nota: USD ya fue filtrado arriba; adicionalmente, si detectamos que el total está representado en USD por bancos
-  // no mostramos USD (ya cubierto). Mantener BS visible.
-  if (hideUsdIfBase && symNorm.includes('USD')) return;
+        const symNorm = normalize(symUp || '');
+        // Si la moneda base coincide con la conversión (o son variantes de USD), ocultar para evitar redundancia
+        if (baseNorm && (baseNorm === symNorm)) return;
+        // Si la moneda base coincide con BS-family, anotarlo (se mostrará normalmente)
+        // Nota: USD ya fue filtrado arriba; adicionalmente, si detectamos que el total está representado en USD por bancos
+        // no mostramos USD (ya cubierto). Mantener BS visible.
+        if (hideUsdIfBase && symNorm.includes('USD')) return;
         const conv = Number((baseValue * Number(tm)).toFixed(2));
         items.push({ sym: symUp, conv });
       });
@@ -1320,7 +1346,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
   }
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-lg w-full max-w-5xl z-10 mx-auto px-6 sm:px-8 lg:px-10 max-h-[92vh] overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
+    <div className={`relative bg-white rounded-lg shadow-lg w-full max-w-[95vw] lg:max-w-[90vw] z-10 mx-auto px-4 sm:px-6 lg:px-8 max-h-[95vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
       <div className="flex justify-between items-start p-4 border-b">
         <div>
           <h3 className="text-lg font-semibold">Registrar pago y completar pedido</h3>
@@ -1343,11 +1369,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
           </div>
           <div className="text-sm text-gray-600">Registra uno o varios pagos para este pedido y complétalo. Los pagos se conservarán en el historial del pedido.</div>
         </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { if (onClose) onClose(); }} title="Volver al pedido">
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => { if (onClose) onClose(); }} title="Volver al pedido">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Mobile: botón para mostrar/ocultar el resumen lateral y ahorrar espacio */}
@@ -1355,7 +1381,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         <button onClick={() => setShowAside(s => !s)} className="text-sm bg-gray-100 px-3 py-1 rounded">{showAside ? 'Ocultar resumen' : 'Mostrar resumen'}</button>
       </div>
 
-      <div className="p-4 sm:p-6 lg:p-8 overflow-auto" style={{maxHeight: '72vh'}}>
+      <div className="p-4 sm:p-6 lg:p-8 overflow-auto flex-1">
         {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1443,7 +1469,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
                   onChange={(e) => setFecha(e.target.value)}
                   disabled={loading}
                 />
-                
+
               </div>
             </div>
 
@@ -1456,8 +1482,8 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
                   </div>
                   {converted && <div className="text-sm text-gray-600">Aproximado: <strong>{converted}</strong></div>}
                 </div>
-           
-               
+
+
                 <div className="mt-3 p-3 bg-white rounded-lg border">
                   <div className="text-xs text-gray-500">Equivalencia (monto / tasa)</div>
                   <div className="mt-1 text-2xl font-bold text-sky-700">
@@ -1472,11 +1498,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
                   <div className="mt-1 text-xs text-gray-400">Este valor se usará para validar contra el total del pedido.</div>
                 </div>
 
-           
+
               </div>
             )}
 
-            
+
           </div>
 
           {/* Right: resumen / lista de pagos */}
@@ -1484,7 +1510,26 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
             {pedidoTotal !== null && (
               <div className="mb-4 p-4 bg-gray-50 rounded border">
                 <div className="text-sm text-gray-600">Total pedido</div>
-                <div className="text-2xl font-semibold mt-1">{pedidoTotal.toFixed(2)}</div>
+                <div className="flex flex-wrap items-baseline gap-x-4 mt-1">
+                  <div className="text-2xl font-semibold text-gray-900">${pedidoTotal.toFixed(2)}</div>
+                  {(() => {
+                    let rate = 0;
+                    let sym = '';
+                    const bsEntry = Object.entries(symbolTasaMap).find(([s]) => isBsFamily(s));
+                    if (bsEntry) {
+                      sym = bsEntry[0];
+                      rate = bsEntry[1];
+                    } else if (tasa && isBsFamily(tasa.simbolo) && Number.isFinite(Number(tasa.monto))) {
+                      sym = tasa.simbolo;
+                      rate = Number(tasa.monto);
+                    }
+
+                    if (rate > 0) {
+                      return <div className="text-xl text-gray-600 font-medium">{sym} {(pedidoTotal * rate).toFixed(2)}</div>;
+                    }
+                    return null;
+                  })()}
+                </div>
                 {/** Mostrar conversiones para Total */}
                 {renderConversions(pedidoTotal)}
 
@@ -1493,10 +1538,32 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
                 {/** Mostrar conversiones para Pagado (equiv.) */}
                 {renderConversions(paymentsEquivalenciaSum)}
 
-               
+
 
                 <div className="mt-3 text-sm text-gray-600">Restante</div>
-                <div className={`text-lg font-semibold mt-1 ${remaining !== null && remaining > 0 ? 'text-rose-600' : 'text-emerald-600'} ${remaining !== null && remaining > 0.009 ? 'animate-pulse' : ''}`}>{remaining !== null ? remaining.toFixed(2) : '—'}</div>
+                <div className="flex flex-wrap items-baseline gap-x-4 mt-1">
+                  <div className={`text-lg font-semibold ${remaining !== null && remaining > 0 ? 'text-rose-600' : 'text-emerald-600'} ${remaining !== null && remaining > 0.009 ? 'animate-pulse' : ''}`}>
+                    ${remaining !== null ? remaining.toFixed(2) : '—'}
+                  </div>
+                  {(() => {
+                    if (remaining === null) return null;
+                    let rate = 0;
+                    let sym = '';
+                    const bsEntry = Object.entries(symbolTasaMap).find(([s]) => isBsFamily(s));
+                    if (bsEntry) {
+                      sym = bsEntry[0];
+                      rate = bsEntry[1];
+                    } else if (tasa && isBsFamily(tasa.simbolo) && Number.isFinite(Number(tasa.monto))) {
+                      sym = tasa.simbolo;
+                      rate = Number(tasa.monto);
+                    }
+
+                    if (rate > 0) {
+                      return <div className="text-base text-gray-600 font-medium">{sym} {(remaining * rate).toFixed(2)}</div>;
+                    }
+                    return null;
+                  })()}
+                </div>
                 {/** Mostrar conversiones para Restante */}
                 {renderConversions(remaining)}
 
@@ -1509,39 +1576,41 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               </div>
             )}
 
-            <div className="mb-4 p-2 bg-white border rounded shadow-sm max-h-[28vh] lg:max-h-[44vh] overflow-auto">
-              <div className="font-medium">Pagos ({payments.length}):</div>
-              <ul className="mt-2 space-y-2 text-sm">
-                {(showAllPayments ? payments : payments.slice(0, 4)).map((p, i) => (
-                  <li key={i} className="flex items-start justify-between bg-gray-50 p-2 rounded">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium">{p.monto.toFixed ? p.monto.toFixed(2) : Number(p.monto).toFixed(2)}</div>
-                        {p.existing && <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">existente</span>}
-                        {!p.existing && <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded">nuevo</span>}
+            {(paymentMode === 'multiple' || payments.length > 0) && (
+              <div className="mb-4 p-2 bg-white border rounded shadow-sm max-h-[28vh] lg:max-h-[44vh] overflow-auto">
+                <div className="font-medium">Pagos ({payments.length}):</div>
+                <ul className="mt-2 space-y-2 text-sm">
+                  {(showAllPayments ? payments : payments.slice(0, 4)).map((p, i) => (
+                    <li key={i} className="flex items-start justify-between bg-gray-50 p-2 rounded">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium">{p.monto.toFixed ? p.monto.toFixed(2) : Number(p.monto).toFixed(2)}</div>
+                          {p.existing && <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">existente</span>}
+                          {!p.existing && <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded">nuevo</span>}
+                        </div>
+                        <div className="text-xs text-gray-500">{p.forma_nombre ? `${p.forma_nombre}` : ''}{p.banco_nombre ? ` — ${p.banco_nombre}` : ''}</div>
+                        <div className="text-xs text-gray-500">Equiv.: {p.equivalencia !== null && p.equivalencia !== undefined ? p.equivalencia.toFixed(2) : '—'} {resolvedMoneda ?? ''}</div>
+                        {p.referencia && <div className="text-xs text-gray-500">ref: {p.referencia}</div>}
                       </div>
-                      <div className="text-xs text-gray-500">{p.forma_nombre ? `${p.forma_nombre}` : ''}{p.banco_nombre ? ` — ${p.banco_nombre}` : ''}</div>
-                      <div className="text-xs text-gray-500">Equiv.: {p.equivalencia !== null && p.equivalencia !== undefined ? p.equivalencia.toFixed(2) : '—'} {resolvedMoneda ?? ''}</div>
-                      {p.referencia && <div className="text-xs text-gray-500">ref: {p.referencia}</div>}
-                    </div>
-                    <div className="ml-3 flex flex-col items-end gap-2">
-                      <button className="text-sm text-rose-600 hover:underline" onClick={() => deletePayment(i)}>Eliminar</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {payments.length > 4 && (
-                <div className="mt-2 text-center">
-                  <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
-                </div>
-              )}
-            </div>
+                      <div className="ml-3 flex flex-col items-end gap-2">
+                        <button className="text-sm text-rose-600 hover:underline" onClick={() => deletePayment(i)}>Eliminar</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {payments.length > 4 && (
+                  <div className="mt-2 text-center">
+                    <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {(tasa || resolvedMoneda) && (
               <div className="p-3 bg-gray-50 rounded border text-sm text-gray-700">
                 <div className="text-xs text-gray-500">Tasa</div>
                 <div className="text-base font-medium">{tasa?.simbolo ?? resolvedMoneda ?? '—'} — {tasa?.monto ?? '—'}</div>
-                
+
               </div>
             )}
           </aside>
