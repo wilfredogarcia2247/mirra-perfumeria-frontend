@@ -67,7 +67,7 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
 
   return (
     <>
-      <article className="bg-cream-100 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-cream-200">
+      <article className="bg-cream-100 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-cream-200 flex flex-col h-full">
         <div className="relative overflow-hidden h-56 sm:h-48">
           <button onClick={() => setOpen(true)} className="w-full h-full p-0 m-0 block">
             <img
@@ -88,16 +88,16 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
           )}
         </div>
 
-        <div className="p-4 md:p-5">
+        <div className="p-4 md:p-5 flex flex-col flex-grow">
           <div className="mb-3">
             <p className="text-copper-600 text-xs font-semibold mb-1 uppercase tracking-wide">{product.brand || 'Marca'}</p>
-            <h3 className="text-lg md:text-xl font-bold text-copper-800 mb-1 line-clamp-1 font-playfair">{product.name}</h3>
+            <h3 className="text-lg md:text-xl font-bold text-copper-800 mb-1 font-playfair">{product.name}</h3>
             <span className="inline-block px-3 py-1 bg-cream-50 text-copper-700 text-xs font-medium rounded-full">{product.category || (product as any).tipo || ''}</span>
           </div>
 
           <p className="text-copper-700 text-sm mb-4 line-clamp-3 leading-relaxed">{product.description || ''}</p>
 
-          <div className="flex items-center justify-between pt-3 border-t border-cream-200">
+          <div className="flex items-center justify-between pt-3 border-t border-cream-200 mt-auto">
             <div>
               {(() => {
                 const pm = getPrecioMostrar(product, selectedTamano ?? undefined);
