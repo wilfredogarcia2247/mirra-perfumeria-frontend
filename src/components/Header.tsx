@@ -84,10 +84,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   }, []);
 
   return (
-    <header 
-      className={`fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${
-        scrolled ? 'py-1' : 'py-0'
-      }`}
+    <header
+      className={`fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${scrolled ? 'py-1' : 'py-0'
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 md:h-20">
@@ -95,10 +94,10 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3">
               <div className=" bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm">
-                <img 
-                  src="/logoColor.png" 
-                  alt="Mirra Perfumería" 
-                  className="w-14 h-14 md:w-14 md:h-14 rounded-full object-cover" 
+                <img
+                  src="/logoColor.png"
+                  alt="Mirra Perfumería"
+                  className="w-14 h-14 md:w-14 md:h-14 rounded-full object-cover"
                 />
               </div>
               <div>
@@ -122,7 +121,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             >
               Nosotros
             </Link>
-            
+
             <div className="relative group">
               <button className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
                 Productos
@@ -148,7 +147,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 )}
               </div>
             </div>
-           
+
           </nav>
 
           {/* Botones de acción */}
@@ -159,8 +158,8 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             >
               Comprar Ahora
             </Link>
-            
-            <button 
+
+            <button
               onClick={onCartClick}
               className="relative p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-all duration-300"
               aria-label="Carrito de compras"
@@ -174,7 +173,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </button>
 
             {/* Botón de menú móvil */}
-            <button 
+            <button
               onClick={toggleMenu}
               className="md:hidden p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-colors"
               aria-label="Menú"
@@ -186,10 +185,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
       </div>
 
       {/* Menú móvil */}
-      <div 
-        className={`md:hidden bg-white/95 backdrop-blur-sm transition-all duration-300 ease-in-out overflow-hidden ${
-          isMenuOpen ? 'max-h-96 py-4 border-t border-white/20' : 'max-h-0 py-0'
-        }`}
+      <div
+        className={`md:hidden bg-white/95 backdrop-blur-sm transition-all duration-300 ease-in-out overflow-hidden ${isMenuOpen ? 'max-h-96 py-4 border-t border-white/20' : 'max-h-0 py-0'
+          }`}
       >
         <div className="px-4 space-y-2">
           <Link

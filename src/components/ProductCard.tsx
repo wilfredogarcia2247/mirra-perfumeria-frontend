@@ -68,7 +68,7 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
   return (
     <>
       <article className="bg-cream-100 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-cream-200">
-            <div className="relative overflow-hidden h-56 sm:h-48">
+        <div className="relative overflow-hidden h-56 sm:h-48">
           <button onClick={() => setOpen(true)} className="w-full h-full p-0 m-0 block">
             <img
               src={getImageUrl(product)}
@@ -95,7 +95,7 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
             <span className="inline-block px-3 py-1 bg-cream-50 text-copper-700 text-xs font-medium rounded-full">{product.category || (product as any).tipo || ''}</span>
           </div>
 
-          <p className="text-copper-700 text-sm mb-4 line-clamp-3 leading-relaxed">{product.description || 'Descripción breve del producto.'}</p>
+          <p className="text-copper-700 text-sm mb-4 line-clamp-3 leading-relaxed">{product.description || ''}</p>
 
           <div className="flex items-center justify-between pt-3 border-t border-cream-200">
             <div>
@@ -118,29 +118,29 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
                   ? product.tamanos
                   : (Array.isArray((product as any)?.formulas) ? (product as any).formulas : []);
                 return (Array.isArray(variantes) && variantes.length > 0 && !openModalOnAdd) ? (
-                <div className="hidden sm:flex items-center gap-2">
-                      {(() => {
-                        const display = [...variantes].sort((a: any, b: any) => {
-                          const pa = a && (a.precio_calculado ?? a.precio_venta ?? null) != null ? Number(a.precio_calculado ?? a.precio_venta) : Number.POSITIVE_INFINITY;
-                          const pb = b && (b.precio_calculado ?? b.precio_venta ?? null) != null ? Number(b.precio_calculado ?? b.precio_venta) : Number.POSITIVE_INFINITY;
-                          return pa - pb; // menor -> mayor
-                        });
-                        return display.map((t: any) => {
-                          const active = selectedTamano && Number(selectedTamano.id) === Number(t.id);
-                          return (
-                            <button
-                              key={t.id}
-                              onClick={() => setSelectedTamano(t)}
-                              className={`px-2 py-1 rounded-md text-xs inline-flex items-center gap-2 border transition-transform duration-150 ease-in-out ${active ? 'bg-copper-700 text-cream-50 border-copper-700 shadow-md scale-105 ring-2 ring-copper-200' : 'bg-cream-50 text-copper-700 border-transparent hover:border-gray-200'} focus:outline-none`}
-                              title={t.nombre}
-                              aria-pressed={active}
-                            >
-                              {active ? <Check className="w-3 h-3" /> : null}
-                              <span className="truncate max-w-[6rem] text-xs">{t.nombre}</span>
-                            </button>
-                          );
-                        });
-                        })()}
+                  <div className="hidden sm:flex items-center gap-2">
+                    {(() => {
+                      const display = [...variantes].sort((a: any, b: any) => {
+                        const pa = a && (a.precio_calculado ?? a.precio_venta ?? null) != null ? Number(a.precio_calculado ?? a.precio_venta) : Number.POSITIVE_INFINITY;
+                        const pb = b && (b.precio_calculado ?? b.precio_venta ?? null) != null ? Number(b.precio_calculado ?? b.precio_venta) : Number.POSITIVE_INFINITY;
+                        return pa - pb; // menor -> mayor
+                      });
+                      return display.map((t: any) => {
+                        const active = selectedTamano && Number(selectedTamano.id) === Number(t.id);
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedTamano(t)}
+                            className={`px-2 py-1 rounded-md text-xs inline-flex items-center gap-2 border transition-transform duration-150 ease-in-out ${active ? 'bg-copper-700 text-cream-50 border-copper-700 shadow-md scale-105 ring-2 ring-copper-200' : 'bg-cream-50 text-copper-700 border-transparent hover:border-gray-200'} focus:outline-none`}
+                            title={t.nombre}
+                            aria-pressed={active}
+                          >
+                            {active ? <Check className="w-3 h-3" /> : null}
+                            <span className="truncate max-w-[6rem] text-xs">{t.nombre}</span>
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
                 ) : null;
               })()}
