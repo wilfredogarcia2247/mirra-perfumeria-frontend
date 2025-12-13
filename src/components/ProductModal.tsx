@@ -72,13 +72,13 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
 
         <div className="overflow-y-auto sm:overflow-visible flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 p-4 sm:p-6">
           {/* Imagen del producto */}
-          <div className="flex items-center justify-center bg-gray-50 rounded-xl p-2 sm:p-4">
-            <div className="w-full max-w-xs">
-              <div className="aspect-square bg-gradient-to-br from-white to-gray-50 rounded-lg p-4 sm:p-8 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-center bg-gray-50 rounded-xl p-4 sm:p-6 w-full h-full">
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full max-h-[500px] bg-gradient-to-br from-white to-gray-50 rounded-lg p-4 sm:p-6 shadow-sm border border-gray-100 flex items-center justify-center">
                 <img
                   src={getImageUrl(product)}
                   alt={product.name}
-                  className="h-full w-full object-contain transition-all duration-300 hover:scale-105"
+                  className="max-w-full max-h-full w-auto h-auto object-contain transition-all duration-300 hover:scale-105"
                   onError={(e) => { 
                     const target = e.currentTarget as HTMLImageElement; 
                     target.onerror = null; 
