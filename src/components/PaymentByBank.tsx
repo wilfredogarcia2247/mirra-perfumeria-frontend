@@ -282,38 +282,29 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
     }
   }
 
-    // Crear órdenes faltantes para un pedido (líneas con fórmula pero sin orden creada)
-    async function createMissingOrdersForPedido(id: number) {
+  // Crear órdenes faltantes para un pedido (líneas con fórmula pero sin orden creada)
+  async function createMissingOrdersForPedido(id: number) {
+    try {
       try {
+        console.log('PaymentByBank.createMissingOrdersForPedido.start', { id });
+      } catch (e) {
+        // ignore log
+      }
+      const p = await getPedidoVenta(id);
+      const prods = Array.isArray(p?.productos) ? p.productos : (Array.isArray(p?.lineas) ? p.lineas : []);
+      const missing = (prods || []).filter((it: any) => {
+        const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
+        const created = (it?.produccion_creada === true) || Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.ordenes);
+        return fid && fid > 0 && !created;
+      });
+      if (missing.length === 0) return;
+      for (const line of missing) {
         try {
-          console.log('PaymentByBank.createMissingOrdersForPedido.start', { id });
-        } catch (e) {
-          // ignore log
-        }
-        const p = await getPedidoVenta(id);
-        const prods = Array.isArray(p?.productos) ? p.productos : (Array.isArray(p?.lineas) ? p.lineas : []);
-        const missing = (prods || []).filter((it: any) => {
-          const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
-          const created = (it?.produccion_creada === true) || Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.ordenes);
-          return fid && fid > 0 && !created;
-        });
-        if (missing.length === 0) return;
-        for (const line of missing) {
-          try {
-            let createdResp: any = null;
-            if (id && line?.id) {
-              try {
-                createdResp = await apiFetch(`/pedidos-venta/${id}/lineas/${line.id}/ordenes-produccion`, { method: 'POST' });
-              } catch (eLine) {
-                const payload: any = {
-                  producto_terminado_id: Number(line?.producto_id ?? line?.producto?.id ?? line?.producto_terminado_id ?? 0) || undefined,
-                  cantidad: Number(line?.cantidad ?? line?.qty ?? 0) || 0,
-                  formula_id: Number(line?.formula_id ?? line?.formula?.id ?? 0) || undefined,
-                  estado: 'Pendiente'
-                };
-                createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
-              }
-            } else {
+          let createdResp: any = null;
+          if (id && line?.id) {
+            try {
+              createdResp = await apiFetch(`/pedidos-venta/${id}/lineas/${line.id}/ordenes-produccion`, { method: 'POST' });
+            } catch (eLine) {
               const payload: any = {
                 producto_terminado_id: Number(line?.producto_id ?? line?.producto?.id ?? line?.producto_terminado_id ?? 0) || undefined,
                 cantidad: Number(line?.cantidad ?? line?.qty ?? 0) || 0,
@@ -322,17 +313,26 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
               };
               createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
             }
-            // Optionally notify or update local state
-          } catch (err) {
-            console.error('Error creando orden faltante para pedido', id, err);
-            throw err;
+          } else {
+            const payload: any = {
+              producto_terminado_id: Number(line?.producto_id ?? line?.producto?.id ?? line?.producto_terminado_id ?? 0) || undefined,
+              cantidad: Number(line?.cantidad ?? line?.qty ?? 0) || 0,
+              formula_id: Number(line?.formula_id ?? line?.formula?.id ?? 0) || undefined,
+              estado: 'Pendiente'
+            };
+            createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
           }
+          // Optionally notify or update local state
+        } catch (err) {
+          console.error('Error creando orden faltante para pedido', id, err);
+          throw err;
         }
-      } catch (e) {
-        console.debug('createMissingOrdersForPedido error', e);
-        throw e;
       }
+    } catch (e) {
+      console.debug('createMissingOrdersForPedido error', e);
+      throw e;
     }
+  }
 
   useEffect(() => {
     // Cuando cambia banco seleccionado, actualizar formas disponibles
@@ -1198,45 +1198,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
       return;
     }
 
-    // Si no hay pagos parciales en memoria y el restante ya está cubierto, completar directamente
-    try {
-      if (pedidoTotal !== null && remaining !== null && remaining <= 0.009) {
-        setLoading(true);
-        setErrors(null);
-        try {
-            try {
-              await tryAutoCompleteOrdersForPedido(pedidoId);
-            } catch (errAuto) {
-              console.error('No se pudieron completar órdenes de producción automáticamente', errAuto);
-              toast.error('No se pudieron completar las órdenes de producción asociadas. Revise el servidor.');
-              setLoading(false);
-              return;
-            }
-            try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
-            if (await pedidoHasPendingProduction(pedidoId)) {
-              toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
-              setLoading(false);
-              return;
-            }
-            const data = await completarPedidoVenta(pedidoId);
-          if (onSuccess) onSuccess(data);
-          setShowSuccess(true);
-          setTimeout(() => setShowSuccess(false), 1600);
-          toast.success('Pedido completado correctamente');
-          if (onClose) onClose();
-          return;
-        } catch (e: any) {
-          console.error('Error completando pedido', e);
-          setErrors(e?.message ?? 'Error completando pedido');
-          try { toast.error(e?.message || 'Error completando pedido'); } catch (err) { }
-          return;
-        } finally {
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      // continuar a validación normal si algo falla al evaluar remaining
-    }
+    // NOTA: Se eliminó el "fast path" que completaba sin enviar pago cuando remaining <= 0.009
+    // Siempre debemos crear el pago cuando el usuario está en este formulario.
+    // El flujo correcto pasa por la validación y envío del pago más abajo.
 
     if (!validate()) return;
     // Validar que la suma del pago actual + pagos existentes cubra el total del pedido
@@ -1341,6 +1305,22 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
         // debug final del pago que se enviará en add-and-complete
         // eslint-disable-next-line no-console
         console.debug('create-pago-final-add-and-complete', pago);
+        console.log('🔍 PAGO ENVIADO AL BACKEND:', JSON.stringify(pago, null, 2));
+        console.log('🔍 pedidoId:', pedidoId);
+
+        // Validar que el pago tiene los campos requeridos antes de enviar
+        if (!pago.forma_pago_id || !pago.banco_id || !pago.monto) {
+          const faltantes = [];
+          if (!pago.forma_pago_id) faltantes.push('forma_pago_id');
+          if (!pago.banco_id) faltantes.push('banco_id');
+          if (!pago.monto) faltantes.push('monto');
+          const msg = `Faltan campos requeridos para el pago: ${faltantes.join(', ')}`;
+          console.error('❌ VALIDACIÓN FRONTEND:', msg);
+          setErrors(msg);
+          toast.error(msg);
+          setLoading(false);
+          return;
+        }
 
         // Enviar en un solo paso: crear y completar el pedido (backend debe soportar crear+finalizar)
         // Esto evita duplicados al crear el pago por separado y luego completar.
@@ -1359,10 +1339,14 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose }: Props) {
           return;
         }
         const data = await completarPedidoVenta(pedidoId, pago);
+        console.log('✅ RESPUESTA DEL BACKEND (completarPedidoVenta):', JSON.stringify(data, null, 2));
+
         // Verificar asociación del pago
         try {
           const fresh = await getPedidoVenta(pedidoId);
+          console.log('🔍 PEDIDO FRESH (después de completar):', JSON.stringify(fresh, null, 2));
           const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          console.log('🔍 PAGOS ENCONTRADOS:', pagosList?.length || 0, pagosList);
           if (!pagosList || pagosList.length === 0) {
             setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa la respuesta del servidor.');
             toast.error('Pago registrado pero no se detectó asociación al pedido');
