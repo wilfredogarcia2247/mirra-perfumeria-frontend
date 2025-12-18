@@ -462,7 +462,7 @@ export default function Hero() {
                                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                   type="tel"
-                                  placeholder="0412..."
+                                  placeholder="04129465465"
                                   value={telefonoCliente}
                                   onChange={(e) => setTelefonoCliente(e.target.value)}
                                   className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
@@ -475,7 +475,7 @@ export default function Hero() {
                                 <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                   type="text"
-                                  placeholder="V-123..."
+                                  placeholder="V-12345678"
                                   value={cedulaCliente}
                                   onChange={(e) => setCedulaCliente(e.target.value)}
                                   className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
@@ -496,7 +496,7 @@ export default function Hero() {
                           <button
                             type="submit"
                             disabled={checkoutLoading || checkoutSuccess}
-                            className={`flex-[2] py-2.5 rounded-lg text-white font-medium text-sm shadow-md flex items-center justify-center gap-2 transition-all ${checkoutSuccess
+                            className={`flex-[2] py-2.5 rounded-lg text-gray-700 font-medium text-sm shadow-md flex items-center justify-center gap-2 transition-all ${checkoutSuccess
                               ? 'bg-green-600 hover:bg-green-700'
                               : 'bg-gradient-to-r from-copper-600 to-amber-600 hover:from-copper-700 hover:to-amber-700'
                               }`}
