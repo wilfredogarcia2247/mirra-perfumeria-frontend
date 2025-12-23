@@ -1490,7 +1490,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   return (
     <div className={embedded
       ? "w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
-      : `relative bg-white rounded-lg shadow-lg w-full max-w-[95vw] lg:max-w-[90vw] z-10 mx-auto px-4 sm:px-6 lg:px-8 max-h-[95vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`
+      : `relative bg-white rounded-lg shadow-lg w-full max-w-4xl z-10 mx-auto max-h-[85vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`
     }>
       <div className="flex justify-between items-start p-4 border-b">
         <div>
@@ -1526,7 +1526,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         <button onClick={() => setShowAside(s => !s)} className="text-sm bg-gray-100 px-3 py-1 rounded">{showAside ? 'Ocultar resumen' : 'Mostrar resumen'}</button>
       </div>
 
-      <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6 lg:p-8'} overflow-auto flex-1`}>
+      <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
         {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1753,31 +1753,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           </aside>
         </div>
 
-        <div className="mt-4 flex flex-col sm:flex-row gap-2 items-stretch">
-          <div className="flex-1 flex gap-2">
-            {paymentMode === 'multiple' && (remaining === null || remaining > 0.009) && (
-              <Button
-                onClick={handleAddPayment}
-                disabled={loading}
-                variant="outline"
-                className="flex-1"
-              >
-                Añadir pago parcial
-              </Button>
-            )}
 
-            {/* Quick flows */}
-            {paymentMode === 'multiple' && pedidoTotal !== null && remaining !== null && remaining <= 0.009 ? (
-              <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                {loading ? 'Procesando...' : 'Completar pedido'}
-              </Button>
-            ) : paymentMode === 'single' ? (
-              <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                {loading ? 'Procesando...' : 'Pagar y completar'}
-              </Button>
-            ) : null}
-          </div>
-        </div>
 
         {showSuccess && (
           <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-50">
@@ -1789,6 +1765,32 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           </div>
         )}
 
+      </div>
+
+      <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-2 items-stretch z-20">
+        <div className="flex-1 flex gap-2">
+          {paymentMode === 'multiple' && (remaining === null || remaining > 0.009) && (
+            <Button
+              onClick={handleAddPayment}
+              disabled={loading}
+              variant="outline"
+              className="flex-1 border-slate-300"
+            >
+              Añadir pago parcial
+            </Button>
+          )}
+
+          {/* Quick flows */}
+          {paymentMode === 'multiple' && pedidoTotal !== null && remaining !== null && remaining <= 0.009 ? (
+            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+              {loading ? 'Procesando...' : 'Completar pedido'}
+            </Button>
+          ) : paymentMode === 'single' ? (
+            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+              {loading ? 'Procesando...' : 'Pagar y completar'}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
