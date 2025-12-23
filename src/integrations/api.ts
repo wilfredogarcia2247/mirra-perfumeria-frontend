@@ -396,7 +396,10 @@ export async function completarOrdenProduccion(id: number, almacen_venta_id?: nu
 
   try {
     return await apiFetch(`/ordenes-produccion/${id}/completar`, { method: 'POST', body: JSON.stringify(payload) });
-  } catch (e) {
+  } catch (e: any) {
+    // Si el error es 400 (Bad Request, p. ej. materia prima insuficiente), no tiene sentido intentar el fallback
+    if (e?.status === 400) throw e;
+
     // fallback: intentar actualizar el estado (no realiza movimientos de inventario en general)
     try {
       return await apiFetch(`/ordenes-produccion/${id}`, { method: 'PUT', body: JSON.stringify({ estado: 'Completado' }) });

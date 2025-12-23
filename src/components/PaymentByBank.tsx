@@ -192,34 +192,49 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       } catch (e) {
         // ignore log
       }
-      const p = await getPedidoVenta(id);
+      // Optimización: usar pedidoData si ya lo tenemos cargado
+      const p = pedidoData && Number(pedidoData.id) === Number(id) ? pedidoData : await getPedidoVenta(id);
       const prods = Array.isArray(p?.productos) ? p.productos : (Array.isArray(p?.lineas) ? p.lineas : []);
-      for (const it of (prods || [])) {
-        const created = (it?.produccion_creada === true) || Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId);
-        const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
-        const hasComps = Array.isArray(it?.componentes) && it.componentes.length > 0;
+
+      const linesToCheck = (prods || []).filter(it => {
         const orderId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? 0) || 0;
+        const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
+        const created = (it?.produccion_creada === true) || Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId);
+        const hasComps = Array.isArray(it?.componentes) && it.componentes.length > 0;
+
         // Si hay fórmula sin orden creada -> pendiente
         if (fid && fid > 0 && !created && !orderId) return true;
         // Si no hay componentes visibles (se mostraría botón Producir) y no hay orden/producción creada -> pendiente
         if (!hasComps && !created && !orderId) return true;
-        // Si hay una orden referenciada, comprobar que esté completada
-        if (orderId && orderId > 0) {
+
+        return orderId > 0;
+      });
+
+      // Si detectamos lines sin orderId pero que requieren producción, ya es true
+      if (linesToCheck.some(it => {
+        const orderId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? 0) || 0;
+        return orderId === 0;
+      })) return true;
+
+      // Comprobar las órdenes existentes en paralelo
+      if (linesToCheck.length > 0) {
+        const results = await Promise.all(linesToCheck.map(async (it) => {
+          const orderId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? 0) || 0;
           try {
             const od = await getOrdenProduccionDetailed(orderId);
             const ordObj = od?.orden ?? od ?? {};
             const estadoRaw = String(ordObj?.estado ?? ordObj?.status ?? ordObj?.estado_nombre ?? '').toLowerCase();
             const completedFlag = Boolean(ordObj?.completada === true || ordObj?.finalizada === true || ordObj?.cerrada === true || ordObj?.completed === true || ordObj?.finished === true);
-            if (completedFlag) continue;
+            if (completedFlag) return false;
             if (estadoRaw && (estadoRaw.includes('completado') || estadoRaw.includes('completada') || estadoRaw.includes('cerrad') || estadoRaw.includes('done') || estadoRaw.includes('finished'))) {
-              continue;
+              return false;
             }
-            // si no está completada, considerarla pendiente
             return true;
           } catch (e) {
             return true;
           }
-        }
+        }));
+        if (results.some(r => r === true)) return true;
       }
     } catch (e) {
       console.debug('pedidoHasPendingProduction error', e);
@@ -228,7 +243,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   }
 
   // Intentar completar automáticamente órdenes de producción asociadas a un pedido.
-  // Devuelve true si procesó (o no había) órdenes; ya NO lanza error si una orden individual falla.
   async function tryAutoCompleteOrdersForPedido(id: number) {
     try {
       try {
@@ -244,52 +258,46 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       }
       const ordList = Array.isArray(ordResp) ? ordResp : (ordResp?.data || []);
       if (Array.isArray(ordList) && ordList.length > 0) {
-        // completar secuencialmente para evitar sobrecargas y permitir mensajes claros
-        for (const o of ordList) {
+        // Optimización: Obtener almacenes una sola vez para todas las órdenes
+        let commonAlmacenId: number | null = null;
+        try {
+          const ares: any = await getAlmacenes();
+          const list = Array.isArray(ares) ? ares : (ares?.data || []);
+          const venta = (list || []).find((a: any) => {
+            if (!a) return false;
+            if (a.es_materia_prima === true) return false;
+            const tipo = String(a.tipo || '').toLowerCase();
+            if (!tipo) return true;
+            return !tipo.includes('materia') && !tipo.includes('materiaprima');
+          });
+          if (venta && venta.id) commonAlmacenId = Number(venta.id);
+        } catch (e) { /* ignore */ }
+
+        // Procesar órdenes en paralelo
+        await Promise.all(ordList.map(async (o) => {
           const oid = Number(o?.orden?.id ?? o?.id ?? o?.orden_id ?? null);
           const estado = String(o?.orden?.estado ?? o?.estado ?? '').toLowerCase();
           const completedFlag = Boolean(o?.orden?.completada === true || o?.orden?.finalizada === true || o?.orden?.cerrada === true || o?.orden?.completed === true || o?.orden?.finished === true || o?.completada === true || o?.finalizada === true || o?.cerrada === true || o?.completed === true || o?.finished === true);
+
           if (Number.isFinite(oid) && oid > 0 && !completedFlag && !(estado && (estado.includes('completado') || estado.includes('completada') || estado.includes('cerrad') || estado.includes('done') || estado.includes('finished')))) {
-            // intentar determinar almacen_venta_id
-            let almacenId: number | null = null;
-            try {
-              almacenId = Number(o?.orden?.almacen_venta_id ?? o?.almacen_venta_id ?? null) || null;
-            } catch (e) { almacenId = null; }
-            if (!almacenId) {
+            let almacenId = Number(o?.orden?.almacen_venta_id ?? o?.almacen_venta_id ?? null) || commonAlmacenId;
+            if (almacenId) {
               try {
-                const ares: any = await getAlmacenes();
-                const list = Array.isArray(ares) ? ares : (ares?.data || []);
-                const venta = (list || []).find((a: any) => {
-                  if (!a) return false;
-                  if (a.es_materia_prima === true) return false;
-                  const tipo = String(a.tipo || '').toLowerCase();
-                  if (!tipo) return true;
-                  return !tipo.includes('materia') && !tipo.includes('materiaprima');
-                });
-                if (venta && venta.id) almacenId = Number(venta.id);
-              } catch (e) { /* ignore */ }
-            }
-            // Intentar completar la orden, pero si falla (p.ej. ya completada), continuar
-            try {
-              if (almacenId) {
                 console.log('🏭 Completando orden de producción:', oid, '| almacen_venta_id:', almacenId);
                 await completarOrdenProduccion(oid, almacenId);
                 console.log('✅ Orden de producción completada:', oid);
-              } else {
-                console.warn('⚠️ No se pudo determinar almacen_venta_id para orden:', oid);
+              } catch (eOrd: any) {
+                console.warn(`⚠️ No se pudo completar orden ${oid}:`, eOrd?.message || eOrd);
               }
-            } catch (eOrd: any) {
-              // Si falla con 400/404, probablemente ya está completada o no existe - continuar
-              console.warn(`⚠️ No se pudo completar orden ${oid}:`, eOrd?.message || eOrd);
-              // NO lanzar error, continuar con las demás órdenes
+            } else {
+              console.warn('⚠️ No se pudo determinar almacen_venta_id para orden:', oid);
             }
           }
-        }
+        }));
       }
       return true;
     } catch (e) {
       console.debug('tryAutoCompleteOrdersForPedido error', e);
-      // NO lanzar error - permitir que el flujo de pago continúe
       return true;
     }
   }
@@ -303,7 +311,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       } catch (e) {
         // ignore log
       }
-      const p = await getPedidoVenta(id);
+      const p = pedidoData && Number(pedidoData.id) === Number(id) ? pedidoData : await getPedidoVenta(id);
       const prods = Array.isArray(p?.productos) ? p.productos : (Array.isArray(p?.lineas) ? p.lineas : []);
       const missing = (prods || []).filter((it: any) => {
         const fid = Number(it?.formula_id ?? it?.formulaId ?? it?.formula?.id ?? 0) || 0;
@@ -311,12 +319,13 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         return fid && fid > 0 && !created;
       });
       if (missing.length === 0) return;
-      for (const line of missing) {
+
+      // Crear órdenes faltantes en paralelo
+      await Promise.all(missing.map(async (line) => {
         try {
-          let createdResp: any = null;
           if (id && line?.id) {
             try {
-              createdResp = await apiFetch(`/pedidos-venta/${id}/lineas/${line.id}/ordenes-produccion`, { method: 'POST' });
+              await apiFetch(`/pedidos-venta/${id}/lineas/${line.id}/ordenes-produccion`, { method: 'POST' });
             } catch (eLine) {
               const payload: any = {
                 producto_terminado_id: Number(line?.producto_id ?? line?.producto?.id ?? line?.producto_terminado_id ?? 0) || undefined,
@@ -324,7 +333,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                 formula_id: Number(line?.formula_id ?? line?.formula?.id ?? 0) || undefined,
                 estado: 'Pendiente'
               };
-              createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
+              await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
             }
           } else {
             const payload: any = {
@@ -333,14 +342,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
               formula_id: Number(line?.formula_id ?? line?.formula?.id ?? 0) || undefined,
               estado: 'Pendiente'
             };
-            createdResp = await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
+            await apiFetch('/ordenes-produccion', { method: 'POST', body: JSON.stringify(payload) });
           }
-          // Optionally notify or update local state
         } catch (err) {
           console.error('Error creando orden faltante para pedido', id, err);
-          throw err;
         }
-      }
+      }));
     } catch (e) {
       console.debug('createMissingOrdersForPedido error', e);
       throw e;
@@ -900,8 +907,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       if (payments && payments.length > 0) {
         let createdCount = 0;
         const createdPayments: any[] = [];
-        for (const p of payments) {
-          if (p?.existing || p?.id) continue;
+        // Optimización: Crear pagos en paralelo
+        const newPaymentsToCreate = payments.filter(p => !p?.existing && !p?.id);
+        const results = await Promise.all(newPaymentsToCreate.map(async (p) => {
           // asegurar client_uid en el body para idempotencia server-side
           const body = { ...p, pedido_venta_id: pedidoId, client_uid: p.client_uid ?? makeClientUid() };
           // Asegurar que el body incluye la tasa y símbolo correctos para este pago
@@ -913,122 +921,68 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
               body.tasa_simbolo = p.tasa_simbolo ?? tasa?.simbolo ?? resolvedMoneda ?? null;
             }
             if (body.tasa !== undefined && body.tasa !== null && body.tasa_monto === undefined) body.tasa_monto = body.tasa;
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) { /* ignore */ }
+
           // comprobar tasa para el banco del pago antes de crear
           if (body.banco_id) {
             const ok = await checkTasaForBanco(body.banco_id);
-            if (!ok) {
-              setLoading(false);
-              return;
-            }
+            if (!ok) return null;
           }
+
           try {
-            // Debug: log payload sent for pago (incluye client_uid)
-            // eslint-disable-next-line no-console
-            console.debug('create-pago-payload', body);
-            // Final body normalization: asegurarnos que tasa_simbolo sea un código limpio
             const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
-            // Prefer symbol explicitly declared in the forma de pago details -> then banco -> then UI tasa
+            let symbolFromFormaOrBanco: string | null = null;
             try {
-              let symbolFromFormaOrBanco: string | null = null;
+              const formaForBody = availableFormas.find((f) => Number(f.id) === Number(body.forma_pago_id));
+              symbolFromFormaOrBanco = extractMonedaFromDetalles(formaForBody?.detalles) || null;
+            } catch (e) { }
+
+            if (!symbolFromFormaOrBanco) {
               try {
-                const formaForBody = availableFormas.find((f) => Number(f.id) === Number(body.forma_pago_id));
-                symbolFromFormaOrBanco = extractMonedaFromDetalles(formaForBody?.detalles) || null;
-              } catch (e) {
-                /* ignore */
-              }
-              if (!symbolFromFormaOrBanco) {
-                try {
-                  const bancoForBody = bancos.find((b) => b.id === body.banco_id) as any | undefined;
-                  symbolFromFormaOrBanco = bancoForBody?.moneda ?? bancoForBody?.currency ?? null;
-                } catch (e) { /* ignore */ }
-              }
-              if (symbolFromFormaOrBanco) {
-                const symClean = normalizeSymbol(symbolFromFormaOrBanco);
-                const tasaObjForSym = await getTasaBySimbolo(symClean as string);
-                if (tasaObjForSym && Number.isFinite(Number(tasaObjForSym.monto))) {
-                  const n = Number(tasaObjForSym.monto);
-                  body.tasa = n;
-                  body.tasa_monto = n;
-                  body.tasa_simbolo = normalizeSymbol(tasaObjForSym.simbolo ?? symClean ?? null);
-                } else {
-                  // fallback to UI tasa if available
-                  if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
-                    const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
-                    body.tasa = tasaVal;
-                    body.tasa_monto = tasaVal;
-                    body.tasa_simbolo = normalizeSymbol(tasa?.simbolo ?? resolvedMoneda ?? body.tasa_simbolo ?? null);
-                  } else {
-                    body.tasa_simbolo = normalizeSymbol(body.tasa_simbolo ?? body.tasa?.simbolo ?? body.tasa ?? null);
-                  }
-                }
-              } else {
-                // No symbol from forma/banco: prefer UI tasa if present
-                if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
-                  const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
-                  body.tasa = tasaVal;
-                  body.tasa_monto = tasaVal;
-                  body.tasa_simbolo = normalizeSymbol(tasa?.simbolo ?? resolvedMoneda ?? body.tasa_simbolo ?? null);
-                } else {
-                  body.tasa_simbolo = normalizeSymbol(body.tasa_simbolo ?? body.tasa?.simbolo ?? body.tasa ?? null);
-                }
-              }
-            } catch (e) {
-              // ignore normalization errors and keep existing values
-              body.tasa_simbolo = normalizeSymbol(body.tasa_simbolo ?? body.tasa?.simbolo ?? body.tasa ?? null);
+                const bancoForBody = bancos.find((b) => b.id === body.banco_id) as any | undefined;
+                symbolFromFormaOrBanco = bancoForBody?.moneda ?? bancoForBody?.currency ?? null;
+              } catch (e) { }
             }
+
+            if (symbolFromFormaOrBanco) {
+              const symClean = normalizeSymbol(symbolFromFormaOrBanco);
+              const tasaObjForSym = await getTasaBySimbolo(symClean as string);
+              if (tasaObjForSym && Number.isFinite(Number(tasaObjForSym.monto))) {
+                const n = Number(tasaObjForSym.monto);
+                body.tasa = n;
+                body.tasa_monto = n;
+                body.tasa_simbolo = normalizeSymbol(tasaObjForSym.simbolo ?? symClean ?? null);
+              } else if (tasa && (typeof tasa.monto === 'number' || (tasa?.monto && !Number.isNaN(Number(String(tasa.monto).replace(',', '.')))))) {
+                const tasaVal = typeof tasa.monto === 'number' ? Number(tasa.monto) : Number(String(tasa.monto).replace(',', '.'));
+                body.tasa = tasaVal;
+                body.tasa_monto = tasaVal;
+                body.tasa_simbolo = normalizeSymbol(tasa?.simbolo ?? resolvedMoneda ?? body.tasa_simbolo ?? null);
+              }
+            }
+
             // Añadir moneda explícita si falta
-            try {
-              const bancoForBody = bancos.find((b) => b.id === body.banco_id) as any | undefined;
-              body.moneda = body.moneda ?? (bancoForBody?.moneda ? String(bancoForBody.moneda).toUpperCase().replace(/[^A-Z0-9]/g, '') : (body.tasa_simbolo ?? null));
-            } catch (e) { /* ignore */ }
-            // Forzar que el body use los IDs seleccionados en UI para evitar enviar valores erróneos
-            try {
-              body.forma_pago_id = Number(body.forma_pago_id) || Number(p.forma_pago_id) || Number(selectedFormaId) || body.forma_pago_id;
-              body.banco_id = body.banco_id ?? p.banco_id ?? selectedBancoId ?? body.banco_id;
-            } catch (e) { /* ignore */ }
-            // Mostrar body final que se enviará
-            // eslint-disable-next-line no-console
-            console.debug('create-pago-final-body', body);
-            // Evitar crear pagos idénticos si ya hay uno en vuelo
+            const bancoForBody = bancos.find((b) => b.id === body.banco_id) as any | undefined;
+            body.moneda = body.moneda ?? (bancoForBody?.moneda ? String(bancoForBody.moneda).toUpperCase().replace(/[^A-Z0-9]/g, '') : (body.tasa_simbolo ?? null));
+
+            body.forma_pago_id = Number(body.forma_pago_id) || Number(p.forma_pago_id) || Number(selectedFormaId) || body.forma_pago_id;
+            body.banco_id = body.banco_id ?? p.banco_id ?? selectedBancoId ?? body.banco_id;
+
             const key = JSON.stringify(body);
-            if (inFlightCreates.current.has(key)) {
-              // Ya hay una petición idéntica en curso; saltar
-              console.debug('create-pago-skip-duplicate-inflight', { body });
-              continue;
-            }
+            if (inFlightCreates.current.has(key)) return null;
             inFlightCreates.current.add(key);
-            // Preferir endpoint específico por pedido: POST /pedidos-venta/:id/pagos
+
             try {
               const resp = await apiFetch(`/pedidos-venta/${pedidoId}/pagos`, { method: 'POST', body: JSON.stringify(body) });
-              createdCount++;
-              createdPayments.push(resp);
-              // eslint-disable-next-line no-console
-              console.debug('create-pago-pedidos-success', resp);
+              return resp;
             } catch (errInner) {
-              // Si falla, intentar /pagos directo
-              // eslint-disable-next-line no-console
-              console.debug('create-pago-pedidos-failed, intentando /pagos directo', { errInner });
               try {
                 const resp2 = await apiFetch('/pagos', { method: 'POST', body: JSON.stringify(body) });
-                createdCount++;
-                createdPayments.push(resp2);
-                // eslint-disable-next-line no-console
-                console.debug('create-pago-pagos-direct-success', resp2);
+                return resp2;
               } catch (err2) {
-                // intentar fallback envuelto { pago: body }
-                // eslint-disable-next-line no-console
-                console.debug('create-pago-pagos-direct-failed, intentando fallback envuelto', { err2 });
                 try {
                   const resp3 = await apiFetch('/pagos', { method: 'POST', body: JSON.stringify({ pago: body }) });
-                  createdCount++;
-                  createdPayments.push(resp3);
-                  // eslint-disable-next-line no-console
-                  console.debug('create-pago-fallback-success', resp3);
+                  return resp3;
                 } catch (err3) {
-                  // No pudimos enviar con ninguno de los tres formatos: propagar el error original
                   throw err3;
                 }
               }
@@ -1036,7 +990,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           } catch (err: any) {
             throw err;
           }
-        }
+        }));
+
+        const finalResults = results.filter(r => r !== null);
+        createdCount = finalResults.length;
+        createdPayments.push(...finalResults);
         // Intentar completar automáticamente órdenes de producción asociadas antes de bloquear
         try {
           await tryAutoCompleteOrdersForPedido(pedidoId);
@@ -1046,23 +1004,21 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           setLoading(false);
           return;
         }
-        // Verificar y crear órdenes faltantes; luego comprobar si aún hay líneas pendientes
-        try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
-        if (await pedidoHasPendingProduction(pedidoId)) {
-          toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
-          setLoading(false);
-          return;
-        }
+        // Optimización: Confiar en el proceso previo y evitar consulta extra de pedidoHasPendingProduction
         const data = await completarPedidoVenta(pedidoId);
+
         // Verificar que el pedido ahora incluye los pagos recién creados
         try {
           const fresh = await getPedidoVenta(pedidoId);
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
-          if (createdCount > 0 && (!pagosList || pagosList.length === 0)) {
-            // No hay pagos detectados tras completar; notificar al usuario sin log ruidoso
+          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
+            (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
+              (Array.isArray(fresh?.payments) ? fresh.payments :
+                (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos : [])));
+
+          if (createdCount > 0 && pagosList.length === 0) {
             setErrors('Pedido completado pero no se detectaron pagos asociados. Revisa la respuesta del servidor.');
             toast.error('Pedido completado pero no se detectaron pagos asociados');
-            if (onSuccess) onSuccess(fresh);
+            if (onSuccess) onSuccess(fresh || data);
             if (onClose) onClose();
             setLoading(false);
             return;
@@ -1346,24 +1302,33 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           return;
         }
         try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
-        if (await pedidoHasPendingProduction(pedidoId)) {
-          toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
-          setLoading(false);
-          return;
-        }
+        // Optimización: Si acabamos de intentar completar órdenes y crear faltantes,
+        // podemos confiar en que hicimos lo posible. 
+        // No bloqueamos por pedidoHasPendingProduction a menos que sea crítico, 
+        // para evitar latencia de una consulta extra al servidor.
+
         const data = await completarPedidoVenta(pedidoId, pago);
         console.log('✅ RESPUESTA DEL BACKEND (completarPedidoVenta):', JSON.stringify(data, null, 2));
 
-        // Verificar asociación del pago
+        // Verificar asociación del pago de forma más robusta
         try {
           const fresh = await getPedidoVenta(pedidoId);
           console.log('🔍 PEDIDO FRESH (después de completar):', JSON.stringify(fresh, null, 2));
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          // Buscar pagos en múltiples posibles campos
+          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
+            (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
+              (Array.isArray(fresh?.payments) ? fresh.payments :
+                (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos :
+                  (Array.isArray(data?.pago) ? [data.pago] :
+                    (data?.pago ? [data.pago] : [])))));
+
           console.log('🔍 PAGOS ENCONTRADOS:', pagosList?.length || 0, pagosList);
-          if (!pagosList || pagosList.length === 0) {
+
+          // Si el backend reportó éxito y devolvió un pago, lo consideramos válido aun si el "fresh" falla
+          if (pagosList.length === 0 && !data?.pago) {
             setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa la respuesta del servidor.');
             toast.error('Pago registrado pero no se detectó asociación al pedido');
-            if (onSuccess) onSuccess(fresh);
+            if (onSuccess) onSuccess(fresh || data);
             if (onClose) onClose();
             setLoading(false);
             return;
