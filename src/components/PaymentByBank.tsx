@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getBancos, getFormasPago, completarPedidoVenta, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes } from '../integrations/api';
@@ -1489,7 +1489,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
   return (
     <div className={embedded
-      ? "w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
+      ? "relative w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
       : `relative bg-white rounded-lg shadow-lg w-full max-w-4xl z-10 mx-auto max-h-[85vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`
     }>
       <div className="flex justify-between items-start p-4 border-b">
@@ -1761,6 +1761,31 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
               <svg className="w-16 h-16 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-500 animate-in fade-in">
+            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center border border-slate-100 scale-100 animate-in zoom-in-95 duration-300">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-tr from-sky-400 to-emerald-400 rounded-full blur-lg opacity-40 animate-pulse"></div>
+                <div className="relative bg-white rounded-full p-4 shadow-sm border border-slate-100">
+                  <Loader2 className="w-10 h-10 text-sky-600 animate-spin" />
+                </div>
+              </div>
+              <div className="mt-6 text-xl font-semibold text-slate-800">Procesando pago</div>
+              <div className="mt-2 text-sm text-slate-500 flex flex-col items-center gap-1">
+                <span>Verificando información y completando el pedido...</span>
+                <span className="text-xs text-slate-400">Esto puede tomar unos segundos</span>
+              </div>
+              {/* Steps indicator simulado para dar feedback visual */}
+              <div className="mt-6 flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce"></div>
+              </div>
             </div>
           </div>
         )}
