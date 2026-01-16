@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     // allow render host for preview or dev
-    allowedHosts: [ "mirra-perfumeria.vercel.app"],
+    allowedHosts: ["mirra-perfumeria.vercel.app", "localhost", "127.0.0.1"],
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   // Configuración para producción
-  base: "/",
+  base: '/',
   build: {
     outDir: "dist",
     assetsDir: "assets",

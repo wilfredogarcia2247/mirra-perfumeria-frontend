@@ -21,30 +21,33 @@ export function getImageUrl(obj?: any, fallbackIndex?: number): string | undefin
     return fallbackImages[index];
   }
 
+  // Convertir HTTPS a HTTP para evitar problemas de certificado en desarrollo
+  const httpUrl = raw.replace('https://', 'http://');
+
   // Si ya es una URL absoluta o data/blob, devolver tal cual
-  if (/^(https?:)?\/\//i.test(raw) || /^data:|^blob:/i.test(raw)) return raw;
+  if (/^(https?:)?\/\//i.test(httpUrl) || /^data:|^blob:/i.test(httpUrl)) return httpUrl;
 
   // Si es una ruta relativa (empieza con '/'), prefijar con la base del API o el origen
-  if (raw.startsWith('/')) {
+  if (httpUrl.startsWith('/')) {
     // Preferir VITE_API_URL sin el sufijo /api si existe, sino origin
     const viteApi = (import.meta.env.VITE_API_URL as string) || '';
     const base = viteApi.replace(/\/api\/?$/, '') || (typeof window !== 'undefined' ? window.location.origin : '');
-    const resolved = `${base}${raw}`;
-    if (import.meta.env.DEV) console.debug('[getImageUrl] resolved relative image', { raw, resolved, base });
+    const resolved = `${base}${httpUrl}`;
+    if (import.meta.env.DEV) console.debug('[getImageUrl] resolved relative image', { raw: httpUrl, resolved, base });
     return resolved;
   }
 
   // Para rutas relativas sin slash (por ejemplo 'uploads/xyz.jpg'), prefijar también con la base
-  if (!/^(https?:)?\/\//i.test(raw) && !/^data:|^blob:/i.test(raw)) {
+  if (!/^(https?:)?\/\//i.test(httpUrl) && !/^data:|^blob:/i.test(httpUrl)) {
     const viteApi = (import.meta.env.VITE_API_URL as string) || '';
     const base = viteApi.replace(/\/api\/?$/, '') || (typeof window !== 'undefined' ? window.location.origin : '');
-    const resolved = base ? `${base.replace(/\/$/, '')}/${raw.replace(/^\//, '')}` : raw;
-    if (import.meta.env.DEV) console.debug('[getImageUrl] resolved non-slash relative image', { raw, resolved, base });
+    const resolved = base ? `${base.replace(/\/$/, '')}/${httpUrl.replace(/^\//, '')}` : httpUrl;
+    if (import.meta.env.DEV) console.debug('[getImageUrl] resolved non-slash relative image', { raw: httpUrl, resolved, base });
     return resolved;
   }
 
-  if (import.meta.env.DEV) console.debug('[getImageUrl] using raw image', { raw });
-  return raw;
+  if (import.meta.env.DEV) console.debug('[getImageUrl] using raw image', { raw: httpUrl });
+  return httpUrl;
 }
 
 // Extrae un mensaje legible de un error devuelto por `apiFetch`.

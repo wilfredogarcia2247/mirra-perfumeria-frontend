@@ -11,7 +11,7 @@ interface ImageUploadProps {
 }
 
 export default function ImageUpload({ onImageUpload, existingImageUrl, originalImageUrl }: ImageUploadProps) {
-  const [previewUrl, setPreviewUrl] = useState<string>(existingImageUrl || '');
+  const [previewUrl, setPreviewUrl] = useState<string>((existingImageUrl || '').replace('https://', 'http://'));
   const [error, setError] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -23,7 +23,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
 
   // Sync when parent tells us there's an existing image (e.g., opening the edit modal)
   useEffect(() => {
-    setPreviewUrl(existingImageUrl || '');
+    setPreviewUrl((existingImageUrl || '').replace('https://', 'http://'));
   }, [existingImageUrl]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,8 +74,9 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
       setUploadProgress(100);
       
       if (response.ok && response.url) {
-        setPreviewUrl(response.url);
-        onImageUpload(response.url);
+        const httpUrl = response.url.replace('https://', 'http://');
+        setPreviewUrl(httpUrl);
+        onImageUpload(httpUrl);
         setUploadSuccess(true);
         toast.success('Imagen subida correctamente');
       } else {
@@ -133,7 +134,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
           {previewUrl ? (
             <div className="relative w-full h-full">
               <img
-                src={previewUrl}
+                src={previewUrl.replace('https://', 'http://')}
                 alt="Vista previa"
                 className="w-full h-full object-contain bg-gray-100"
               />
