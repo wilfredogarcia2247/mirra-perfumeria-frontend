@@ -12,12 +12,25 @@ RUN npm ci
 # Copiar el resto del código
 COPY . .
 
+# Declarar argumentos de build para variables de entorno
+ARG VITE_API_URL
+ARG VITE_MINIO_ENDPOINT
+ARG VITE_MINIO_BUCKET
+ARG VITE_CLOUDINARY_CLOUD_NAME
+ARG VITE_CLOUDINARY_UPLOAD_PRESET
+
+# Exportar como variables de entorno para el build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_MINIO_ENDPOINT=$VITE_MINIO_ENDPOINT
+ENV VITE_MINIO_BUCKET=$VITE_MINIO_BUCKET
+ENV VITE_CLOUDINARY_CLOUD_NAME=$VITE_CLOUDINARY_CLOUD_NAME
+ENV VITE_CLOUDINARY_UPLOAD_PRESET=$VITE_CLOUDINARY_UPLOAD_PRESET
+
 # Build de la aplicación
 RUN npm run build
 
 # Etapa 2: Production
 FROM node:20-alpine AS production
-
 
 WORKDIR /app
 
