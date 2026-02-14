@@ -134,6 +134,10 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                   <div className="px-4 py-2 text-gray-600">Cargando...</div>
                 ) : (
                   <div className="px-2 py-1 max-h-64 overflow-auto">
+                    {/* Opción Todos */}
+                    <Link to="/" className="block px-4 py-1 text-gray-700 hover:bg-gray-100 rounded">
+                      Todos
+                    </Link>
                     {categoriesList.map((c: any) => {
                       const name = c.nombre ?? c.name ?? '';
                       const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');
@@ -220,6 +224,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
               <div className="text-gray-600 px-2 py-1">Cargando categorías...</div>
             ) : (
               <div className="space-y-2">
+                <Link to="/" className="block px-2 py-2 text-gray-700 hover:bg-gray-100 rounded">
+                  Todos
+                </Link>
                 {categoriesList.map((c: any) => {
                   const name = c.nombre ?? c.name ?? '';
                   const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');

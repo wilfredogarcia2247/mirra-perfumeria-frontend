@@ -36,9 +36,10 @@ const App = () => (
         <Routes>
           {/* Rutas públicas */}
           <Route path="/" element={<Hero />} />
+          <Route path="/categoria/:categorySlug" element={<Hero />} />
           <Route path="/login" element={<Login />} />
           <Route path="/about" element={<AboutUs />} />
-          
+
           {/* Rutas protegidas */}
           <Route element={<ProtectedRoute />}>
             <Route element={<ModuleProtectedRoute moduleKey="dashboard" />}>
@@ -97,7 +98,7 @@ const App = () => (
               <Route path="/pagos" element={<Pagos />} />
             </Route>
           </Route>
-          
+
           {/* Ruta 404 leo se perdio*/}
           <Route path="*" element={<NotFound />} />
         </Routes>

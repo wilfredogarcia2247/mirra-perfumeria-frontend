@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic } from '@/integrations/api';
@@ -21,6 +21,7 @@ export default function Hero() {
   const [perPage] = useState(12);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
+  const { categorySlug } = useParams();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -85,7 +86,11 @@ export default function Hero() {
         // Apply category filter if needed
         const categoryFiltered = selectedCategory === 'all'
           ? filtered
-          : filtered.filter((p) => (p.category || '').toLowerCase() === selectedCategory.toLowerCase());
+          : filtered.filter((p) => {
+            const catName = p.category || '';
+            const catSlug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            return catSlug === selectedCategory.toLowerCase();
+          });
 
         // Store full filtered list
         setFullProducts(categoryFiltered);
@@ -110,7 +115,16 @@ export default function Hero() {
       }
     })();
     return () => { mounted = false; };
-  }, [page, perPage, search, selectedCategory]);
+  }, [page, perPage, search, selectedCategory, categorySlug]);
+
+  // Update selectedCategory when URL param changes
+  useEffect(() => {
+    if (categorySlug) {
+      setSelectedCategory(categorySlug);
+    } else {
+      setSelectedCategory('all');
+    }
+  }, [categorySlug]);
 
   // Obtener tasa pública cacheada para mostrar precios convertidos en el carrito público
   useEffect(() => {
@@ -155,14 +169,18 @@ export default function Hero() {
 
       <section className="relative z-10 px-4 sm:px-6 pt-24 sm:pt-24">
         <div className="max-w-7xl mx-auto pb-12 sm:pb-20 md:pb-28 text-center">
-          <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 mb-3 sm:mb-4 bg-primary-50 text-primary-700 text-xs sm:text-sm font-medium rounded-full border border-primary-100">
-            Colección 2026
+          <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 mb-3 sm:mb-4 bg-primary-50 text-primary-700 text-xs sm:text-sm font-medium rounded-full border border-primary-100 uppercase tracking-wide">
+            {selectedCategory === 'all'
+              ? 'Colección 2026'
+              : selectedCategory.split('-').join(' ')}
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-bell-mt leading-tight mb-4 sm:mb-6">
             Descubre la Esencia de la <span className="text-primary-600">Elegancia</span>
           </h1>
           <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed px-2 sm:px-0">
-            Sumérgete en nuestra exclusiva colección de fragancias que capturan la esencia del lujo y la sofisticación.
+            {selectedCategory === 'all'
+              ? "Sumérgete en nuestra exclusiva colección de fragancias que capturan la esencia del lujo y la sofisticación."
+              : `Descubre nuestra selección exclusiva de ${selectedCategory.replace(/-/g, ' ')}.`}
           </p>
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <a
@@ -190,7 +208,9 @@ export default function Hero() {
 
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
-          <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3">Nuestros Productos</h2>
+          <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3 capitalize">
+            {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${selectedCategory.split('-').join(' ')}`}
+          </h2>
           <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
           <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.</p>
         </div>
