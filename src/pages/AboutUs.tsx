@@ -133,7 +133,7 @@ export default function AboutUs() {
             <Store className="w-16 h-16 text-primary-600 mx-auto mb-6" />
             <h2 className="text-3xl font-bold text-gray-800 mb-6">Mirra Hoy</h2>
             <p className="text-lg text-gray-600 leading-relaxed max-w-3xl mx-auto">
-              Lo que comenzó como un sueño a inicios de 2025, se materializó a finales de ese mismo año. Hoy, con una colección de <span className="font-bold text-primary-700">235 fragancias</span> seleccionadas meticulosamente, Mirra Perfumería es el resultado de creer que comprar un perfume debe ser una experiencia tan memorable como el aroma mismo.
+              Lo que comenzó como un sueño a inicios de 2025, se materializó a finales de ese mismo año. Hoy, con una colección de mas de <span className="font-bold text-primary-700">300 fragancias</span> seleccionadas meticulosamente, Mirra Perfumería es el resultado de creer que comprar un perfume debe ser una experiencia tan memorable como el aroma mismo.
             </p>
           </div>
         </FadeInSection>
