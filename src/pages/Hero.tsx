@@ -271,7 +271,7 @@ export default function Hero() {
             {/* Page numbers */}
             {(() => {
               const totalPages = Math.max(1, Math.ceil((total || 0) / perPage));
-              const maxVisiblePages = 7; // Show 7 page numbers at a time
+              const maxVisiblePages = isMobile ? 3 : 7;
               let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
               let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
