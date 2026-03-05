@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/Layout";
-import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto, createProduccion } from "@/integrations/api";
+import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto, createProduccion, searchFormulasByLike, updateFormulasByLike } from "@/integrations/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -37,6 +37,16 @@ export default function Formulas() {
   const [produceAvailability, setProduceAvailability] = useState<Array<{ materia_prima_id: number; nombre?: string; disponible: number; requerido: number }>>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
+
+  // Bulk price update modal state
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
+  const [bulkQuery, setBulkQuery] = useState('');
+  const [bulkResults, setBulkResults] = useState<any[]>([]);
+  const [bulkSearched, setBulkSearched] = useState(false);
+  const [bulkSearching, setBulkSearching] = useState(false);
+  const [bulkNewPrice, setBulkNewPrice] = useState<string>('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkStep, setBulkStep] = useState<'search' | 'confirm'>('search');
 
   // Pagination state
   const [page, setPage] = useState<number>(1);
@@ -504,6 +514,59 @@ export default function Formulas() {
   }
 
 
+  // --- Bulk price update handlers ---
+  async function handleBulkSearch() {
+    if (!bulkQuery.trim()) return toast.error('Ingrese un término de búsqueda (ej: 30ml)');
+    setBulkSearching(true);
+    setBulkSearched(false);
+    try {
+      const res: any = await searchFormulasByLike(bulkQuery);
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setBulkResults(data);
+      setBulkSearched(true);
+    } catch (err: any) {
+      console.error('Error buscando fórmulas by-like', err);
+      toast.error(err?.message || 'Error al buscar fórmulas');
+    } finally {
+      setBulkSearching(false);
+    }
+  }
+
+  async function handleBulkUpdate() {
+    const price = Number(bulkNewPrice);
+    if (!bulkQuery.trim()) return toast.error('q requerido');
+    if (!Number.isFinite(price) || price < 0) return toast.error('Ingrese un precio válido');
+    setBulkUpdating(true);
+    try {
+      const res: any = await updateFormulasByLike(bulkQuery, price);
+      toast.success(`Se actualizaron ${res?.updated_count ?? 0} fórmulas a $${price.toFixed(2)}`);
+      // Refresh formula list
+      const fres: any = await getFormulas(page);
+      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
+      await enrichAndSetFormulas(data);
+      // Reset and close
+      setBulkPriceOpen(false);
+      setBulkStep('search');
+      setBulkQuery('');
+      setBulkResults([]);
+      setBulkSearched(false);
+      setBulkNewPrice('');
+    } catch (err: any) {
+      console.error('Error actualizando precios en masa', err);
+      toast.error(err?.message || 'Error al actualizar precios');
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  function resetBulkModal() {
+    setBulkStep('search');
+    setBulkQuery('');
+    setBulkResults([]);
+    setBulkSearched(false);
+    setBulkNewPrice('');
+  }
+
 
   return (
     <Layout>
@@ -512,6 +575,17 @@ export default function Formulas() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h1 className="text-2xl font-bold">Fórmulas</h1>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { resetBulkModal(); setBulkPriceOpen(true); }}
+                className="gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                </svg>
+                Actualizar Precios
+              </Button>
               <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva fórmula</Button>
             </div>
           </div>
@@ -913,6 +987,246 @@ export default function Formulas() {
             ) : (
               <div className="p-4">Cargando...</div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk price update dialog */}
+        <Dialog open={bulkPriceOpen} onOpenChange={(open) => { setBulkPriceOpen(open); if (!open) resetBulkModal(); }}>
+          <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="pb-2">
+              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                </svg>
+                Actualizar Precios en Masa
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Busca fórmulas por nombre (ej: "30ml", "60ml") y actualiza el precio de venta de todas las que coincidan.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5 py-4">
+              {/* Step indicator */}
+              <div className="flex items-center gap-3 text-sm">
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-colors ${bulkStep === 'search'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                  }`}>
+                  <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">1</span>
+                  Buscar
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-colors ${bulkStep === 'confirm'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                  }`}>
+                  <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">2</span>
+                  Actualizar
+                </div>
+              </div>
+
+              {/* Step 1: Search */}
+              {bulkStep === 'search' && (
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="text"
+                        placeholder='Ej: "30ml", "60ml", "100ml"...'
+                        value={bulkQuery}
+                        onChange={(e) => { setBulkQuery(e.target.value); setBulkSearched(false); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleBulkSearch(); }}
+                        className="pl-10"
+                      />
+                      <svg
+                        className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                      >
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <Button onClick={handleBulkSearch} disabled={bulkSearching || !bulkQuery.trim()} className="gap-2">
+                      {bulkSearching ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Buscando...
+                        </>
+                      ) : 'Buscar'}
+                    </Button>
+                  </div>
+
+                  {/* Results */}
+                  {bulkSearched && (
+                    <div className="border rounded-lg overflow-hidden">
+                      {bulkResults.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-2 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          No se encontraron fórmulas que contengan <strong>"{bulkQuery}"</strong>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="bg-muted/50 px-4 py-2.5 border-b flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              Se encontraron <strong className="text-primary">{bulkResults.length}</strong> fórmula{bulkResults.length !== 1 ? 's' : ''} que coinciden con <strong>"{bulkQuery}"</strong>
+                            </span>
+                          </div>
+                          <div className="max-h-[300px] overflow-y-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/30 sticky top-0">
+                                <tr>
+                                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">#</th>
+                                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Nombre</th>
+                                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Precio Actual</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {bulkResults.map((f: any, idx: number) => (
+                                  <tr key={f.id || idx} className="hover:bg-muted/20 transition-colors">
+                                    <td className="px-4 py-2 text-muted-foreground">{idx + 1}</td>
+                                    <td className="px-4 py-2 font-medium">{f.nombre || f.titulo || `Fórmula #${f.id}`}</td>
+                                    <td className="px-4 py-2 text-right">
+                                      {f.precio_venta != null
+                                        ? <span className="font-semibold text-green-700">${Number(f.precio_venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        : <span className="text-muted-foreground">—</span>
+                                      }
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Set price and confirm */}
+              {bulkStep === 'confirm' && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-amber-800">Confirmar actualización</p>
+                        <p className="text-sm text-amber-700 mt-1">
+                          Estás a punto de actualizar el <strong>precio de venta</strong> de <strong>{bulkResults.length}</strong> fórmula{bulkResults.length !== 1 ? 's' : ''} que
+                          contienen <strong>"{bulkQuery}"</strong> en su nombre.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Nuevo precio de venta ($)</label>
+                    <div className="relative max-w-xs">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={bulkNewPrice}
+                        onChange={(e) => setBulkNewPrice(e.target.value)}
+                        placeholder="Ej: 25.00"
+                        className="pl-8 text-lg font-semibold"
+                        autoFocus
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Este precio se aplicará a las {bulkResults.length} fórmulas encontradas.
+                    </p>
+                  </div>
+
+                  {/* Summary of affected formulas (collapsed view) */}
+                  <details className="border rounded-lg">
+                    <summary className="px-4 py-2.5 cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      Ver fórmulas afectadas ({bulkResults.length})
+                    </summary>
+                    <div className="max-h-[200px] overflow-y-auto border-t">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/30 sticky top-0">
+                          <tr>
+                            <th className="text-left px-4 py-1.5 font-medium text-muted-foreground">Nombre</th>
+                            <th className="text-right px-4 py-1.5 font-medium text-muted-foreground">Precio Actual</th>
+                            <th className="text-right px-4 py-1.5 font-medium text-green-600">Nuevo Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {bulkResults.map((f: any, idx: number) => (
+                            <tr key={f.id || idx}>
+                              <td className="px-4 py-1.5">{f.nombre || `Fórmula #${f.id}`}</td>
+                              <td className="px-4 py-1.5 text-right text-muted-foreground">
+                                {f.precio_venta != null ? `$${Number(f.precio_venta).toFixed(2)}` : '—'}
+                              </td>
+                              <td className="px-4 py-1.5 text-right font-semibold text-green-700">
+                                {bulkNewPrice ? `$${Number(bulkNewPrice).toFixed(2)}` : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="pt-4 border-t gap-2">
+              {bulkStep === 'search' && (
+                <>
+                  <Button variant="outline" onClick={() => { setBulkPriceOpen(false); resetBulkModal(); }}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => setBulkStep('confirm')}
+                    disabled={!bulkSearched || bulkResults.length === 0}
+                    className="gap-2"
+                  >
+                    Continuar
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </Button>
+                </>
+              )}
+              {bulkStep === 'confirm' && (
+                <>
+                  <Button variant="outline" onClick={() => setBulkStep('search')} disabled={bulkUpdating}>
+                    ← Volver
+                  </Button>
+                  <Button
+                    onClick={handleBulkUpdate}
+                    disabled={bulkUpdating || !bulkNewPrice || Number(bulkNewPrice) < 0}
+                    className="gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    {bulkUpdating ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Actualizando...
+                      </>
+                    ) : (
+                      <>
+                        Actualizar {bulkResults.length} fórmula{bulkResults.length !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

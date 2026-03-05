@@ -258,6 +258,22 @@ export async function createFormula(data: { producto_terminado_id: number; compo
   return apiFetch(`/formulas`, { method: 'POST', body: JSON.stringify(data) });
 }
 
+// Buscar fórmulas por coincidencia parcial de nombre (GET /api/formulas/by-like?q=...)
+export async function searchFormulasByLike(q: string) {
+  if (!q || String(q).trim() === '') throw new Error('q requerido');
+  return apiFetch(`/formulas/by-like?q=${encodeURIComponent(String(q).trim())}`);
+}
+
+// Actualizar precio_venta en masa para fórmulas que coincidan (PATCH /api/formulas/by-like)
+export async function updateFormulasByLike(q: string, precio_venta: number) {
+  if (!q || String(q).trim() === '') throw new Error('q requerido');
+  if (precio_venta == null || isNaN(Number(precio_venta))) throw new Error('precio_venta requerido y debe ser numérico');
+  return apiFetch(`/formulas/by-like`, {
+    method: 'PATCH',
+    body: JSON.stringify({ q: String(q).trim(), precio_venta: Number(precio_venta) }),
+  });
+}
+
 // Tamaños (formats / tamaños de venta)
 // Nota: el endpoint `/api/tamanos` fue removido en el backend y los "tamaños"
 // ahora se modelan como `formulas`. Para mantener compatibilidad con las
