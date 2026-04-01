@@ -21,6 +21,7 @@ import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
+import WhatsappAdmin from "./pages/WhatsappAdmin";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
@@ -78,6 +79,10 @@ const App = () => (
 
             <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
               <Route path="/usuarios" element={<Usuarios />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
+              <Route path="/admin/whatsapp" element={<WhatsappAdmin />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="marcas" />}>

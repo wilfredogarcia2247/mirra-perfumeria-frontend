@@ -853,6 +853,15 @@ export async function cancelarPedidoVenta(id: number) {
 
 // Envío público de pedido (sin Authorization). Útil para checkout público que no requiere token.
 export async function createPedidoVentaPublic(data: any) {
+  const normalizePhoneForWhatsapp = (value: string) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('58')) return digits;
+    if (digits.length === 11 && digits.startsWith('0')) return `58${digits.slice(1)}`;
+    if (digits.length === 10) return `58${digits}`;
+    return digits;
+  };
+
   const url = `${API_URL}/pedidos-venta`;
   // Asegurar que la tasa se envía; por defecto 1
   const payload = { ...data };
@@ -951,7 +960,7 @@ export async function createPedidoVentaPublic(data: any) {
   // se enviarán `productos` (snapshots) y `total` calculado cuando sea posible.
   const finalPayload: any = {};
   finalPayload.nombre_cliente = payload.nombre_cliente;
-  finalPayload.telefono = payload.telefono;
+  finalPayload.telefono = normalizePhoneForWhatsapp(payload.telefono);
   if (payload.cedula !== undefined) finalPayload.cedula = payload.cedula;
   finalPayload.lineas = lines.map((l: any) => {
     const base: any = { producto_id: l.producto_id ?? l.productId ?? l.id, cantidad: Number(l.cantidad ?? 0) };
@@ -1047,6 +1056,7 @@ export async function createPedidoVentaPublic(data: any) {
 // src/integrations/api.ts
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const WHATSAPP_API_URL = import.meta.env.VITE_WHATSAPP_API_URL || "http://localhost:3005";
 
 function getToken() {
   return localStorage.getItem("jwt_token");
@@ -1120,6 +1130,22 @@ export async function uploadImage(file: File) {
 }
 
 export { apiFetch, API_URL, getToken };
+
+export async function getWhatsAppSessionStatus() {
+  const res = await fetch(`${WHATSAPP_API_URL}/api/messages/session/status`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'No se pudo consultar el estado de WhatsApp');
+  }
+
+  const body = await res.json();
+  return body?.data || body;
+}
+
 export async function login(email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",

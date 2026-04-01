@@ -1,4 +1,4 @@
-import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, Square } from "lucide-react";
+import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle } from "lucide-react";
 import { useLocation, Link } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -31,6 +31,7 @@ const menuItems = [
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical, module: 'formulas' as const },
   { title: "Pedidos", url: "/pedidos", icon: Receipt, module: 'pedidos' as const },
   { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' as const },
+  { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' as const },
 ];
 
 export function AppSidebar() {
