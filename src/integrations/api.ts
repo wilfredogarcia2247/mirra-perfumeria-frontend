@@ -1146,6 +1146,21 @@ export async function getWhatsAppSessionStatus() {
   return body?.data || body;
 }
 
+export async function disconnectWhatsAppSession() {
+  const res = await fetch(`${WHATSAPP_API_URL}/api/messages/session/disconnect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'No se pudo desconectar la sesion de WhatsApp');
+  }
+
+  const body = await res.json();
+  return body?.data || body;
+}
+
 export async function login(email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",

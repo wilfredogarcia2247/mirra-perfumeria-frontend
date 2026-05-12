@@ -3,7 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getWhatsAppSessionStatus } from '@/integrations/api';
+import { disconnectWhatsAppSession, getWhatsAppSessionStatus } from '@/integrations/api';
 
 type SessionStatus = {
   ready?: boolean;
@@ -14,6 +14,7 @@ type SessionStatus = {
 export default function WhatsappAdmin() {
   const [status, setStatus] = useState<SessionStatus>({});
   const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -27,6 +28,19 @@ export default function WhatsappAdmin() {
       setLoading(false);
     }
   }, []);
+
+  const handleDisconnect = useCallback(async () => {
+    try {
+      setDisconnecting(true);
+      setError(null);
+      await disconnectWhatsAppSession();
+      await loadStatus();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo desconectar WhatsApp');
+    } finally {
+      setDisconnecting(false);
+    }
+  }, [loadStatus]);
 
   useEffect(() => {
     loadStatus();
@@ -58,6 +72,9 @@ export default function WhatsappAdmin() {
             <div className="flex items-center gap-3">
               <Button onClick={loadStatus} disabled={loading}>
                 {loading ? 'Consultando...' : 'Actualizar ahora'}
+              </Button>
+              <Button variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
+                {disconnecting ? 'Desconectando...' : 'Desconectar telefono'}
               </Button>
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </div>
