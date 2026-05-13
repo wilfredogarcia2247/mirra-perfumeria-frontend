@@ -19,9 +19,12 @@ type SessionStatus = {
     lastQrAt?: string | null;
     lastReadyAt?: string | null;
     lastAuthFailureAt?: string | null;
+    lastAuthFailureMessage?: string | null;
     lastDisconnectedAt?: string | null;
     lastDisconnectReason?: string | null;
   };
+  statusCode?: string;
+  statusMessage?: string;
   lastSendAttempt?: {
     to?: string;
     status?: string;
@@ -101,6 +104,18 @@ export default function WhatsappAdmin() {
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </div>
 
+            <div
+              className={`rounded-md border p-3 text-sm ${
+                status.statusCode === 'connected'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : status.statusCode === 'auth_failure'
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-amber-200 bg-amber-50 text-amber-700'
+              }`}
+            >
+              {status.statusMessage || 'Esperando estado de vinculacion...'}
+            </div>
+
             {status.ready ? (
               <div className="space-y-3 rounded-md border p-4 text-sm text-muted-foreground">
                 <p>WhatsApp ya esta conectado. Este numero ya puede enviar mensajes.</p>
@@ -138,6 +153,7 @@ export default function WhatsappAdmin() {
               <p>Error: {status.lastSendAttempt?.error || 'Ninguno'}</p>
               <p>Preview: {status.lastSendAttempt?.textPreview || 'N/D'}</p>
               <p>Ultimo auth_failure: {status.events?.lastAuthFailureAt || 'N/D'}</p>
+              <p>Detalle auth_failure: {status.events?.lastAuthFailureMessage || 'N/D'}</p>
               <p>Ultima desconexion: {status.events?.lastDisconnectedAt || 'N/D'}</p>
             </div>
           </CardContent>
