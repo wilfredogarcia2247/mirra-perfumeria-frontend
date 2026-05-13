@@ -3,7 +3,11 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { disconnectWhatsAppSession, getWhatsAppSessionStatus } from '@/integrations/api';
+import {
+  disconnectWhatsAppSession,
+  getWhatsAppSessionStatus,
+  resetWhatsAppSessionStorage,
+} from '@/integrations/api';
 
 type SessionStatus = {
   ready?: boolean;
@@ -40,6 +44,7 @@ export default function WhatsappAdmin() {
   const [status, setStatus] = useState<SessionStatus>({});
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -64,6 +69,19 @@ export default function WhatsappAdmin() {
       setError(err?.message || 'No se pudo desconectar WhatsApp');
     } finally {
       setDisconnecting(false);
+    }
+  }, [loadStatus]);
+
+  const handleResetStorage = useCallback(async () => {
+    try {
+      setResetting(true);
+      setError(null);
+      await resetWhatsAppSessionStorage();
+      await loadStatus();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo limpiar la sesion/cache de WhatsApp');
+    } finally {
+      setResetting(false);
     }
   }, [loadStatus]);
 
@@ -100,6 +118,9 @@ export default function WhatsappAdmin() {
               </Button>
               <Button variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
                 {disconnecting ? 'Desconectando...' : 'Desconectar telefono'}
+              </Button>
+              <Button variant="outline" onClick={handleResetStorage} disabled={resetting}>
+                {resetting ? 'Limpiando...' : 'Limpiar sesion y cache'}
               </Button>
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </div>

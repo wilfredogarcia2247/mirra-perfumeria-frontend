@@ -1161,6 +1161,21 @@ export async function disconnectWhatsAppSession() {
   return body?.data || body;
 }
 
+export async function resetWhatsAppSessionStorage() {
+  const res = await fetch(`${WHATSAPP_API_URL}/api/messages/session/reset-storage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'No se pudo limpiar la sesion/cache de WhatsApp');
+  }
+
+  const body = await res.json();
+  return body?.data || body;
+}
+
 export async function login(email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
