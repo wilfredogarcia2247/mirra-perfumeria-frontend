@@ -9,6 +9,28 @@ type SessionStatus = {
   ready?: boolean;
   hasQr?: boolean;
   qrImage?: string | null;
+  device?: {
+    wid?: string | null;
+    phone?: string | null;
+    pushname?: string | null;
+    platform?: string | null;
+  } | null;
+  events?: {
+    lastQrAt?: string | null;
+    lastReadyAt?: string | null;
+    lastAuthFailureAt?: string | null;
+    lastDisconnectedAt?: string | null;
+    lastDisconnectReason?: string | null;
+  };
+  lastSendAttempt?: {
+    to?: string;
+    status?: string;
+    createdAt?: string;
+    finishedAt?: string;
+    error?: string;
+    messageId?: string | null;
+    textPreview?: string;
+  } | null;
 };
 
 export default function WhatsappAdmin() {
@@ -80,8 +102,12 @@ export default function WhatsappAdmin() {
             </div>
 
             {status.ready ? (
-              <div className="rounded-md border p-4 text-sm text-muted-foreground">
-                WhatsApp ya esta conectado. Este numero ya puede enviar mensajes.
+              <div className="space-y-3 rounded-md border p-4 text-sm text-muted-foreground">
+                <p>WhatsApp ya esta conectado. Este numero ya puede enviar mensajes.</p>
+                <p>Numero conectado: {status.device?.phone || 'N/D'}</p>
+                <p>Cuenta: {status.device?.pushname || 'N/D'}</p>
+                <p>Plataforma: {status.device?.platform || 'N/D'}</p>
+                <p>Ultima conexion: {status.events?.lastReadyAt || 'N/D'}</p>
               </div>
             ) : status.hasQr && status.qrImage ? (
               <div className="space-y-3">
@@ -101,6 +127,19 @@ export default function WhatsappAdmin() {
                 Aun no hay QR disponible. Espera unos segundos o reinicia el microservicio de WhatsApp.
               </p>
             )}
+
+            <div className="rounded-md border p-4 text-sm text-muted-foreground space-y-2">
+              <p className="font-medium text-foreground">Estado de envio mas reciente</p>
+              <p>Intento: {status.lastSendAttempt?.createdAt || 'Sin intentos'}</p>
+              <p>Destino: {status.lastSendAttempt?.to || 'N/D'}</p>
+              <p>Resultado: {status.lastSendAttempt?.status || 'N/D'}</p>
+              <p>Finalizo: {status.lastSendAttempt?.finishedAt || 'N/D'}</p>
+              <p>ID mensaje: {status.lastSendAttempt?.messageId || 'N/D'}</p>
+              <p>Error: {status.lastSendAttempt?.error || 'Ninguno'}</p>
+              <p>Preview: {status.lastSendAttempt?.textPreview || 'N/D'}</p>
+              <p>Ultimo auth_failure: {status.events?.lastAuthFailureAt || 'N/D'}</p>
+              <p>Ultima desconexion: {status.events?.lastDisconnectedAt || 'N/D'}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
