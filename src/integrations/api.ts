@@ -1176,6 +1176,21 @@ export async function resetWhatsAppSessionStorage() {
   return body?.data || body;
 }
 
+export async function recoverWhatsAppProfileLock() {
+  const res = await fetch(`${WHATSAPP_API_URL}/api/messages/session/recover-lock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'No se pudo limpiar el bloqueo de Chromium');
+  }
+
+  const body = await res.json();
+  return body?.data || body;
+}
+
 export async function login(email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",

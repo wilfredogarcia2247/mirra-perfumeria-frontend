@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import {
   disconnectWhatsAppSession,
   getWhatsAppSessionStatus,
+  recoverWhatsAppProfileLock,
   resetWhatsAppSessionStorage,
 } from '@/integrations/api';
 
@@ -44,6 +45,7 @@ export default function WhatsappAdmin() {
   const [status, setStatus] = useState<SessionStatus>({});
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [recoveringLock, setRecoveringLock] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +87,19 @@ export default function WhatsappAdmin() {
     }
   }, [loadStatus]);
 
+  const handleRecoverLock = useCallback(async () => {
+    try {
+      setRecoveringLock(true);
+      setError(null);
+      await recoverWhatsAppProfileLock();
+      await loadStatus();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo limpiar el bloqueo de perfil Chromium');
+    } finally {
+      setRecoveringLock(false);
+    }
+  }, [loadStatus]);
+
   useEffect(() => {
     loadStatus();
     const interval = setInterval(loadStatus, 5000);
@@ -118,6 +133,9 @@ export default function WhatsappAdmin() {
               </Button>
               <Button variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
                 {disconnecting ? 'Desconectando...' : 'Desconectar telefono'}
+              </Button>
+              <Button variant="secondary" onClick={handleRecoverLock} disabled={recoveringLock}>
+                {recoveringLock ? 'Recuperando bloqueo...' : 'Reparar bloqueo Chromium'}
               </Button>
               <Button variant="outline" onClick={handleResetStorage} disabled={resetting}>
                 {resetting ? 'Limpiando...' : 'Limpiar sesion y cache'}
