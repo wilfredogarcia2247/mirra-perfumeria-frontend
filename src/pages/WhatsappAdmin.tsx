@@ -1,200 +1,183 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  disconnectWhatsAppSession,
   getWhatsAppSessionStatus,
-  recoverWhatsAppProfileLock,
-  resetWhatsAppSessionStorage,
+  getOutboundOrderWhatsAppMessages,
+  sendWahaTextMessage,
 } from '@/integrations/api';
 
-type SessionStatus = {
-  ready?: boolean;
-  hasQr?: boolean;
-  qrImage?: string | null;
-  device?: {
-    wid?: string | null;
-    phone?: string | null;
-    pushname?: string | null;
-    platform?: string | null;
-  } | null;
-  events?: {
-    lastQrAt?: string | null;
-    lastReadyAt?: string | null;
-    lastAuthFailureAt?: string | null;
-    lastAuthFailureMessage?: string | null;
-    lastDisconnectedAt?: string | null;
-    lastDisconnectReason?: string | null;
-  };
-  statusCode?: string;
-  statusMessage?: string;
-  lastSendAttempt?: {
-    to?: string;
-    status?: string;
-    createdAt?: string;
-    finishedAt?: string;
-    error?: string;
-    messageId?: string | null;
-    textPreview?: string;
-  } | null;
-};
-
 export default function WhatsappAdmin() {
-  const [status, setStatus] = useState<SessionStatus>({});
+  const [sessionName, setSessionName] = useState('default');
+  const [to, setTo] = useState('');
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [recoveringLock, setRecoveringLock] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<any>(null);
 
-  const loadStatus = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await getWhatsAppSessionStatus();
-      setStatus(data || {});
-    } catch (err: any) {
-      setError(err?.message || 'Error consultando estado de WhatsApp');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [orderMessages, setOrderMessages] = useState<any[]>([]);
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      setDisconnecting(true);
-      setError(null);
-      await disconnectWhatsAppSession();
-      await loadStatus();
-    } catch (err: any) {
-      setError(err?.message || 'No se pudo desconectar WhatsApp');
-    } finally {
-      setDisconnecting(false);
-    }
-  }, [loadStatus]);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  const handleResetStorage = useCallback(async () => {
-    try {
-      setResetting(true);
-      setError(null);
-      await resetWhatsAppSessionStorage();
-      await loadStatus();
-    } catch (err: any) {
-      setError(err?.message || 'No se pudo limpiar la sesion/cache de WhatsApp');
-    } finally {
-      setResetting(false);
-    }
-  }, [loadStatus]);
+    let nextError = '';
 
-  const handleRecoverLock = useCallback(async () => {
     try {
-      setRecoveringLock(true);
-      setError(null);
-      await recoverWhatsAppProfileLock();
-      await loadStatus();
+      const statusData = await getWhatsAppSessionStatus(sessionName);
+      setConnectionStatus(statusData || null);
     } catch (err: any) {
-      setError(err?.message || 'No se pudo limpiar el bloqueo de perfil Chromium');
-    } finally {
-      setRecoveringLock(false);
+      nextError = `Estado: ${err?.message || 'sin respuesta'}`;
+      setConnectionStatus(null);
     }
-  }, [loadStatus]);
+
+    try {
+      const orderData = await getOutboundOrderWhatsAppMessages();
+      setOrderMessages(Array.isArray(orderData) ? orderData : []);
+    } catch (err: any) {
+      nextError = nextError
+        ? `${nextError} | Pedidos: ${err?.message || 'sin respuesta'}`
+        : `Pedidos: ${err?.message || 'sin respuesta'}`;
+      setOrderMessages([]);
+    }
+
+    if (nextError) {
+      setError(nextError);
+    }
+    setLoading(false);
+  }, [sessionName]);
+
+  const isConnected =
+    connectionStatus?.ready ||
+    connectionStatus?.statusCode === 'working' ||
+    String(connectionStatus?.statusMessage || '').toLowerCase().includes('working');
+
+  const handleSend = useCallback(async () => {
+    try {
+      if (!to.trim() || !text.trim()) {
+        setError('Debes llenar destino y mensaje');
+        return;
+      }
+      setSending(true);
+      setError(null);
+      await sendWahaTextMessage(sessionName, to, text);
+      setText('');
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo enviar el mensaje');
+    } finally {
+      setSending(false);
+    }
+  }, [loadData, sessionName, text, to]);
 
   useEffect(() => {
-    loadStatus();
-    const interval = setInterval(loadStatus, 5000);
+    loadData();
+    const interval = setInterval(loadData, 8000);
     return () => clearInterval(interval);
-  }, [loadStatus]);
+  }, [loadData]);
 
   return (
     <Layout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Admin WhatsApp</h2>
-          <p className="text-muted-foreground">
-            Escanea este QR con el telefono que enviara notificaciones de pedidos.
-          </p>
+          <h2 className="text-3xl font-bold tracking-tight">WhatsApp (WAHA)</h2>
+          <p className="text-muted-foreground">Centro de mensajeria, contactos y seguimiento de pedidos.</p>
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div>
-              <CardTitle>Estado de sesion</CardTitle>
-              <CardDescription>Actualizacion automatica cada 5 segundos.</CardDescription>
-            </div>
-            <Badge variant={status.ready ? 'default' : 'secondary'}>
-              {status.ready ? 'Conectado' : 'Pendiente de vinculacion'}
-            </Badge>
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle>Estado de conexion</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Button onClick={loadStatus} disabled={loading}>
-                {loading ? 'Consultando...' : 'Actualizar ahora'}
-              </Button>
-              <Button variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
-                {disconnecting ? 'Desconectando...' : 'Desconectar telefono'}
-              </Button>
-              <Button variant="secondary" onClick={handleRecoverLock} disabled={recoveringLock}>
-                {recoveringLock ? 'Recuperando bloqueo...' : 'Reparar bloqueo Chromium'}
-              </Button>
-              <Button variant="outline" onClick={handleResetStorage} disabled={resetting}>
-                {resetting ? 'Limpiando...' : 'Limpiar sesion y cache'}
-              </Button>
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            </div>
-
-            <div
-              className={`rounded-md border p-3 text-sm ${
-                status.statusCode === 'connected'
-                  ? 'border-green-200 bg-green-50 text-green-800'
-                  : status.statusCode === 'auth_failure'
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : 'border-amber-200 bg-amber-50 text-amber-700'
-              }`}
-            >
-              {status.statusMessage || 'Esperando estado de vinculacion...'}
-            </div>
-
-            {status.ready ? (
-              <div className="space-y-3 rounded-md border p-4 text-sm text-muted-foreground">
-                <p>WhatsApp ya esta conectado. Este numero ya puede enviar mensajes.</p>
-                <p>Numero conectado: {status.device?.phone || 'N/D'}</p>
-                <p>Cuenta: {status.device?.pushname || 'N/D'}</p>
-                <p>Plataforma: {status.device?.platform || 'N/D'}</p>
-                <p>Ultima conexion: {status.events?.lastReadyAt || 'N/D'}</p>
-              </div>
-            ) : status.hasQr && status.qrImage ? (
-              <div className="space-y-3">
-                <div className="inline-flex rounded-md border bg-white p-3">
-                  <img
-                    src={status.qrImage}
-                    alt="QR de WhatsApp"
-                    className="h-72 w-72 max-w-full"
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Abre WhatsApp en tu telefono, entra a Dispositivos vinculados y escanea el QR.
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Aun no hay QR disponible. Espera unos segundos o reinicia el microservicio de WhatsApp.
+          <CardContent className="grid gap-3 pt-4 text-sm md:grid-cols-5">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Estado</p>
+              <p className={`font-semibold ${isConnected ? 'text-green-600' : 'text-amber-600'}`}>
+                {isConnected ? 'Conectado' : 'No conectado'}
               </p>
-            )}
-
-            <div className="rounded-md border p-4 text-sm text-muted-foreground space-y-2">
-              <p className="font-medium text-foreground">Estado de envio mas reciente</p>
-              <p>Intento: {status.lastSendAttempt?.createdAt || 'Sin intentos'}</p>
-              <p>Destino: {status.lastSendAttempt?.to || 'N/D'}</p>
-              <p>Resultado: {status.lastSendAttempt?.status || 'N/D'}</p>
-              <p>Finalizo: {status.lastSendAttempt?.finishedAt || 'N/D'}</p>
-              <p>ID mensaje: {status.lastSendAttempt?.messageId || 'N/D'}</p>
-              <p>Error: {status.lastSendAttempt?.error || 'Ninguno'}</p>
-              <p>Preview: {status.lastSendAttempt?.textPreview || 'N/D'}</p>
-              <p>Ultimo auth_failure: {status.events?.lastAuthFailureAt || 'N/D'}</p>
-              <p>Detalle auth_failure: {status.events?.lastAuthFailureMessage || 'N/D'}</p>
-              <p>Ultima desconexion: {status.events?.lastDisconnectedAt || 'N/D'}</p>
             </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Sesion</p>
+              <p className="font-semibold">{sessionName || 'default'}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Detalle</p>
+              <p className="font-semibold">{connectionStatus?.statusMessage || 'Sin informacion'}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Numero</p>
+              <p className="font-semibold">{connectionStatus?.device?.phone || 'N/D'}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Cuenta</p>
+              <p className="font-semibold">{connectionStatus?.device?.pushname || 'N/D'}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle>Envio manual</CardTitle>
+            <CardDescription>
+              La conexion/sesion se gestiona en el dashboard de WAHA. Aqui solo operas mensajes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 md:grid-cols-12">
+              <label className="text-sm">Session:</label>
+              <input
+                value={sessionName}
+                onChange={(e) => setSessionName(e.target.value)}
+                className="h-9 rounded border px-2 text-sm md:col-span-2"
+                placeholder="default"
+              />
+              <input
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="h-9 rounded border px-2 text-sm md:col-span-3"
+                placeholder="Telefono o chatId"
+              />
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="min-h-20 rounded border px-2 py-2 text-sm md:col-span-4"
+                placeholder="Escribe el mensaje"
+              />
+              <Button className="md:col-span-1" onClick={handleSend} disabled={sending}>
+                {sending ? 'Enviando...' : 'Enviar'}
+              </Button>
+              <Button className="md:col-span-1" variant="outline" onClick={loadData} disabled={loading}>
+                {loading ? 'Actualizando...' : 'Actualizar'}
+              </Button>
+            </div>
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle>Mensajes enviados por pedidos</CardTitle>
+            <CardDescription>Registro interno de los envios automáticos del backend.</CardDescription>
+          </CardHeader>
+          <CardContent className="max-h-[360px] space-y-2 overflow-auto pt-4">
+            {orderMessages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aun no hay mensajes de pedidos registrados.</p>
+            ) : (
+              orderMessages.slice(0, 30).map((item, index) => (
+                <div key={index} className="rounded-lg border p-3 text-sm">
+                  <p className="text-xs text-muted-foreground">Fecha: {item?.createdAt || 'N/D'}</p>
+                  <p>
+                    <span className="font-medium">Tipo:</span> {item?.meta?.type || 'N/D'} |{' '}
+                    <span className="font-medium">Pedido:</span> {item?.meta?.orderId || 'N/D'}
+                  </p>
+                  <p>
+                    <span className="font-medium">Destino:</span> {item?.to || item?.chatId || 'N/D'}
+                  </p>
+                  <p className="mt-1">{item?.text || 'N/D'}</p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
