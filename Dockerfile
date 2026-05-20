@@ -27,8 +27,23 @@ ENV VITE_MINIO_BUCKET=${VITE_MINIO_BUCKET}
 ENV VITE_CLOUDINARY_CLOUD_NAME=${VITE_CLOUDINARY_CLOUD_NAME}
 ENV VITE_CLOUDINARY_UPLOAD_PRESET=${VITE_CLOUDINARY_UPLOAD_PRESET}
 
-# (Opcional pero útil) imprime para verificar en logs que llegaron los args
-RUN echo "VITE_API_URL=$VITE_API_URL" && echo "VITE_WHATSAPP_API_URL=$VITE_WHATSAPP_API_URL" && npm run build
+# Debug de variables en build (sin exponer secretos completos)
+RUN set -eu; \
+  echo "--- Build args debug ---"; \
+  echo "VITE_API_URL=${VITE_API_URL:-<empty>}"; \
+  echo "VITE_WHATSAPP_API_URL=${VITE_WHATSAPP_API_URL:-<empty>}"; \
+  if [ -n "${VITE_WAHA_API_KEY:-}" ]; then \
+    echo "VITE_WAHA_API_KEY=<set> (len=${#VITE_WAHA_API_KEY})"; \
+  else \
+    echo "VITE_WAHA_API_KEY=<empty>"; \
+  fi; \
+  echo "VITE_CLOUDINARY_CLOUD_NAME=${VITE_CLOUDINARY_CLOUD_NAME:-<empty>}"; \
+  echo "VITE_CLOUDINARY_UPLOAD_PRESET=${VITE_CLOUDINARY_UPLOAD_PRESET:-<empty>}"; \
+  if [ -z "${VITE_WHATSAPP_API_URL:-}" ]; then \
+    echo "ERROR: VITE_WHATSAPP_API_URL is empty during build"; \
+    exit 1; \
+  fi; \
+  npm run build
 
 
 # Etapa 2: Production
