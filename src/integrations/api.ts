@@ -1152,8 +1152,38 @@ async function wahaFetch(path: string, options: RequestInit = {}) {
     headers,
   });
   const raw = await res.text();
-  const body = raw ? JSON.parse(raw) : null;
-  if (!res.ok) throw new Error(body?.message || body?.error || `WAHA error ${res.status}`);
+  let body: any = null;
+  try {
+    body = raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    body = null;
+  }
+
+  if (!res.ok) {
+    const detail = {
+      url: `${WAHA_URL}${path}`,
+      method: options.method || 'GET',
+      status: res.status,
+      statusText: res.statusText,
+      requestHeaders: headers,
+      requestBody: typeof options.body === 'string' ? options.body : '[non-string body]',
+      responseBodyParsed: body,
+      responseBodyRaw: raw,
+    };
+
+    try {
+      // eslint-disable-next-line no-console
+      console.error('[WAHA] request failed', detail);
+    } catch (error) {
+      // ignore console serialization errors
+    }
+
+    throw new Error(
+      body?.message ||
+      body?.error ||
+      `WAHA error ${res.status} ${res.statusText} on ${options.method || 'GET'} ${path}`,
+    );
+  }
   return body;
 }
 
@@ -1205,7 +1235,7 @@ export async function getWhatsAppSessionStatus(session?: string) {
 
     let qrData = null;
     if (sessionData?.status === 'SCAN_QR_CODE') {
-      qrData = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/auth/qr`, { method: 'POST' });
+      qrData = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/auth/qr`);
     }
     return mapWahaSessionStatus(sessionData, qrData, sessionName);
   }
@@ -1295,16 +1325,17 @@ export async function getOutboundOrderWhatsAppMessages() {
 export async function listWahaChats(session?: string) {
   if (!WAHA_URL) return [];
   const sessionName = (session || 'default').trim() || 'default';
-  const body = await wahaFetch(`/api/chats?session=${encodeURIComponent(sessionName)}`);
+  const body = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/chats`);
   return Array.isArray(body) ? body : body?.data || [];
 }
 
 export async function listWahaMessages(session?: string, chatId?: string) {
   if (!WAHA_URL) return [];
   const sessionName = (session || 'default').trim() || 'default';
-  const params = new URLSearchParams({ session: sessionName });
-  if (chatId) params.set('chatId', chatId);
-  const body = await wahaFetch(`/api/messages?${params.toString()}`);
+  if (!chatId) return [];
+  const body = await wahaFetch(
+    `/api/${encodeURIComponent(sessionName)}/chats/${encodeURIComponent(chatId)}/messages`,
+  );
   return Array.isArray(body) ? body : body?.data || [];
 }
 
