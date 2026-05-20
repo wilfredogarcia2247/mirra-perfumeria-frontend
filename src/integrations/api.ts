@@ -1132,8 +1132,16 @@ export async function uploadImage(file: File) {
 
 export { apiFetch, API_URL, getToken };
 
+function wahaConfigError(context: string) {
+  const host = typeof window !== 'undefined' ? window.location.host : 'unknown-host';
+  const mode = import.meta.env.MODE || 'unknown-mode';
+  return new Error(
+    `[${context}] VITE_WHATSAPP_API_URL no configurado. WAHA_URL="${WAHA_URL}" MODE="${mode}" HOST="${host}"`,
+  );
+}
+
 async function wahaFetch(path: string, options: RequestInit = {}) {
-  if (!WAHA_URL) throw new Error('VITE_WHATSAPP_API_URL no configurado');
+  if (!WAHA_URL) throw wahaConfigError('wahaFetch');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {}),
@@ -1301,7 +1309,7 @@ export async function listWahaMessages(session?: string, chatId?: string) {
 }
 
 export async function sendWahaTextMessage(session: string, to: string, text: string) {
-  if (!WAHA_URL) throw new Error('VITE_WHATSAPP_API_URL no configurado');
+  if (!WAHA_URL) throw wahaConfigError('sendWahaTextMessage');
   const cleanSession = (session || 'default').trim() || 'default';
   const chatId = to.includes('@') ? to : `${to.replace(/\D/g, '')}@c.us`;
   return wahaFetch('/api/sendText', {
