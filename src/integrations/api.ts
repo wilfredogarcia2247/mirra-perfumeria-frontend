@@ -557,6 +557,15 @@ export async function createClienteBanco(data: any) {
 export async function getPagos() {
   return apiFetch("/pagos");
 }
+
+export async function getVentasPorMetodoMoneda() {
+  return apiFetch('/pagos/resumen-metodo-moneda');
+}
+
+export async function getClientesTopResumen(limit = 10, pedidosLimit = 5) {
+  return apiFetch(`/pedidos-venta/clientes-top-resumen?limit=${encodeURIComponent(String(limit))}&pedidos_limit=${encodeURIComponent(String(pedidosLimit))}`);
+}
+
 // Obtener pagos por pedido: GET /api/pedidos-venta/:id/pagos
 export async function getPagosByPedido(id: number) {
   try {

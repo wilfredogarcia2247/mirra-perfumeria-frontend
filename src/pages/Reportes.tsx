@@ -1,6 +1,6 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getFormasPago, getPagos, getPedidos, getProductos } from '@/integrations/api';
+import { getClientesTopResumen, getPedidos, getProductos, getVentasPorMetodoMoneda } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -16,7 +16,7 @@ type ReportSlug =
   | 'rentabilidad'
   | 'ticket-promedio';
 
-type DataKey = 'pedidos' | 'pagos' | 'productos' | 'formasPago';
+type DataKey = 'pedidos' | 'productos' | 'ventasMetodo' | 'clientesResumen';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
@@ -36,11 +36,11 @@ const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'final
 const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   'resumen-general': ['pedidos', 'productos'],
   'ventas-periodo': ['pedidos'],
-  'ventas-metodo': ['pagos', 'formasPago'],
+  'ventas-metodo': ['ventasMetodo'],
   'productos-favoritos': ['pedidos'],
   inventario: ['productos'],
   'pedidos-estado': ['pedidos'],
-  clientes: ['pedidos'],
+  clientes: ['clientesResumen'],
   compras: ['pedidos', 'productos'],
   rentabilidad: ['pedidos', 'productos'],
   'ticket-promedio': ['pedidos'],
@@ -48,9 +48,9 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
 
 const DATA_LABELS: Record<DataKey, string> = {
   pedidos: 'pedidos',
-  pagos: 'pagos',
   productos: 'productos',
-  formasPago: 'formas de pago',
+  ventasMetodo: 'ventas por metodo',
+  clientesResumen: 'clientes top',
 };
 
 function parseNumber(value: any): number {
@@ -103,14 +103,14 @@ export default function Reportes() {
 
   const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
-  const [pagos, setPagos] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
-  const [formasPago, setFormasPago] = useState<any[]>([]);
+  const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
+  const [clientesResumen, setClientesResumen] = useState<any[]>([]);
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
-    pagos: false,
     productos: false,
-    formasPago: false,
+    ventasMetodo: false,
+    clientesResumen: false,
   });
 
   useEffect(() => {
@@ -141,27 +141,27 @@ export default function Reportes() {
             if (cancelled) return;
             setPedidos(Array.isArray(res) ? res : (res?.data || []));
           }
-          if (key === 'pagos') {
-            const res = await getPagos();
+          if (key === 'ventasMetodo') {
+            const res = await getVentasPorMetodoMoneda();
             if (cancelled) return;
-            setPagos(Array.isArray(res) ? res : (res?.data || []));
+            setVentasMetodo(Array.isArray(res) ? res : (res?.data || []));
           }
           if (key === 'productos') {
             const res = await getProductos();
             if (cancelled) return;
             setProductos(Array.isArray(res) ? res : (res?.data || []));
           }
-          if (key === 'formasPago') {
-            const res = await getFormasPago();
+          if (key === 'clientesResumen') {
+            const res = await getClientesTopResumen(10, 6);
             if (cancelled) return;
-            setFormasPago(Array.isArray(res) ? res : (res?.data || []));
+            setClientesResumen(Array.isArray(res) ? res : (res?.data || []));
           }
         } catch (error) {
           if (cancelled) return;
           if (key === 'pedidos') setPedidos([]);
-          if (key === 'pagos') setPagos([]);
           if (key === 'productos') setProductos([]);
-          if (key === 'formasPago') setFormasPago([]);
+          if (key === 'ventasMetodo') setVentasMetodo([]);
+          if (key === 'clientesResumen') setClientesResumen([]);
         }
 
         if (cancelled) return;
@@ -222,7 +222,11 @@ export default function Reportes() {
         orderTotal += subtotal;
         const key = String(item?.producto_id ?? item?.id ?? item?.nombre_producto ?? 'desconocido');
         const nombre = String(item?.nombre_producto || item?.nombre || `Producto ${key}`);
-        const baseName = getBaseProductName(nombre);
+        const productoIdNum = Number(item?.producto_id ?? item?.id);
+        const nombreInventario = Number.isFinite(productoIdNum)
+          ? String(productos.find((p: any) => Number(p?.id) === productoIdNum)?.nombre || '')
+          : '';
+        const baseName = getBaseProductName(nombreInventario || nombre);
         const presentacion = getPresentationMl(nombre);
         const current = productSales[key] || { nombre, cantidad: 0, monto: 0 };
         current.cantidad += qty;
@@ -235,7 +239,7 @@ export default function Reportes() {
         pCurrent.precioPromedio = pCurrent.cantidad > 0 ? pCurrent.monto / pCurrent.cantidad : 0;
         presentationSales[presentacion] = pCurrent;
 
-        const bKey = String(item?.producto_id ?? baseName);
+        const bKey = Number.isFinite(productoIdNum) ? `id:${productoIdNum}` : `name:${baseName}`;
         const bCurrent = productBehavior[bKey] || { baseName, pedidos: 0, cantidad: 0, precios: [], nombres: new Set<string>(), presentaciones: new Set<string>() };
         bCurrent.pedidos += 1;
         bCurrent.cantidad += qty;
@@ -261,21 +265,20 @@ export default function Reportes() {
     }
 
     const salesTotal = Object.values(monthlySales).reduce((acc, n) => acc + n, 0);
-    const formaPagoMap = new Map<string, string>();
-    for (const forma of formasPago) {
-      const id = String(forma?.id ?? '');
-      const nombre = String(forma?.nombre || forma?.descripcion || `Metodo ${id}`);
-      if (id) formaPagoMap.set(id, nombre);
-    }
-    const pagosPorMetodo: Record<string, { monto: number; cantidad: number }> = {};
-    for (const pago of pagos) {
-      const methodId = String(pago?.forma_pago_id ?? '');
-      const metodo = String(pago?.forma_pago_nombre || formaPagoMap.get(methodId) || pago?.forma_pago_descripcion || `Metodo ${methodId || 'N/A'}`);
-      const current = pagosPorMetodo[metodo] || { monto: 0, cantidad: 0 };
-      current.monto += parseNumber(pago?.monto);
-      current.cantidad += 1;
-      pagosPorMetodo[metodo] = current;
-    }
+    const pagosPorMetodo = (ventasMetodo || [])
+      .map((item: any) => ({
+        metodo: String(item?.metodo || 'Metodo no definido'),
+        monto_total: parseNumber(item?.monto_total),
+        cantidad_total: parseNumber(item?.cantidad_total),
+        monedas: Array.isArray(item?.monedas)
+          ? item.monedas.map((m: any) => ({
+            moneda: String(m?.moneda || 'SIN_MONEDA'),
+            monto: parseNumber(m?.monto),
+            cantidad: parseNumber(m?.cantidad),
+          }))
+          : [],
+      }))
+      .sort((a: any, b: any) => b.monto_total - a.monto_total);
 
     const withoutStockProducts = productos
       .filter((p: any) => parseNumber(p?.stock) <= 0)
@@ -327,9 +330,15 @@ export default function Reportes() {
           presentaciones: Array.from(it.presentaciones),
           nombres: Array.from(it.nombres),
         };
-      })
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 8);
+      });
+
+    const topProductosPorCantidad = [...behaviorRows]
+      .sort((a, b) => b.cantidad - a.cantidad || b.pedidos - a.pedidos)
+      .slice(0, 10);
+
+    const topProductosPorApariciones = [...behaviorRows]
+      .sort((a, b) => b.pedidos - a.pedidos || b.cantidad - a.cantidad)
+      .slice(0, 10);
 
     const productStockMap = new Map<string, any>();
     for (const p of productos) {
@@ -337,7 +346,7 @@ export default function Reportes() {
       if (name) productStockMap.set(normalizeText(name), p);
     }
 
-    const restockPriorities = behaviorRows
+    const restockPriorities = topProductosPorCantidad
       .map((row) => {
         const match = productStockMap.get(normalizeText(row.nombreBase));
         const stock = parseNumber(match?.stock);
@@ -370,7 +379,10 @@ export default function Reportes() {
       ordersByStatus,
       pagosPorMetodo,
       topProducts: Object.values(productSales).sort((a, b) => b.cantidad - a.cantidad).slice(0, 10),
-      topCustomers: Object.values(customerSales).sort((a, b) => b.pedidos - a.pedidos).slice(0, 10),
+      topCustomers: (clientesResumen.length > 0
+        ? clientesResumen
+        : Object.values(customerSales)
+      ).sort((a: any, b: any) => parseNumber(b?.monto) - parseNumber(a?.monto)).slice(0, 10),
       totalProductos: productos.length,
       withoutStock,
       lowStock,
@@ -384,6 +396,8 @@ export default function Reportes() {
       businessStatus,
       businessReason,
       behaviorRows,
+      topProductosPorCantidad,
+      topProductosPorApariciones,
       restockPriorities,
       withoutStockProducts,
       lowStockProducts,
@@ -391,7 +405,7 @@ export default function Reportes() {
       utilidadEstimada,
       ticketPromedio,
     };
-  }, [formasPago, pagos, pedidos, productos]);
+  }, [clientesResumen, pedidos, productos, ventasMetodo]);
 
   const renderReport = () => {
     if (loadingInfo.active) {
@@ -443,13 +457,22 @@ export default function Reportes() {
         <Card>
           <CardHeader><CardTitle>Ventas por metodo de pago</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {Object.entries(metrics.pagosPorMetodo).sort((a, b) => b[1].monto - a[1].monto).map(([metodo, data]) => (
-              <div key={metodo} className="flex items-center justify-between rounded-md border p-3">
-                <span>{metodo}</span>
-                <div className="text-right">
-                  <strong>${data.monto.toFixed(2)}</strong>
-                  <p className="text-xs text-muted-foreground">{data.cantidad} pagos</p>
+            {metrics.pagosPorMetodo.length === 0 && <p className="text-sm text-muted-foreground">No hay pagos para mostrar.</p>}
+            {metrics.pagosPorMetodo.map((data: any) => (
+              <div key={data.metodo} className="rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <span>{data.metodo}</span>
+                  <div className="text-right">
+                    <strong>{data.monto_total.toFixed(2)}</strong>
+                    <p className="text-xs text-muted-foreground">{data.cantidad_total} pagos</p>
+                  </div>
                 </div>
+                {data.monedas.map((m: any) => (
+                  <div key={`${data.metodo}-${m.moneda}`} className="mt-2 flex items-center justify-between rounded border bg-muted/40 px-2 py-1 text-sm">
+                    <span>{m.moneda}</span>
+                    <span>{m.monto.toFixed(2)} ({m.cantidad} pagos)</span>
+                  </div>
+                ))}
               </div>
             ))}
           </CardContent>
@@ -459,22 +482,43 @@ export default function Reportes() {
 
     if (selectedReport === 'productos-favoritos') {
       return (
-        <Card>
-          <CardHeader><CardTitle>Top productos y variacion de nombre/precio</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {metrics.behaviorRows.map((item, index) => (
-              <div key={`${item.nombreBase}-${index}`} className="rounded-md border p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span>{index + 1}. {item.nombreBase}</span>
-                  <span>{item.cantidad} uds</span>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle>Mas vendidos por cantidad</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {metrics.topProductosPorCantidad.map((item: any, index: number) => (
+                <div key={`cant-${item.nombreBase}-${index}`} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{index + 1}. {item.nombreBase}</span>
+                    <span>{item.cantidad} uds</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Aparece en {item.pedidos} pedidos | Precio prom: ${item.precioProm.toFixed(2)}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Presentaciones: {item.presentaciones.join(', ')} | Precio min: ${item.precioMin.toFixed(2)} | Precio max: ${item.precioMax.toFixed(2)} | Precio prom: ${item.precioProm.toFixed(2)}
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+              {metrics.topProductosPorCantidad.length === 0 && <p className="text-sm text-muted-foreground">Sin datos de ventas.</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Mas frecuentes en pedidos</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {metrics.topProductosPorApariciones.map((item: any, index: number) => (
+                <div key={`ped-${item.nombreBase}-${index}`} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{index + 1}. {item.nombreBase}</span>
+                    <span>{item.pedidos} pedidos</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Cantidad vendida: {item.cantidad} uds | Precio prom: ${item.precioProm.toFixed(2)}
+                  </p>
+                </div>
+              ))}
+              {metrics.topProductosPorApariciones.length === 0 && <p className="text-sm text-muted-foreground">Sin datos de ventas.</p>}
+            </CardContent>
+          </Card>
+        </div>
       );
     }
 
@@ -541,10 +585,20 @@ export default function Reportes() {
           <CardHeader><CardTitle>Clientes frecuentes</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {metrics.topCustomers.map((item, index) => (
-              <div key={`${item.nombre}-${index}`} className="flex items-center justify-between rounded-md border p-3">
-                <span>{index + 1}. {item.nombre}</span>
-                <span>{item.pedidos} pedidos</span>
-              </div>
+              <details key={`${item.nombre}-${index}`} className="rounded-md border p-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                  <span>{index + 1}. {item.nombre}</span>
+                  <span className="text-right text-sm text-muted-foreground">{item.pedidos} pedidos | {parseNumber(item.monto).toFixed(2)}</span>
+                </summary>
+                <div className="mt-2 space-y-1">
+                  {(Array.isArray(item.pedidos_resumen) ? item.pedidos_resumen : []).map((pedido: any) => (
+                    <div key={`${item.nombre}-pedido-${pedido.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-xs">
+                      <span>Pedido #{pedido.id} | {String(pedido.estado || 'N/A')}</span>
+                      <span>{parseNumber(pedido.total).toFixed(2)} | {parseNumber(pedido.items_count)} items</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
             ))}
           </CardContent>
         </Card>
