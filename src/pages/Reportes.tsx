@@ -1,6 +1,6 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getClientesTopResumen, getPedidos, getProductos, getVentasPorMetodoMoneda } from '@/integrations/api';
+import { getClientesTopResumen, getPedidosResumenReportes, getProductos, getVentasPorMetodoMoneda } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -137,7 +137,7 @@ export default function Reportes() {
         if (cancelled) return;
         try {
           if (key === 'pedidos') {
-            const res = await getPedidos();
+            const res = await getPedidosResumenReportes();
             if (cancelled) return;
             setPedidos(Array.isArray(res) ? res : (res?.data || []));
           }
