@@ -44,6 +44,8 @@ const reportSubmenu = [
   { title: "Pedidos por estado", url: "/reportes/pedidos-estado" },
   { title: "Clientes frecuentes", url: "/reportes/clientes" },
   { title: "Compras y reposicion", url: "/reportes/compras" },
+  { title: "Rentabilidad", url: "/reportes/rentabilidad" },
+  { title: "Ticket promedio", url: "/reportes/ticket-promedio" },
 ];
 
 export function AppSidebar() {

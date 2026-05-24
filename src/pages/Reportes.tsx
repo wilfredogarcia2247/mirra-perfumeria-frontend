@@ -1,6 +1,6 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getPagos, getPedidos, getProductos } from '@/integrations/api';
+import { getFormasPago, getPagos, getPedidos, getProductos } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -12,7 +12,11 @@ type ReportSlug =
   | 'inventario'
   | 'pedidos-estado'
   | 'clientes'
-  | 'compras';
+  | 'compras'
+  | 'rentabilidad'
+  | 'ticket-promedio';
+
+type DataKey = 'pedidos' | 'pagos' | 'productos' | 'formasPago';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
@@ -23,9 +27,31 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'pedidos-estado', title: 'Pedidos por estado', description: 'Completados, cancelados y pendientes' },
   { slug: 'clientes', title: 'Clientes frecuentes', description: 'Clientes con mayor recurrencia de compra' },
   { slug: 'compras', title: 'Compras y reposicion', description: 'Indicadores para planificar compras' },
+  { slug: 'rentabilidad', title: 'Rentabilidad', description: 'Margen estimado por ventas y costos' },
+  { slug: 'ticket-promedio', title: 'Ticket promedio', description: 'Monto promedio por pedido completado' },
 ];
 
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
+
+const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
+  'resumen-general': ['pedidos', 'productos'],
+  'ventas-periodo': ['pedidos'],
+  'ventas-metodo': ['pagos', 'formasPago'],
+  'productos-favoritos': ['pedidos'],
+  inventario: ['productos'],
+  'pedidos-estado': ['pedidos'],
+  clientes: ['pedidos'],
+  compras: ['pedidos', 'productos'],
+  rentabilidad: ['pedidos', 'productos'],
+  'ticket-promedio': ['pedidos'],
+};
+
+const DATA_LABELS: Record<DataKey, string> = {
+  pedidos: 'pedidos',
+  pagos: 'pagos',
+  productos: 'productos',
+  formasPago: 'formas de pago',
+};
 
 function parseNumber(value: any): number {
   if (value === null || value === undefined) return 0;
@@ -48,6 +74,23 @@ function parseNumber(value: any): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeText(value: any): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getPresentationMl(name: string): string {
+  const match = String(name || '').match(/presentaci[oó]n\s*([0-9]+)\s*ml/i);
+  return match ? `${match[1]}ml` : 'Sin presentacion';
+}
+
+function getBaseProductName(name: string): string {
+  return String(name || '').split(/presentaci[oó]n/i)[0].trim() || String(name || 'Producto sin nombre');
+}
+
 function getReportSlug(pathname: string): ReportSlug {
   if (pathname === '/reportes' || pathname === '/reportes/') return 'resumen-general';
   const value = pathname.split('/')[2] as ReportSlug | undefined;
@@ -58,41 +101,105 @@ export default function Reportes() {
   const location = useLocation();
   const selectedReport = getReportSlug(location.pathname);
 
-  const [loading, setLoading] = useState(true);
+  const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [pagos, setPagos] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
+  const [formasPago, setFormasPago] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
+    pedidos: false,
+    pagos: false,
+    productos: false,
+    formasPago: false,
+  });
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [pedidosRes, pagosRes, productosRes] = await Promise.all([getPedidos(), getPagos(), getProductos()]);
-        if (!mounted) return;
-        setPedidos(Array.isArray(pedidosRes) ? pedidosRes : (pedidosRes?.data || []));
-        setPagos(Array.isArray(pagosRes) ? pagosRes : (pagosRes?.data || []));
-        setProductos(Array.isArray(productosRes) ? productosRes : (productosRes?.data || []));
-      } catch (error) {
-        if (!mounted) return;
-        setPedidos([]);
-        setPagos([]);
-        setProductos([]);
-      } finally {
-        if (mounted) setLoading(false);
+    let cancelled = false;
+
+    const run = async () => {
+      const required = REPORT_REQUIREMENTS[selectedReport] || [];
+      const missing = required.filter((key) => !loaded[key]);
+
+      if (missing.length === 0) {
+        setLoadingInfo({ active: false, progress: 100, message: 'Reporte listo', etaSeconds: 0 });
+        return;
       }
-    })();
-    return () => {
-      mounted = false;
+
+      setLoadingInfo({
+        active: true,
+        progress: 0,
+        message: `Cargando ${missing.length} fuente(s): ${missing.map((k) => DATA_LABELS[k]).join(', ')}`,
+        etaSeconds: missing.length,
+      });
+
+      for (let i = 0; i < missing.length; i += 1) {
+        const key = missing[i];
+        if (cancelled) return;
+        try {
+          if (key === 'pedidos') {
+            const res = await getPedidos();
+            if (cancelled) return;
+            setPedidos(Array.isArray(res) ? res : (res?.data || []));
+          }
+          if (key === 'pagos') {
+            const res = await getPagos();
+            if (cancelled) return;
+            setPagos(Array.isArray(res) ? res : (res?.data || []));
+          }
+          if (key === 'productos') {
+            const res = await getProductos();
+            if (cancelled) return;
+            setProductos(Array.isArray(res) ? res : (res?.data || []));
+          }
+          if (key === 'formasPago') {
+            const res = await getFormasPago();
+            if (cancelled) return;
+            setFormasPago(Array.isArray(res) ? res : (res?.data || []));
+          }
+        } catch (error) {
+          if (cancelled) return;
+          if (key === 'pedidos') setPedidos([]);
+          if (key === 'pagos') setPagos([]);
+          if (key === 'productos') setProductos([]);
+          if (key === 'formasPago') setFormasPago([]);
+        }
+
+        if (cancelled) return;
+        setLoaded((prev) => ({ ...prev, [key]: true }));
+        const progress = Math.round(((i + 1) / missing.length) * 100);
+        const etaSeconds = Math.max(0, missing.length - (i + 1));
+        setLoadingInfo({
+          active: i + 1 < missing.length,
+          progress,
+          message: i + 1 < missing.length ? `Cargando ${DATA_LABELS[missing[i + 1]]}...` : 'Reporte listo',
+          etaSeconds,
+        });
+      }
     };
-  }, []);
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, selectedReport]);
 
   const metrics = useMemo(() => {
     const ordersByStatus: Record<string, number> = {};
     const monthlySales: Record<string, number> = {};
     const productSales: Record<string, { nombre: string; cantidad: number; monto: number }> = {};
+    const presentationSales: Record<string, { presentacion: string; cantidad: number; monto: number; precioPromedio: number }> = {};
+    const productBehavior: Record<string, { baseName: string; pedidos: number; cantidad: number; precios: number[]; nombres: Set<string>; presentaciones: Set<string> }> = {};
     const customerSales: Record<string, { nombre: string; pedidos: number; monto: number }> = {};
     let completedOrders = 0;
     let cancelledOrders = 0;
+    let dailySales = 0;
+    let monthSales = 0;
+    let monthCompletedOrders = 0;
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
 
     for (const pedido of pedidos) {
       const estado = String(pedido?.estado || 'sin_estado').toLowerCase();
@@ -104,6 +211,7 @@ export default function Reportes() {
       completedOrders += 1;
       const fecha = new Date(pedido?.fecha || pedido?.created_at || Date.now());
       const monthKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      const orderDayKey = `${fecha.getFullYear()}-${fecha.getMonth()}-${fecha.getDate()}`;
 
       const items = Array.isArray(pedido?.productos) ? pedido.productos : [];
       let orderTotal = 0;
@@ -114,13 +222,35 @@ export default function Reportes() {
         orderTotal += subtotal;
         const key = String(item?.producto_id ?? item?.id ?? item?.nombre_producto ?? 'desconocido');
         const nombre = String(item?.nombre_producto || item?.nombre || `Producto ${key}`);
+        const baseName = getBaseProductName(nombre);
+        const presentacion = getPresentationMl(nombre);
         const current = productSales[key] || { nombre, cantidad: 0, monto: 0 };
         current.cantidad += qty;
         current.monto += subtotal;
         productSales[key] = current;
+
+        const pCurrent = presentationSales[presentacion] || { presentacion, cantidad: 0, monto: 0, precioPromedio: 0 };
+        pCurrent.cantidad += qty;
+        pCurrent.monto += subtotal;
+        pCurrent.precioPromedio = pCurrent.cantidad > 0 ? pCurrent.monto / pCurrent.cantidad : 0;
+        presentationSales[presentacion] = pCurrent;
+
+        const bKey = String(item?.producto_id ?? baseName);
+        const bCurrent = productBehavior[bKey] || { baseName, pedidos: 0, cantidad: 0, precios: [], nombres: new Set<string>(), presentaciones: new Set<string>() };
+        bCurrent.pedidos += 1;
+        bCurrent.cantidad += qty;
+        if (price > 0) bCurrent.precios.push(price);
+        bCurrent.nombres.add(nombre);
+        bCurrent.presentaciones.add(presentacion);
+        productBehavior[bKey] = bCurrent;
       }
 
       monthlySales[monthKey] = (monthlySales[monthKey] || 0) + orderTotal;
+      if (orderDayKey === todayKey) dailySales += orderTotal;
+      if (fecha.getFullYear() === thisYear && fecha.getMonth() === thisMonth) {
+        monthSales += orderTotal;
+        monthCompletedOrders += 1;
+      }
 
       const customerKey = String(pedido?.telefono || pedido?.cedula || pedido?.nombre_cliente || `cliente-${pedido?.id}`);
       const customerName = String(pedido?.nombre_cliente || 'Cliente sin nombre');
@@ -131,14 +261,105 @@ export default function Reportes() {
     }
 
     const salesTotal = Object.values(monthlySales).reduce((acc, n) => acc + n, 0);
-    const pagosPorMetodo: Record<string, number> = {};
+    const formaPagoMap = new Map<string, string>();
+    for (const forma of formasPago) {
+      const id = String(forma?.id ?? '');
+      const nombre = String(forma?.nombre || forma?.descripcion || `Metodo ${id}`);
+      if (id) formaPagoMap.set(id, nombre);
+    }
+    const pagosPorMetodo: Record<string, { monto: number; cantidad: number }> = {};
     for (const pago of pagos) {
-      const metodo = String(pago?.forma_pago_nombre || pago?.forma_pago_id || 'sin_metodo');
-      pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + parseNumber(pago?.monto);
+      const methodId = String(pago?.forma_pago_id ?? '');
+      const metodo = String(pago?.forma_pago_nombre || formaPagoMap.get(methodId) || pago?.forma_pago_descripcion || `Metodo ${methodId || 'N/A'}`);
+      const current = pagosPorMetodo[metodo] || { monto: 0, cantidad: 0 };
+      current.monto += parseNumber(pago?.monto);
+      current.cantidad += 1;
+      pagosPorMetodo[metodo] = current;
     }
 
-    const withoutStock = productos.filter((p: any) => parseNumber(p?.stock) <= 0).length;
-    const lowStock = productos.filter((p: any) => parseNumber(p?.stock) > 0 && parseNumber(p?.stock) <= 5).length;
+    const withoutStockProducts = productos
+      .filter((p: any) => parseNumber(p?.stock) <= 0)
+      .map((p: any) => ({
+        id: p?.id,
+        nombre: String(p?.nombre || `Producto ${p?.id || ''}`),
+        stock: parseNumber(p?.stock),
+        categoriaId: p?.categoria_id ?? null,
+      }));
+    const lowStockProducts = productos
+      .filter((p: any) => parseNumber(p?.stock) > 0 && parseNumber(p?.stock) <= 5)
+      .map((p: any) => ({
+        id: p?.id,
+        nombre: String(p?.nombre || `Producto ${p?.id || ''}`),
+        stock: parseNumber(p?.stock),
+        categoriaId: p?.categoria_id ?? null,
+      }))
+      .sort((a: any, b: any) => a.stock - b.stock);
+    const withoutStock = withoutStockProducts.length;
+    const lowStock = lowStockProducts.length;
+
+    const topProduct = Object.values(productSales).sort((a, b) => b.cantidad - a.cantidad)[0] || null;
+    const topPresentation = Object.values(presentationSales).sort((a, b) => b.cantidad - a.cantidad)[0] || null;
+    const cancelRate = pedidos.length > 0 ? (cancelledOrders / pedidos.length) * 100 : 0;
+    const stockRiskRate = productos.length > 0 ? ((withoutStock + lowStock) / productos.length) * 100 : 0;
+
+    let businessStatus = 'Estable';
+    let businessReason = 'Comportamiento balanceado de ventas, inventario y cancelaciones.';
+    if (cancelRate >= 20 || stockRiskRate >= 35) {
+      businessStatus = 'En riesgo';
+      businessReason = 'Hay señales de riesgo por cancelaciones altas o inventario comprometido.';
+    } else if (monthSales > 0 && cancelRate < 10 && stockRiskRate < 20) {
+      businessStatus = 'Saludable';
+      businessReason = 'Buen nivel de ventas del mes con riesgo operativo controlado.';
+    }
+
+    const behaviorRows = Object.values(productBehavior)
+      .map((it) => {
+        const precioMin = it.precios.length > 0 ? Math.min(...it.precios) : 0;
+        const precioMax = it.precios.length > 0 ? Math.max(...it.precios) : 0;
+        const precioProm = it.precios.length > 0 ? it.precios.reduce((a, n) => a + n, 0) / it.precios.length : 0;
+        return {
+          nombreBase: it.baseName,
+          cantidad: it.cantidad,
+          pedidos: it.pedidos,
+          precioMin,
+          precioMax,
+          precioProm,
+          presentaciones: Array.from(it.presentaciones),
+          nombres: Array.from(it.nombres),
+        };
+      })
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 8);
+
+    const productStockMap = new Map<string, any>();
+    for (const p of productos) {
+      const name = String(p?.nombre || '');
+      if (name) productStockMap.set(normalizeText(name), p);
+    }
+
+    const restockPriorities = behaviorRows
+      .map((row) => {
+        const match = productStockMap.get(normalizeText(row.nombreBase));
+        const stock = parseNumber(match?.stock);
+        const prioridad = row.cantidad * 3 - stock;
+        return {
+          nombre: row.nombreBase,
+          vendido: row.cantidad,
+          stock,
+          prioridad,
+          presentaciones: row.presentaciones,
+        };
+      })
+      .sort((a, b) => b.prioridad - a.prioridad)
+      .slice(0, 6);
+
+    const totalCostoEstimado = Object.values(productSales).reduce((acc, item) => {
+      const match = productos.find((p: any) => String(p?.nombre) === String(item.nombre));
+      const costo = parseNumber(match?.costo);
+      return acc + (item.cantidad * costo);
+    }, 0);
+    const utilidadEstimada = salesTotal - totalCostoEstimado;
+    const ticketPromedio = completedOrders > 0 ? salesTotal / completedOrders : 0;
 
     return {
       totalPedidos: pedidos.length,
@@ -153,21 +374,48 @@ export default function Reportes() {
       totalProductos: productos.length,
       withoutStock,
       lowStock,
+      dailySales,
+      monthSales,
+      monthCompletedOrders,
+      topProduct,
+      topPresentation,
+      cancelRate,
+      stockRiskRate,
+      businessStatus,
+      businessReason,
+      behaviorRows,
+      restockPriorities,
+      withoutStockProducts,
+      lowStockProducts,
+      totalCostoEstimado,
+      utilidadEstimada,
+      ticketPromedio,
     };
-  }, [pagos, pedidos, productos]);
+  }, [formasPago, pagos, pedidos, productos]);
 
   const renderReport = () => {
-    if (loading) {
-      return <Card><CardContent className="p-6">Cargando reportes...</CardContent></Card>;
+    if (loadingInfo.active) {
+      return (
+        <Card>
+          <CardContent className="p-6 space-y-2">
+            <p className="text-sm font-medium">{loadingInfo.message}</p>
+            <p className="text-xs text-muted-foreground">Progreso: {loadingInfo.progress}%{loadingInfo.etaSeconds > 0 ? ` | Tiempo estimado: ~${loadingInfo.etaSeconds}s` : ''}</p>
+          </CardContent>
+        </Card>
+      );
     }
 
     if (selectedReport === 'resumen-general') {
       return (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card><CardHeader><CardTitle>Total pedidos</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.totalPedidos}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Pedidos completados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.completedOrders}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Ventas acumuladas</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.salesTotal.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Productos sin stock</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.withoutStock}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Ventas de hoy</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.dailySales.toFixed(2)}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Ventas del mes</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.monthSales.toFixed(2)}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Pedidos completados (mes)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.monthCompletedOrders}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Estado del negocio</CardTitle></CardHeader><CardContent><p className="text-xl font-bold">{metrics.businessStatus}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.businessReason}</p></CardContent></Card>
+          <Card><CardHeader><CardTitle>Producto mas vendido</CardTitle></CardHeader><CardContent className="text-sm">{metrics.topProduct ? `${metrics.topProduct.nombre} (${metrics.topProduct.cantidad} uds)` : 'Sin datos'}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Presentacion mas vendida</CardTitle></CardHeader><CardContent className="text-sm">{metrics.topPresentation ? `${metrics.topPresentation.presentacion} (${metrics.topPresentation.cantidad} uds)` : 'Sin datos'}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Tasa de cancelacion</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.cancelRate.toFixed(1)}%</CardContent></Card>
+          <Card><CardHeader><CardTitle>Riesgo de inventario</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.stockRiskRate.toFixed(1)}%</CardContent></Card>
         </div>
       );
     }
@@ -195,10 +443,13 @@ export default function Reportes() {
         <Card>
           <CardHeader><CardTitle>Ventas por metodo de pago</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {Object.entries(metrics.pagosPorMetodo).sort((a, b) => b[1] - a[1]).map(([metodo, total]) => (
+            {Object.entries(metrics.pagosPorMetodo).sort((a, b) => b[1].monto - a[1].monto).map(([metodo, data]) => (
               <div key={metodo} className="flex items-center justify-between rounded-md border p-3">
                 <span>{metodo}</span>
-                <strong>${total.toFixed(2)}</strong>
+                <div className="text-right">
+                  <strong>${data.monto.toFixed(2)}</strong>
+                  <p className="text-xs text-muted-foreground">{data.cantidad} pagos</p>
+                </div>
               </div>
             ))}
           </CardContent>
@@ -209,12 +460,17 @@ export default function Reportes() {
     if (selectedReport === 'productos-favoritos') {
       return (
         <Card>
-          <CardHeader><CardTitle>Top productos favoritos</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Top productos y variacion de nombre/precio</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {metrics.topProducts.map((item, index) => (
-              <div key={`${item.nombre}-${index}`} className="flex items-center justify-between rounded-md border p-3">
-                <span>{index + 1}. {item.nombre}</span>
-                <span>{item.cantidad} uds</span>
+            {metrics.behaviorRows.map((item, index) => (
+              <div key={`${item.nombreBase}-${index}`} className="rounded-md border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span>{index + 1}. {item.nombreBase}</span>
+                  <span>{item.cantidad} uds</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Presentaciones: {item.presentaciones.join(', ')} | Precio min: ${item.precioMin.toFixed(2)} | Precio max: ${item.precioMax.toFixed(2)} | Precio prom: ${item.precioProm.toFixed(2)}
+                </p>
               </div>
             ))}
           </CardContent>
@@ -224,10 +480,41 @@ export default function Reportes() {
 
     if (selectedReport === 'inventario') {
       return (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card><CardHeader><CardTitle>Total productos</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.totalProductos}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Sin stock</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.withoutStock}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Stock bajo (max 5)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.lowStock}</CardContent></Card>
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card><CardHeader><CardTitle>Total productos</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.totalProductos}</CardContent></Card>
+            <Card><CardHeader><CardTitle>Sin stock</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.withoutStock}</CardContent></Card>
+            <Card><CardHeader><CardTitle>Stock bajo (max 5)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.lowStock}</CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle>Productos con condiciones particulares de inventario</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {metrics.withoutStockProducts.slice(0, 12).map((item: any) => (
+                <div key={`oos-${item.id}`} className="rounded-md border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{item.nombre}</span>
+                    <strong className="text-red-700">Sin stock</strong>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Stock actual: {item.stock} | Categoria: {item.categoriaId ?? 'N/A'}</p>
+                </div>
+              ))}
+
+              {metrics.lowStockProducts.slice(0, 20).map((item: any) => (
+                <div key={`low-${item.id}`} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{item.nombre}</span>
+                    <strong className="text-amber-700">Stock bajo</strong>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Stock actual: {item.stock} | Categoria: {item.categoriaId ?? 'N/A'}</p>
+                </div>
+              ))}
+
+              {metrics.withoutStockProducts.length === 0 && metrics.lowStockProducts.length === 0 && (
+                <p className="text-sm text-muted-foreground">No hay productos con condiciones criticas de inventario.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       );
     }
@@ -264,12 +551,43 @@ export default function Reportes() {
       );
     }
 
+    if (selectedReport === 'rentabilidad') {
+      const margen = metrics.salesTotal > 0 ? (metrics.utilidadEstimada / metrics.salesTotal) * 100 : 0;
+      return (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card><CardHeader><CardTitle>Ingresos estimados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.salesTotal.toFixed(2)}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Costos estimados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.totalCostoEstimado.toFixed(2)}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Margen estimado</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{margen.toFixed(1)}%</CardContent></Card>
+        </div>
+      );
+    }
+
+    if (selectedReport === 'ticket-promedio') {
+      return (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card><CardHeader><CardTitle>Ticket promedio</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.ticketPromedio.toFixed(2)}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Pedidos completados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.completedOrders}</CardContent></Card>
+          <Card><CardHeader><CardTitle>Ventas acumuladas</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.salesTotal.toFixed(2)}</CardContent></Card>
+        </div>
+      );
+    }
+
     return (
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardHeader><CardTitle>Pedidos cancelados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.cancelledOrders}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Productos a reponer</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.withoutStock + metrics.lowStock}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Nota</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Este reporte orienta compras en base a ventas y stock actual.</CardContent></Card>
-      </div>
+      <Card>
+        <CardHeader><CardTitle>Reposicion prioritaria basada en ventas</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {metrics.restockPriorities.map((row: any, idx: number) => (
+            <div key={`${row.nombre}-${idx}`} className="rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span>{idx + 1}. {row.nombre}</span>
+                <strong>Stock: {row.stock}</strong>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Vendido: {row.vendido} uds | Presentaciones: {row.presentaciones.join(', ') || 'N/A'} | Prioridad: {row.prioridad.toFixed(1)}</p>
+            </div>
+          ))}
+          {metrics.restockPriorities.length === 0 && <p className="text-sm text-muted-foreground">Sin datos suficientes para calcular reposicion.</p>}
+        </CardContent>
+      </Card>
     );
   };
 
