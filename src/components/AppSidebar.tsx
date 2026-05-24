@@ -1,5 +1,5 @@
-import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle } from "lucide-react";
-import { useLocation, Link } from 'react-router-dom';
+import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3 } from "lucide-react";
+import { useLocation } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
 // no module-based menu filtering — keep menu visible for all users except the Usuarios link which remains admin-only
@@ -30,8 +30,20 @@ const menuItems = [
   { title: "Productos", url: "/productos", icon: Package, module: 'productos' as const },
   { title: "Fórmulas", url: "/formulas", icon: FlaskConical, module: 'formulas' as const },
   { title: "Pedidos", url: "/pedidos", icon: Receipt, module: 'pedidos' as const },
+  { title: "Reportes", url: "/reportes", icon: BarChart3, module: 'dashboard' as const },
   { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' as const },
   { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' as const },
+];
+
+const reportSubmenu = [
+  { title: "Resumen general", url: "/reportes" },
+  { title: "Ventas por periodo", url: "/reportes/ventas-periodo" },
+  { title: "Ventas por metodo", url: "/reportes/ventas-metodo" },
+  { title: "Productos favoritos", url: "/reportes/productos-favoritos" },
+  { title: "Estado de inventario", url: "/reportes/inventario" },
+  { title: "Pedidos por estado", url: "/reportes/pedidos-estado" },
+  { title: "Clientes frecuentes", url: "/reportes/clientes" },
+  { title: "Compras y reposicion", url: "/reportes/compras" },
 ];
 
 export function AppSidebar() {
@@ -123,24 +135,45 @@ export function AppSidebar() {
                 return item;
               }).filter(Boolean).map((item: any) => {
                 const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
+                const isReportSection = item.url === '/reportes';
                 return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      onClick={() => navigate(item.url)}
-                      isActive={isActive}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? 'bg-primary-600 text-white' : 'text-sidebar-foreground hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
-                      title={!open ? item.title : undefined}
-                    >
-                      <span className="flex items-center justify-center w-6 h-6 shrink-0">
-                        {item.title === "Producción" ? (
-                          <i className="fa-solid fa-industry inline-block w-4 h-4" aria-hidden="true" />
-                        ) : (
-                          <item.icon className="h-5 w-5" />
-                        )}
-                      </span>
-                      {open && <span className="flex-1 text-sm font-medium">{item.title}</span>}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <div key={item.title}>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => navigate(item.url)}
+                        isActive={isActive}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? 'bg-primary-600 text-white' : 'text-sidebar-foreground hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
+                        title={!open ? item.title : undefined}
+                      >
+                        <span className="flex items-center justify-center w-6 h-6 shrink-0">
+                          {item.title === "Producción" ? (
+                            <i className="fa-solid fa-industry inline-block w-4 h-4" aria-hidden="true" />
+                          ) : (
+                            <item.icon className="h-5 w-5" />
+                          )}
+                        </span>
+                        {open && <span className="flex-1 text-sm font-medium">{item.title}</span>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    {open && isReportSection && isActive && (
+                      <div className="ml-9 mt-1 space-y-1">
+                        {reportSubmenu.map((subItem) => {
+                          const subActive = location.pathname === subItem.url;
+                          return (
+                            <button
+                              key={subItem.url}
+                              type="button"
+                              onClick={() => navigate(subItem.url)}
+                              className={`block w-full rounded-md px-2 py-1 text-left text-xs transition-colors ${subActive ? 'bg-primary-100 text-primary-700' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
+                            >
+                              {subItem.title}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 

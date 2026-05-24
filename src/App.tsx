@@ -22,6 +22,7 @@ import AboutUs from "./pages/AboutUs";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import WhatsappAdmin from "./pages/WhatsappAdmin";
+import Reportes from "./pages/Reportes";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
@@ -71,6 +72,11 @@ const App = () => (
 
             <Route element={<ModuleProtectedRoute moduleKey="pedidos" />}>
               <Route path="/pedidos" element={<Pedidos />} />
+            </Route>
+
+            <Route element={<ModuleProtectedRoute moduleKey="dashboard" />}>
+              <Route path="/reportes" element={<Reportes />} />
+              <Route path="/reportes/:tipo" element={<Reportes />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="tasas_cambio" />}>
