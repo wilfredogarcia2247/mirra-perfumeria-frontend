@@ -11,7 +11,13 @@ interface ImageUploadProps {
 }
 
 export default function ImageUpload({ onImageUpload, existingImageUrl, originalImageUrl }: ImageUploadProps) {
-  const [previewUrl, setPreviewUrl] = useState<string>((existingImageUrl || '').replace('https://', 'http://'));
+  const normalizePreviewUrl = (url: string) => {
+    if (!url) return '';
+    if (/^data:|^blob:/i.test(url)) return url;
+    return url.replace('https://', 'http://');
+  };
+
+  const [previewUrl, setPreviewUrl] = useState<string>(normalizePreviewUrl(existingImageUrl || ''));
   const [error, setError] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -23,7 +29,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
 
   // Sync when parent tells us there's an existing image (e.g., opening the edit modal)
   useEffect(() => {
-    setPreviewUrl((existingImageUrl || '').replace('https://', 'http://'));
+    setPreviewUrl(normalizePreviewUrl(existingImageUrl || ''));
   }, [existingImageUrl]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,7 +80,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
       setUploadProgress(100);
       
       if (response.ok && response.url) {
-        const httpUrl = response.url.replace('https://', 'http://');
+        const httpUrl = normalizePreviewUrl(response.url);
         setPreviewUrl(httpUrl);
         onImageUpload(httpUrl);
         setUploadSuccess(true);
@@ -134,8 +140,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
           {previewUrl ? (
             <div className="relative w-full h-full">
               <img
-                src={previewUrl.replace('https://', 'http://')}
-                alt="Vista previa"
+                  src={previewUrl}
                 className="w-full h-full object-contain bg-gray-100"
               />
 

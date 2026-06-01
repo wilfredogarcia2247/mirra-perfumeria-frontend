@@ -21,11 +21,14 @@ export function getImageUrl(obj?: any, fallbackIndex?: number): string | undefin
     return fallbackImages[index];
   }
 
+  // Si ya es una URL local de blob o data, devolverla tal cual
+  if (/^data:|^blob:/i.test(raw)) return raw;
+
   // Convertir HTTPS a HTTP para evitar problemas de certificado en desarrollo
   const httpUrl = raw.replace('https://', 'http://');
 
-  // Si ya es una URL absoluta o data/blob, devolver tal cual
-  if (/^(https?:)?\/\//i.test(httpUrl) || /^data:|^blob:/i.test(httpUrl)) return httpUrl;
+  // Si ya es una URL absoluta, devolver tal cual
+  if (/^(https?:)?\/\//i.test(httpUrl)) return httpUrl;
 
   // Si es una ruta relativa (empieza con '/'), prefijar con la base del API o el origen
   if (httpUrl.startsWith('/')) {
