@@ -75,10 +75,10 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
       }, 100);
 
       const response = await uploadImageToAPI(file);
-      
+
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       if (response.ok && response.url) {
         const httpUrl = normalizePreviewUrl(response.url);
         setPreviewUrl(httpUrl);
@@ -121,9 +121,8 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
           onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
           onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }}
           onDrop={onDropHandler}
-          className={`relative flex items-center justify-center w-full h-48 border-2 rounded-lg cursor-pointer overflow-hidden transition-shadow ${
-            isUploading ? 'bg-gray-50 shadow-inner' : 'bg-white hover:shadow-lg border-gray-200'
-          } ${isDragOver ? 'ring-4 ring-primary/40' : ''}`}
+          className={`relative flex items-center justify-center w-full h-48 border-2 rounded-lg cursor-pointer overflow-hidden transition-shadow ${isUploading ? 'bg-gray-50 shadow-inner' : 'bg-white hover:shadow-lg border-gray-200'
+            } ${isDragOver ? 'ring-4 ring-primary/40' : ''}`}
         >
           <input
             ref={fileInputRef}
@@ -140,7 +139,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
           {previewUrl ? (
             <div className="relative w-full h-full">
               <img
-                  src={previewUrl}
+                src={previewUrl}
                 className="w-full h-full object-contain bg-gray-100"
               />
 
