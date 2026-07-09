@@ -1,13 +1,21 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getClientesTopResumen, getPedidosResumenReportes, getProductos, getVentasPorMetodoMoneda } from '@/integrations/api';
+import {
+  getClientesTopResumen,
+  getPedidosResumenReportes,
+  getProductos,
+  getVentasPorMetodoMoneda,
+  getVentasPorPresentacion,
+} from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 type ReportSlug =
   | 'resumen-general'
   | 'ventas-periodo'
   | 'ventas-metodo'
+  | 'ventas-presentacion'
   | 'productos-favoritos'
   | 'inventario'
   | 'pedidos-estado'
@@ -16,12 +24,13 @@ type ReportSlug =
   | 'rentabilidad'
   | 'ticket-promedio';
 
-type DataKey = 'pedidos' | 'productos' | 'ventasMetodo' | 'clientesResumen';
+type DataKey = 'pedidos' | 'productos' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
   { slug: 'ventas-periodo', title: 'Ventas por periodo', description: 'Comparativo de ventas por mes' },
   { slug: 'ventas-metodo', title: 'Ventas por metodo', description: 'Distribucion por forma de pago' },
+  { slug: 'ventas-presentacion', title: 'Ventas por presentacion', description: 'Unidades vendidas por ml reportado' },
   { slug: 'productos-favoritos', title: 'Productos favoritos', description: 'Top productos mas vendidos' },
   { slug: 'inventario', title: 'Estado de inventario', description: 'Stock, productos sin stock y reposicion' },
   { slug: 'pedidos-estado', title: 'Pedidos por estado', description: 'Completados, cancelados y pendientes' },
@@ -37,6 +46,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   'resumen-general': ['pedidos', 'productos'],
   'ventas-periodo': ['pedidos'],
   'ventas-metodo': ['ventasMetodo'],
+   'ventas-presentacion': ['presentaciones'],
   'productos-favoritos': ['pedidos'],
   inventario: ['productos'],
   'pedidos-estado': ['pedidos'],
@@ -51,7 +61,18 @@ const DATA_LABELS: Record<DataKey, string> = {
   productos: 'productos',
   ventasMetodo: 'ventas por metodo',
   clientesResumen: 'clientes top',
+  presentaciones: 'ventas por presentacion',
 };
+
+const MONTH_SHORT_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const PRESENTATION_CHART_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--accent))',
+];
 
 function parseNumber(value: any): number {
   if (value === null || value === undefined) return 0;
@@ -105,11 +126,13 @@ export default function Reportes() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
+  const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
     ventasMetodo: false,
+    presentaciones: false,
     clientesResumen: false,
   });
 
@@ -146,6 +169,11 @@ export default function Reportes() {
             if (cancelled) return;
             setVentasMetodo(Array.isArray(res) ? res : (res?.data || []));
           }
+          if (key === 'presentaciones') {
+            const res = await getVentasPorPresentacion();
+            if (cancelled) return;
+            setPresentaciones(Array.isArray(res) ? res : (res?.data || []));
+          }
           if (key === 'productos') {
             const res = await getProductos();
             if (cancelled) return;
@@ -161,6 +189,7 @@ export default function Reportes() {
           if (key === 'pedidos') setPedidos([]);
           if (key === 'productos') setProductos([]);
           if (key === 'ventasMetodo') setVentasMetodo([]);
+          if (key === 'presentaciones') setPresentaciones([]);
           if (key === 'clientesResumen') setClientesResumen([]);
         }
 
@@ -191,6 +220,58 @@ export default function Reportes() {
     const presentationSales: Record<string, { presentacion: string; cantidad: number; monto: number; precioPromedio: number }> = {};
     const productBehavior: Record<string, { baseName: string; pedidos: number; cantidad: number; precios: number[]; nombres: Set<string>; presentaciones: Set<string> }> = {};
     const customerSales: Record<string, { nombre: string; pedidos: number; monto: number }> = {};
+    const presentationReportRows = (Array.isArray(presentaciones) ? presentaciones : []).map((item: any) => {
+      const label = String(item?.presentacion_ml ?? item?.presentacion ?? 'Sin presentación (ml)');
+      const unidades = parseNumber(item?.unidades_vendidas ?? item?.cantidad ?? item?.total ?? 0);
+      const monthlyRaw = Array.isArray(item?.ventas_mensuales) ? item.ventas_mensuales : [];
+      const monthly = monthlyRaw
+        .map((entry: any) => {
+          const month = typeof entry?.month === 'string' ? entry.month : null;
+          const cantidad = parseNumber(entry?.unidades_vendidas ?? entry?.cantidad ?? entry?.total ?? 0);
+          if (!month) return null;
+          return { month, cantidad };
+        })
+        .filter(Boolean) as Array<{ month: string; cantidad: number }>;
+      return {
+        presentacion: label,
+        cantidad: unidades,
+        monthly,
+      };
+    });
+    const presentationReport = [...presentationReportRows].sort((a, b) => {
+      if (b.cantidad !== a.cantidad) return b.cantidad - a.cantidad;
+      return a.presentacion.localeCompare(b.presentacion);
+    });
+    const presentationReportTotal = presentationReport.reduce((acc, row) => acc + row.cantidad, 0);
+    const presentationChartKeys = presentationReport.map((row) => row.presentacion);
+    const presentationMonthlyTotals = new Map<string, Record<string, number>>();
+    for (const row of presentationReportRows) {
+      for (const monthEntry of row.monthly) {
+        const { month, cantidad } = monthEntry;
+        if (!presentationMonthlyTotals.has(month)) presentationMonthlyTotals.set(month, {});
+        const record = presentationMonthlyTotals.get(month)!;
+        record[row.presentacion] = (record[row.presentacion] || 0) + cantidad;
+      }
+    }
+    const formatMonthLabel = (monthKey: string) => {
+      if (!monthKey || typeof monthKey !== 'string') return monthKey || 'Mes';
+      const match = /^([0-9]{4})-([0-9]{2})$/.exec(monthKey);
+      if (!match) return monthKey;
+      const [, year, monthStr] = match;
+      const monthIndex = Number(monthStr) - 1;
+      const monthLabel = MONTH_SHORT_LABELS[monthIndex] ?? monthStr;
+      return `${monthLabel} ${year}`;
+    };
+    const presentationChartData = Array.from(presentationMonthlyTotals.keys())
+      .sort((a, b) => a.localeCompare(b))
+      .map((monthKey) => {
+        const base: Record<string, any> = { month: monthKey, label: formatMonthLabel(monthKey) };
+        const record = presentationMonthlyTotals.get(monthKey) || {};
+        for (const key of presentationChartKeys) {
+          base[key] = parseNumber(record[key] ?? 0);
+        }
+        return base;
+      });
     let completedOrders = 0;
     let cancelledOrders = 0;
     let dailySales = 0;
@@ -301,7 +382,11 @@ export default function Reportes() {
     const lowStock = lowStockProducts.length;
 
     const topProduct = Object.values(productSales).sort((a, b) => b.cantidad - a.cantidad)[0] || null;
-    const topPresentation = Object.values(presentationSales).sort((a, b) => b.cantidad - a.cantidad)[0] || null;
+    const topPresentationLegacy = Object.values(presentationSales).sort((a, b) => b.cantidad - a.cantidad)[0] || null;
+    const topPresentationBackend = presentationReport.length > 0
+      ? { presentacion: presentationReport[0].presentacion, cantidad: presentationReport[0].cantidad, monto: 0, precioPromedio: 0 }
+      : null;
+    const topPresentation = topPresentationBackend || topPresentationLegacy;
     const cancelRate = pedidos.length > 0 ? (cancelledOrders / pedidos.length) * 100 : 0;
     const stockRiskRate = productos.length > 0 ? ((withoutStock + lowStock) / productos.length) * 100 : 0;
 
@@ -320,12 +405,12 @@ export default function Reportes() {
         const precioMin = it.precios.length > 0 ? Math.min(...it.precios) : 0;
         const precioMax = it.precios.length > 0 ? Math.max(...it.precios) : 0;
         const precioProm = it.precios.length > 0 ? it.precios.reduce((a, n) => a + n, 0) / it.precios.length : 0;
-        return {
-          nombreBase: it.baseName,
-          cantidad: it.cantidad,
-          pedidos: it.pedidos,
-          precioMin,
-          precioMax,
+      return {
+        nombreBase: it.baseName,
+        cantidad: it.cantidad,
+        pedidos: it.pedidos,
+        precioMin,
+        precioMax,
           precioProm,
           presentaciones: Array.from(it.presentaciones),
           nombres: Array.from(it.nombres),
@@ -391,6 +476,10 @@ export default function Reportes() {
       monthCompletedOrders,
       topProduct,
       topPresentation,
+      presentationReport,
+      presentationReportTotal,
+      presentationChartData,
+      presentationChartKeys,
       cancelRate,
       stockRiskRate,
       businessStatus,
@@ -405,7 +494,7 @@ export default function Reportes() {
       utilidadEstimada,
       ticketPromedio,
     };
-  }, [clientesResumen, pedidos, productos, ventasMetodo]);
+  }, [clientesResumen, pedidos, presentaciones, productos, ventasMetodo]);
 
   const renderReport = () => {
     if (loadingInfo.active) {
@@ -477,6 +566,68 @@ export default function Reportes() {
             ))}
           </CardContent>
         </Card>
+      );
+    }
+
+    if (selectedReport === 'ventas-presentacion') {
+      const rows = metrics.presentationReport;
+      const total = metrics.presentationReportTotal;
+      const chartData = metrics.presentationChartData;
+      const chartKeys = metrics.presentationChartKeys;
+      return (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Ventas por presentacion (ml)</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {rows.length === 0 && <p className="text-sm text-muted-foreground">Aun no hay ventas completadas con presentacion identificada.</p>}
+              {rows.map((row: any) => {
+                const share = total > 0 ? (row.cantidad / total) * 100 : 0;
+                return (
+                  <div key={row.presentacion} className="flex flex-col gap-1 rounded-md border p-3 md:flex-row md:items-center md:justify-between">
+                    <div className="font-medium">{row.presentacion}</div>
+                    <div className="text-sm text-muted-foreground md:text-right">
+                      <div><strong>{row.cantidad}</strong> uds vendidas</div>
+                      <div>{share.toFixed(1)}% del total</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {total > 0 && (
+                <p className="pt-2 text-xs text-muted-foreground">Total unidades vendidas consideradas: {total}.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Ventas mensuales por presentacion</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {chartData.length === 0 || chartKeys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay suficiente información mensual para graficar todavía.</p>
+              ) : (
+                <div className="w-full">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" />
+                      <YAxis allowDecimals={false} />
+                      <RechartsTooltip cursor={{ fill: 'rgba(202, 158, 103, 0.12)' }} />
+                      <Legend />
+                      {chartKeys.map((key: string, index: number) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          fill={PRESENTATION_CHART_COLORS[index % PRESENTATION_CHART_COLORS.length]}
+                          radius={[4, 4, 0, 0]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Incluye únicamente pedidos completados con presentacion detectada en el nombre del producto.</p>
+            </CardContent>
+          </Card>
+        </div>
       );
     }
 

@@ -39,6 +39,7 @@ const reportSubmenu = [
   { title: "Resumen general", url: "/reportes" },
   { title: "Ventas por periodo", url: "/reportes/ventas-periodo" },
   { title: "Ventas por metodo", url: "/reportes/ventas-metodo" },
+  { title: "Ventas por presentación", url: "/reportes/ventas-presentacion" },
   { title: "Productos favoritos", url: "/reportes/productos-favoritos" },
   { title: "Estado de inventario", url: "/reportes/inventario" },
   { title: "Pedidos por estado", url: "/reportes/pedidos-estado" },

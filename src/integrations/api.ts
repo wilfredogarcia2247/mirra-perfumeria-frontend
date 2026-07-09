@@ -114,6 +114,10 @@ export async function getPedidosResumenReportes() {
   return apiFetch('/pedidos-venta/reportes-resumen');
 }
 
+export async function getVentasPorPresentacion() {
+  return apiFetch('/pedidos-venta/reportes-presentaciones');
+}
+
 export async function getPedidosPaginated(page = 1, limit = 12, estado?: string) {
   let url = `/pedidos-venta/paginated?page=${page}&limit=${limit}`;
   if (estado) url += `&estado=${encodeURIComponent(estado)}`;
