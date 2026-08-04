@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, completarOrdenProduccion, searchPedidos } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, completarOrdenProduccion, searchPedidos } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText } from 'lucide-react';
@@ -21,6 +21,68 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from "sonner";
 
+type AjusteDraft = {
+  id?: number | string;
+  tipo: 'descuento' | 'recargo';
+  modo: 'porcentaje' | 'monto';
+  valor: number;
+  motivo: string;
+};
+
+type AjustesSummary = {
+  ajustes: Array<AjusteDraft & { monto_aplicado: number }>;
+  total_base: number;
+  total_descuentos: number;
+  total_recargos: number;
+  total_final: number;
+};
+
+const roundMoney = (value: number): number => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 100) / 100;
+};
+
+const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummary => {
+  const baseVal = roundMoney(Number(base) || 0);
+  let totalDesc = 0;
+  let totalRec = 0;
+  const normalized = (Array.isArray(list) ? list : []).map((item) => {
+    const tipo = ((item?.tipo || 'descuento') === 'recargo' ? 'recargo' : 'descuento') as AjusteDraft['tipo'];
+    const modo = ((item?.modo || 'porcentaje') === 'monto' ? 'monto' : 'porcentaje') as AjusteDraft['modo'];
+    const valorNum = roundMoney(Number(item?.valor) || 0);
+    const applied = modo === 'porcentaje' ? roundMoney(baseVal * (valorNum / 100)) : roundMoney(valorNum);
+    if (tipo === 'descuento') totalDesc += applied;
+    else totalRec += applied;
+    return { ...item, tipo, modo, valor: valorNum, monto_aplicado: applied };
+  });
+  totalDesc = roundMoney(totalDesc);
+  totalRec = roundMoney(totalRec);
+  let totalFinal = roundMoney(baseVal - totalDesc + totalRec);
+  if (totalFinal < 0) totalFinal = 0;
+  return {
+    ajustes: normalized,
+    total_base: baseVal,
+    total_descuentos: totalDesc,
+    total_recargos: totalRec,
+    total_final: totalFinal,
+  };
+};
+
+const adaptAjusteFromApi = (aj: any): AjusteDraft => {
+  const tipo = String(aj?.tipo || '').toLowerCase() === 'recargo' ? 'recargo' : 'descuento';
+  const modo = String(aj?.modo || '').toLowerCase() === 'monto' ? 'monto' : 'porcentaje';
+  const valor = roundMoney(Number(aj?.valor ?? aj?.monto ?? 0) || 0);
+  const motivo = typeof aj?.motivo === 'string' ? aj.motivo : '';
+  return {
+    id: aj?.id ?? undefined,
+    tipo,
+    modo,
+    valor,
+    motivo,
+  };
+};
+
 export default function Pedidos() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -36,6 +98,10 @@ export default function Pedidos() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [ajustesDraft, setAjustesDraft] = useState<AjusteDraft[]>([]);
+  const [ajustesDirty, setAjustesDirty] = useState(false);
+  const [ajustesSaving, setAjustesSaving] = useState(false);
+  const [ajustesError, setAjustesError] = useState<string | null>(null);
   // Refrescar y reconstruir el mapa de pagos por pedido
   const refreshPagosMap = async () => {
     try {
@@ -281,36 +347,39 @@ export default function Pedidos() {
   const fmtProductosCount = (p: any) => Array.isArray(p?.productos) ? p.productos.length : 0;
   const fmtEstado = (p: any) => p?.estado || p?.status || '-';
   const fmtTotal = (p: any) => {
-    // Obtener total base (en moneda local) como número
-    const base = (() => {
-      const t = p?.total ?? p?.monto ?? null;
-      if (typeof t === 'number') return t;
-      const tnum = Number(t);
-      if (!Number.isNaN(tnum)) return tnum;
-      if (Array.isArray(p?.productos) && p.productos.length > 0) {
-        return p.productos.reduce((acc: number, it: any) => {
-          if (typeof it.subtotal === 'number') return acc + it.subtotal;
-          const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
-          const qty = typeof it.cantidad === 'number' ? it.cantidad : Number(it.cantidad) || 0;
-          return acc + price * qty;
-        }, 0);
-      }
-      return null;
-    })();
+    const base = roundMoney(
+      p?.total_base ??
+        (typeof p?.total === 'number'
+          ? p.total
+          : (() => {
+              const numeric = Number(p?.total);
+              return Number.isFinite(numeric) ? numeric : 0;
+            })())
+    );
+    const descuentos = roundMoney(p?.total_descuentos ?? 0);
+    const recargos = roundMoney(p?.total_recargos ?? 0);
+    const final = roundMoney(
+      p?.total_final ??
+        p?.total ??
+        (base - descuentos + recargos)
+    );
 
-    if (base === null) return '-';
-
-    // Obtener tasa (si existe)
-    const tRaw = p?.tasa_cambio_monto ?? p?.tasa ?? null;
-    const tNum = typeof tRaw === 'number' ? tRaw : (tRaw ? Number(String(tRaw).replace(',', '.')) : null);
-    const tasaVal = Number.isFinite(tNum) && tNum > 0 ? tNum : null;
-    const simbolo = p?.tasa_simbolo || (p?.tasa && p.tasa.simbolo) || 'Bs';
-
-    if (tasaVal) {
-      const converted = base * tasaVal;
-      return `$${base.toFixed(2)} x ${tasaVal.toFixed(4)} = ${simbolo} ${converted.toFixed(2)}`;
+    let label = `$${final.toFixed(2)}`;
+    if (descuentos > 0 || recargos > 0) {
+      const parts = [`$${base.toFixed(2)}`];
+      if (descuentos > 0) parts.push(`- $${descuentos.toFixed(2)}`);
+      if (recargos > 0) parts.push(`+ $${recargos.toFixed(2)}`);
+      label = `$${final.toFixed(2)} (${parts.join(' ')})`;
     }
-    return `$${base.toFixed(2)}`;
+
+    const tasaVal = fmtTasa(p);
+    if (tasaVal) {
+      const simbolo = p?.tasa_simbolo || (p?.tasa && p.tasa.simbolo) || 'Bs';
+      const converted = roundMoney(final * tasaVal);
+      label += ` • ${simbolo} ${converted.toFixed(2)}`;
+    }
+
+    return label;
   };
   const fmtTasa = (p: any) => {
     const t = p?.tasa_cambio_monto ?? p?.tasa ?? null;
@@ -320,12 +389,23 @@ export default function Pedidos() {
 
   function isPedidoPaid(p: any) {
     try {
-      // Prefer explicit flag
       if (p?.pagado === true || p?.is_paid === true) return true;
-      let pagos = Array.isArray(p?.pagos) ? p.pagos : (Array.isArray(p?.pagos_venta) ? p.pagos_venta : (Array.isArray(p?.payments) ? p.payments : []));
-      // Si el mapa global de pagos ya contiene entradas para este pedido, considerarlo pagado.
+
+      let pagos = Array.isArray(p?.pagos)
+        ? p.pagos
+        : (Array.isArray(p?.pagos_venta)
+            ? p.pagos_venta
+            : (Array.isArray(p?.payments) ? p.payments : []));
+
       try {
-        const candidate = p?.id ?? p?.pedido_venta_id ?? p?.pedidoId ?? p?.venta_id ?? p?.ventaId ?? p?.order_id ?? p?.orderId;
+        const candidate =
+          p?.id ??
+          p?.pedido_venta_id ??
+          p?.pedidoId ??
+          p?.venta_id ??
+          p?.ventaId ??
+          p?.order_id ??
+          p?.orderId;
         const pidNum = Number(candidate);
         if ((!pagos || pagos.length === 0) && pagosMap && Number.isFinite(pidNum) && pidNum > 0) {
           const mapped = pagosMap[pidNum];
@@ -334,21 +414,42 @@ export default function Pedidos() {
       } catch (e) {
         // ignore mapping errors
       }
-      // fallback: usar pagosMap cargado globalmente. Soportar varias formas de identificar el id del pedido
+
       if ((!pagos || pagos.length === 0) && pagosMap) {
-        const candidate = p?.id ?? p?.pedido_venta_id ?? p?.pedidoId ?? p?.venta_id ?? p?.ventaId ?? p?.order_id ?? p?.orderId;
+        const candidate =
+          p?.id ??
+          p?.pedido_venta_id ??
+          p?.pedidoId ??
+          p?.venta_id ??
+          p?.ventaId ??
+          p?.order_id ??
+          p?.orderId;
         const pidNum = Number(candidate);
         if (Number.isFinite(pidNum) && pidNum > 0) {
           pagos = pagosMap[pidNum] || [];
         }
       }
+
       if (!pagos || pagos.length === 0) return false;
-      // calcular total base similar a fmtTotal
-      const base = (() => {
-        const t = p?.total ?? p?.monto ?? null;
-        if (typeof t === 'number') return t;
-        const tnum = Number(t);
-        if (!Number.isNaN(tnum)) return tnum;
+
+      const expectedTotal = (() => {
+        const candidates = [
+          p?.total_final,
+          p?.total,
+          p?.monto,
+          p?.monto_total,
+          p?.total_pedido,
+        ];
+        for (const candidate of candidates) {
+          if (typeof candidate === 'number' && Number.isFinite(candidate)) return candidate;
+          const numeric = Number(candidate);
+          if (Number.isFinite(numeric)) return numeric;
+        }
+        if (typeof p?.total_base === 'number' && Number.isFinite(p.total_base)) {
+          const desc = Number(p?.total_descuentos ?? 0);
+          const rec = Number(p?.total_recargos ?? 0);
+          return roundMoney(p.total_base - (Number.isFinite(desc) ? desc : 0) + (Number.isFinite(rec) ? rec : 0));
+        }
         if (Array.isArray(p?.productos) && p.productos.length > 0) {
           return p.productos.reduce((acc: number, it: any) => {
             const price = typeof it.precio_venta === 'number' ? it.precio_venta : Number(it.precio_venta) || 0;
@@ -358,15 +459,12 @@ export default function Pedidos() {
         }
         return null;
       })();
-      if (base === null) {
-        // Si el listado no incluye el total del pedido (base === null) pero sí tenemos pagos
-        // asociados (por ejemplo porque se consultaron con `getPagos()`), consideramos
-        // el pedido como pagado para efectos del badge en el listado.
-        // Esto evita mostrar "Sin pago" cuando el detalle sí contiene pagos.
+
+      if (expectedTotal === null) {
         return pagos.length > 0;
       }
+
       const tasaVal = fmtTasa(p);
-      // sumar equivalencias (si las hay) o derivarlas con tasa del pedido
       let sumEq = 0;
       let sumRawMonto = 0;
       for (const pay of pagos) {
@@ -385,14 +483,12 @@ export default function Pedidos() {
           sumEq += monto / usedT;
         }
       }
+
       const tol = 0.05;
-      // Si no pudimos derivar equivalencias (sumEq === 0) pero los pagos suman montos en la misma
-      // unidad que el pedido (no hay tasa), comparar la suma bruta de montos con el total.
       if ((!Number.isFinite(sumEq) || sumEq === 0) && (!tasaVal || Number.isNaN(Number(tasaVal)))) {
-        // comparar sumRawMonto con base
-        return Number.isFinite(sumRawMonto) && Math.abs(sumRawMonto - base) <= tol;
+        return Number.isFinite(sumRawMonto) && Math.abs(sumRawMonto - expectedTotal) <= tol;
       }
-      return Number.isFinite(sumEq) && Math.abs(sumEq - base) <= tol;
+      return Number.isFinite(sumEq) && Math.abs(sumEq - expectedTotal) <= tol;
     } catch (e) {
       return false;
     }
@@ -431,6 +527,153 @@ export default function Pedidos() {
   const [directFormas, setDirectFormas] = useState<any[]>([]);
   const [directBancoId, setDirectBancoId] = useState<number | null>(null);
   const [directFormaId, setDirectFormaId] = useState<number | null>(null);
+
+  const ensureAjustesFromPedido = React.useCallback((pedido: any) => {
+    const ajustesFromApi = Array.isArray(pedido?.ajustes)
+      ? pedido.ajustes.map(adaptAjusteFromApi)
+      : [];
+    setAjustesDraft(ajustesFromApi);
+    setAjustesDirty(false);
+    setAjustesError(null);
+  }, []);
+
+  const ajustesPreview = React.useMemo(() => {
+    const base = Number(selectedPedido?.total_base ?? 0);
+    return computeAjustesSummary(base, ajustesDraft);
+  }, [selectedPedido, ajustesDraft]);
+
+  const handleAddAjuste = () => {
+    setAjustesDraft((prev) => [
+      ...prev,
+      { tipo: 'descuento', modo: 'porcentaje', valor: 5, motivo: '' },
+    ]);
+    setAjustesDirty(true);
+  };
+
+  const handleAjusteChange = (index: number, field: keyof AjusteDraft, value: any) => {
+    setAjustesDraft((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        if (field === 'valor') {
+          const num = Number(value);
+          return { ...item, valor: Number.isFinite(num) && num >= 0 ? num : 0 };
+        }
+        if (field === 'tipo') {
+          return { ...item, tipo: value === 'recargo' ? 'recargo' : 'descuento' };
+        }
+        if (field === 'modo') {
+          return { ...item, modo: value === 'monto' ? 'monto' : 'porcentaje' };
+        }
+        if (field === 'motivo') {
+          return { ...item, motivo: String(value ?? '') };
+        }
+        return item;
+      })
+    );
+    setAjustesDirty(true);
+  };
+
+  const handleRemoveAjuste = (index: number) => {
+    setAjustesDraft((prev) => prev.filter((_, idx) => idx !== index));
+    setAjustesDirty(true);
+  };
+
+  const handleResetAjustes = () => {
+    if (!selectedPedido) return;
+    ensureAjustesFromPedido(selectedPedido);
+  };
+
+  const handleSaveAjustes = async () => {
+    if (!selectedPedido?.id) {
+      toast.error('Selecciona un pedido antes de guardar ajustes');
+      return;
+    }
+    if (ajustesSaving) return;
+
+    const currentId = selectedPedido.id;
+    const sanitized = ajustesDraft.map((aj) => ({
+      tipo: aj.tipo,
+      modo: aj.modo,
+      valor: roundMoney(aj.valor),
+      motivo: aj.motivo.trim(),
+    }));
+
+    if (sanitized.some((aj) => aj.valor <= 0)) {
+      setAjustesError('Cada ajuste debe tener un valor mayor a cero.');
+      return;
+    }
+    if (sanitized.some((aj) => !aj.motivo)) {
+      setAjustesError('Cada ajuste debe incluir un motivo.');
+      return;
+    }
+
+    setAjustesError(null);
+    setAjustesSaving(true);
+    try {
+      const response = await updatePedidoAjustes(currentId, sanitized);
+      const ajustesResponse = Array.isArray(response?.ajustes) ? response.ajustes : [];
+      const adapted = ajustesResponse.map(adaptAjusteFromApi);
+
+      setSelectedPedido((prev) => {
+        if (!prev || prev.id !== currentId) return prev;
+        const total_base = roundMoney(response?.total_base ?? prev.total_base ?? prev.total ?? 0);
+        const total_descuentos = roundMoney(response?.total_descuentos ?? prev.total_descuentos ?? 0);
+        const total_recargos = roundMoney(response?.total_recargos ?? prev.total_recargos ?? 0);
+        const total_final = roundMoney(response?.total_final ?? response?.total ?? prev.total_final ?? prev.total ?? 0);
+        return {
+          ...prev,
+          ajustes: ajustesResponse,
+          total_base,
+          total_descuentos,
+          total_recargos,
+          total_final,
+          total: total_final,
+        };
+      });
+
+      setPedidos((list) =>
+        list.map((p) => {
+          if (p.id !== currentId) return p;
+          const total_base = roundMoney(response?.total_base ?? p.total_base ?? p.total ?? 0);
+          const total_descuentos = roundMoney(response?.total_descuentos ?? p.total_descuentos ?? 0);
+          const total_recargos = roundMoney(response?.total_recargos ?? p.total_recargos ?? 0);
+          const total_final = roundMoney(response?.total_final ?? response?.total ?? p.total_final ?? p.total ?? 0);
+          return {
+            ...p,
+            ajustes: ajustesResponse,
+            total_base,
+            total_descuentos,
+            total_recargos,
+            total_final,
+            total: total_final,
+          };
+        })
+      );
+
+      setAjustesDraft(adapted);
+      setAjustesDirty(false);
+      setAjustesError(null);
+      toast.success('Ajustes actualizados');
+    } catch (err: any) {
+      const message = parseApiError(err) || (err?.message ?? 'Error guardando ajustes');
+      setAjustesError(message);
+      toast.error(message);
+    } finally {
+      setAjustesSaving(false);
+    }
+  };
+
+  const persistedTotals = React.useMemo(() => {
+    if (!selectedPedido) return { base: 0, descuentos: 0, recargos: 0, final: 0 };
+    const base = roundMoney(selectedPedido?.total_base ?? selectedPedido?.total ?? 0);
+    const descuentos = roundMoney(selectedPedido?.total_descuentos ?? 0);
+    const recargos = roundMoney(selectedPedido?.total_recargos ?? 0);
+    const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
+    return { base, descuentos, recargos, final };
+  }, [selectedPedido]);
+
+  const tasaActual = fmtTasa(selectedPedido);
+  const tasaSimbolo = selectedPedido?.tasa_simbolo || (selectedPedido?.tasa && selectedPedido.tasa.simbolo) || 'Bs';
   const [directLoading, setDirectLoading] = useState(false);
   // Ordenes de producción detalladas asociadas al pedido abierto
   const [ordenesDetailed, setOrdenesDetailed] = useState<any[]>([]);
@@ -860,6 +1103,7 @@ export default function Pedidos() {
 
         console.debug('detalle-pago-check', { id, base, tasaVal, sumEq, sumRaw, pagosCount: pagosList.length, computedPaid });
         setSelectedPedido(detalle);
+        ensureAjustesFromPedido(detalle);
         // Cargar órdenes de producción detalladas asociadas a este pedido
         (async () => {
           try {
@@ -969,6 +1213,7 @@ export default function Pedidos() {
       } catch (errInner) {
         // si algo falla en diagnóstico, continuar mostrando detalle
         setSelectedPedido(detalle);
+        ensureAjustesFromPedido(detalle);
         setShowPaymentsView(Array.isArray(detalle?.pagos) && detalle.pagos.length > 0);
       }
       setIsDetailOpen(true);
@@ -988,6 +1233,9 @@ export default function Pedidos() {
   const closeDetalle = () => {
     setIsDetailOpen(false);
     setSelectedPedido(null);
+    setAjustesDraft([]);
+    setAjustesDirty(false);
+    setAjustesError(null);
   };
 
   async function handleCompletarPedido() {
@@ -1000,6 +1248,10 @@ export default function Pedidos() {
   async function completarSinPago() {
     if (!selectedPedido?.id) return;
     if (!selectedPedido?.id) return;
+    if (ajustesDirty) {
+      toast.error('Guarda los ajustes antes de completar el pedido');
+      return;
+    }
 
     // Intentar completar órdenes de producción existentes asociadas al pedido.
     // Esto cubre casos donde la orden existe pero está en estado 'Pendiente' en la BD.
@@ -1187,9 +1439,43 @@ export default function Pedidos() {
     setCompleting(true);
     try {
       const resp = await completarPedidoVenta(selectedPedido.id);
+      const total_base = roundMoney(resp?.total_base ?? selectedPedido.total_base ?? selectedPedido.total ?? 0);
+      const total_descuentos = roundMoney(resp?.total_descuentos ?? selectedPedido.total_descuentos ?? 0);
+      const total_recargos = roundMoney(resp?.total_recargos ?? selectedPedido.total_recargos ?? 0);
+      const total_final = roundMoney(resp?.total_final ?? resp?.total ?? selectedPedido.total_final ?? selectedPedido.total ?? 0);
       toast.success('Pedido completado');
-      setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
-      setPedidos((list) => list.map((p) => (p.id === selectedPedido.id ? { ...p, estado: 'Completado' } : p)));
+      const currentId = selectedPedido.id;
+      setSelectedPedido((s: any) => {
+        if (!s || s.id !== currentId) return s;
+        return {
+          ...s,
+          estado: 'Completado',
+          ajustes: Array.isArray(resp?.ajustes) ? resp.ajustes : s.ajustes,
+          total_base,
+          total_descuentos,
+          total_recargos,
+          total_final,
+          total: total_final,
+        };
+      });
+      setPedidos((list) =>
+        list.map((p) => {
+          if (p.id !== currentId) return p;
+          return {
+            ...p,
+            estado: 'Completado',
+            ajustes: Array.isArray(resp?.ajustes) ? resp.ajustes : p.ajustes,
+            total_base,
+            total_descuentos,
+            total_recargos,
+            total_final,
+            total: total_final,
+          };
+        })
+      );
+      if (Array.isArray(resp?.ajustes)) {
+        ensureAjustesFromPedido({ ajustes: resp.ajustes });
+      }
       setShowPaymentInline(false);
       setIsDetailOpen(false);
     } catch (err) {
@@ -1608,25 +1894,122 @@ export default function Pedidos() {
                     </table>
                   </div>
 
-                  <div className="flex justify-end">
-                    <div className="text-right">
-                      <div className="text-sm text-muted-foreground">Total</div>
-                      <div className="text-lg font-semibold">{typeof selectedPedido.total === 'number' ? `$${selectedPedido.total.toFixed(2)}` : selectedPedido.total}</div>
-                      {/* Mostrar convertido si hay tasa aplicada */}
-                      {(() => {
-                        const base = (typeof selectedPedido.total === 'number') ? selectedPedido.total : (Number(selectedPedido.total) || null);
-                        const t = selectedPedido?.tasa_cambio_monto ?? selectedPedido?.tasa ?? null;
-                        const tn = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
-                        const tasaVal = Number.isFinite(tn) && tn > 0 ? tn : null;
-                        const simbolo = selectedPedido?.tasa_simbolo || (selectedPedido?.tasa && selectedPedido.tasa.simbolo) || 'Bs';
-                        if (base && tasaVal) {
-                          const conv = base * tasaVal;
-                          return (
-                            <div className="text-sm text-muted-foreground">Convertido: <strong>{simbolo} {conv.toFixed(2)}</strong> </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                  <div className="space-y-4">
+                    <div className="bg-white border rounded p-4 shadow-sm">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <h3 className="text-base font-semibold">Descuentos y recargos</h3>
+                        {ajustesDirty && (
+                          <Badge variant="secondary" className="bg-amber-200 text-amber-900">Cambios sin guardar</Badge>
+                        )}
+                      </div>
+                      {ajustesDraft.length === 0 ? (
+                        <div className="mt-3 text-sm text-muted-foreground">No hay ajustes registrados para este pedido.</div>
+                      ) : (
+                        <div className="mt-3 space-y-3">
+                          {ajustesDraft.map((ajuste, index) => {
+                            const previewRow = ajustesPreview.ajustes[index];
+                            return (
+                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-12 gap-2 items-end">
+                                <div className="col-span-2">
+                                  <label className="text-xs text-muted-foreground">Tipo</label>
+                                  <select
+                                    value={ajuste.tipo}
+                                    onChange={(e) => handleAjusteChange(index, 'tipo', e.target.value)}
+                                    className="w-full border rounded px-2 py-1 text-sm"
+                                  >
+                                    <option value="descuento">Descuento</option>
+                                    <option value="recargo">Recargo</option>
+                                  </select>
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-xs text-muted-foreground">Modo</label>
+                                  <select
+                                    value={ajuste.modo}
+                                    onChange={(e) => handleAjusteChange(index, 'modo', e.target.value)}
+                                    className="w-full border rounded px-2 py-1 text-sm"
+                                  >
+                                    <option value="porcentaje">%</option>
+                                    <option value="monto">Monto</option>
+                                  </select>
+                                </div>
+                                <div className="col-span-2">
+                                  <label className="text-xs text-muted-foreground">{ajuste.modo === 'porcentaje' ? 'Porcentaje' : 'Monto ($)'}</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={ajuste.valor}
+                                    onChange={(e) => handleAjusteChange(index, 'valor', e.target.value)}
+                                    className="w-full border rounded px-2 py-1 text-sm"
+                                  />
+                                </div>
+                                <div className="col-span-4">
+                                  <label className="text-xs text-muted-foreground">Motivo</label>
+                                  <input
+                                    type="text"
+                                    value={ajuste.motivo}
+                                    onChange={(e) => handleAjusteChange(index, 'motivo', e.target.value)}
+                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    placeholder="Ej. Descuento promocional"
+                                  />
+                                </div>
+                                <div className="col-span-1 text-right text-sm font-medium">
+                                  {previewRow ? `$${previewRow.monto_aplicado.toFixed(2)}` : '$0.00'}
+                                </div>
+                                <div className="col-span-1 flex justify-end">
+                                  <Button size="sm" variant="ghost" onClick={() => handleRemoveAjuste(index)} className="text-red-500 hover:text-red-600">
+                                    Quitar
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={handleAddAjuste}>Agregar ajuste</Button>
+                          <Button size="sm" variant="ghost" onClick={handleResetAjustes} disabled={!ajustesDirty}>Restablecer</Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {ajustesError && <span className="text-xs text-red-500">{ajustesError}</span>}
+                          <Button size="sm" onClick={handleSaveAjustes} disabled={!ajustesDirty || ajustesSaving}>
+                            {ajustesSaving ? 'Guardando...' : 'Guardar ajustes'}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        Vista previa: Subtotal ${ajustesPreview.total_base.toFixed(2)}
+                        {ajustesPreview.total_descuentos > 0 && ` - $${ajustesPreview.total_descuentos.toFixed(2)}`}
+                        {ajustesPreview.total_recargos > 0 && ` + $${ajustesPreview.total_recargos.toFixed(2)}`}
+                        {' = '}
+                        <strong>${ajustesPreview.total_final.toFixed(2)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <div className="text-right space-y-1">
+                        <div className="text-sm text-muted-foreground">Subtotal</div>
+                        <div className="text-sm font-medium">${persistedTotals.base.toFixed(2)}</div>
+                        {persistedTotals.descuentos > 0 && (
+                          <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentos.toFixed(2)}</div>
+                        )}
+                        {persistedTotals.recargos > 0 && (
+                          <div className="text-sm text-rose-600">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
+                        )}
+                        <div className="text-lg font-semibold">Total final: ${persistedTotals.final.toFixed(2)}</div>
+                        {tasaActual ? (
+                          <div className="text-sm text-muted-foreground">
+                            Convertido: <strong>{tasaSimbolo} {roundMoney(persistedTotals.final * tasaActual).toFixed(2)}</strong>
+                          </div>
+                        ) : null}
+                        {ajustesDirty && (
+                          <div className="mt-2 text-xs text-amber-600">
+                            Vista previa sin guardar: ${ajustesPreview.total_final.toFixed(2)}
+                            {tasaActual ? ` • ${tasaSimbolo} ${roundMoney(ajustesPreview.total_final * tasaActual).toFixed(2)}` : ''}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {/* Vista de pagos en solo lectura (se puede abrir para pedidos completados) */}
@@ -2017,11 +2400,49 @@ export default function Pedidos() {
                   embedded={true}
                   pedidoId={selectedPedido?.id ?? 0}
                   onSuccess={async (data: any) => {
+                    const currentId = selectedPedido?.id;
                     // Asegurar que actualizamos pagosMap para que el listado muestre 'Pagado'
                     try { await refreshPagosMap(); } catch (e) { console.debug(e); }
                     toast.success('Pedido completado y pago registrado');
-                    setSelectedPedido((s: any) => s ? { ...s, estado: 'Completado' } : s);
-                    setPedidos((list) => list.map((p) => (p.id === selectedPedido?.id ? { ...p, estado: 'Completado' } : p)));
+                    setSelectedPedido((s: any) => {
+                      if (!s || s.id !== currentId) return s;
+                      const total_base = roundMoney(data?.total_base ?? s.total_base ?? s.total ?? 0);
+                      const total_descuentos = roundMoney(data?.total_descuentos ?? s.total_descuentos ?? 0);
+                      const total_recargos = roundMoney(data?.total_recargos ?? s.total_recargos ?? 0);
+                      const total_final = roundMoney(data?.total_final ?? data?.total ?? s.total_final ?? s.total ?? 0);
+                      return {
+                        ...s,
+                        estado: 'Completado',
+                        ajustes: Array.isArray(data?.ajustes) ? data.ajustes : s.ajustes,
+                        total_base,
+                        total_descuentos,
+                        total_recargos,
+                        total_final,
+                        total: total_final,
+                      };
+                    });
+                    setPedidos((list) =>
+                      list.map((p) => {
+                        if (p.id !== currentId) return p;
+                        const total_base = roundMoney(data?.total_base ?? p.total_base ?? p.total ?? 0);
+                        const total_descuentos = roundMoney(data?.total_descuentos ?? p.total_descuentos ?? 0);
+                        const total_recargos = roundMoney(data?.total_recargos ?? p.total_recargos ?? 0);
+                        const total_final = roundMoney(data?.total_final ?? data?.total ?? p.total_final ?? p.total ?? 0);
+                        return {
+                          ...p,
+                          estado: 'Completado',
+                          ajustes: Array.isArray(data?.ajustes) ? data.ajustes : p.ajustes,
+                          total_base,
+                          total_descuentos,
+                          total_recargos,
+                          total_final,
+                          total: total_final,
+                        };
+                      })
+                    );
+                    if (Array.isArray(data?.ajustes)) {
+                      ensureAjustesFromPedido({ ajustes: data.ajustes });
+                    }
                     setShowPaymentInline(false);
                     setIsDetailOpen(false);
                   }}
@@ -2037,13 +2458,12 @@ export default function Pedidos() {
               <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
                 <div className="flex gap-2">
                   <Button size="lg" variant="default" onClick={() => {
-                    // abrir formulario de pago pero bloquear si hay líneas pendientes por producir
-                    /*if (hasPendingProductionLines(selectedPedido)) {
-                      toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+                    if (ajustesDirty) {
+                      toast.error('Guarda los ajustes antes de registrar el pago');
                       return;
-                    }*/
+                    }
                     setShowPaymentInline(true);
-                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido)} className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white">
+                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido) || ajustesDirty} className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white">
                     Registrar pago y completar
                   </Button>
                   {selectedPedido?.estado === 'Completado' && (
@@ -2051,7 +2471,7 @@ export default function Pedidos() {
                       Ver pagos
                     </Button>
                   )}
-                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido)}>
+                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>

@@ -28,6 +28,12 @@ function extractMonedaFromDetalles(detalles: any) {
 
 }
 
+const roundMoney = (value: number) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 100) / 100;
+};
+
 
 type Forma = { id: number; nombre: string; detalles?: any };
 type Banco = { id: number; nombre: string; formas_pago?: Forma[] };
@@ -37,6 +43,15 @@ type Props = {
   onSuccess?: (data: any) => void;
   onClose?: () => void;
   embedded?: boolean;
+};
+
+type PedidoAjuste = {
+  id?: number;
+  tipo?: string;
+  modo?: string;
+  valor?: number;
+  motivo?: string;
+  monto_aplicado?: number;
 };
 
 export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded = false }: Props) {
@@ -76,6 +91,8 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const [bankTotalsMap, setBankTotalsMap] = useState<Record<number, number>>({});
   const [payments, setPayments] = useState<Array<any>>([]);
   const [pedidoTotal, setPedidoTotal] = useState<number | null>(null);
+  const [pedidoResumen, setPedidoResumen] = useState<{ base: number; descuentos: number; recargos: number; final: number } | null>(null);
+  const [pedidoAjustes, setPedidoAjustes] = useState<PedidoAjuste[]>([]);
   const [pedidoData, setPedidoData] = useState<any | null>(null);
   const [paymentMode, setPaymentMode] = useState<'single' | 'multiple'>('single');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -134,8 +151,29 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         console.log('PaymentByBank.loadPedido.start', { pedidoId });
         const p = await getPedidoVenta(pedidoId);
         setPedidoData(p);
-        const total = Number(p?.total ?? p?.monto_total ?? p?.total_pedido ?? 0);
-        setPedidoTotal(Number.isFinite(total) ? total : null);
+        const totalFinalRaw = Number(p?.total_final ?? p?.total ?? p?.monto_total ?? p?.total_pedido ?? 0);
+        const totalBaseRaw = Number(p?.total_base ?? totalFinalRaw);
+        const totalDescRaw = Number(p?.total_descuentos ?? 0);
+        const totalRecRaw = Number(p?.total_recargos ?? 0);
+        const finalRounded = Number.isFinite(totalFinalRaw) ? roundMoney(totalFinalRaw) : null;
+        setPedidoTotal(finalRounded);
+        setPedidoResumen({
+          base: roundMoney(Number.isFinite(totalBaseRaw) ? totalBaseRaw : 0),
+          descuentos: roundMoney(Number.isFinite(totalDescRaw) ? totalDescRaw : 0),
+          recargos: roundMoney(Number.isFinite(totalRecRaw) ? totalRecRaw : 0),
+          final: finalRounded ?? roundMoney((Number.isFinite(totalBaseRaw) ? totalBaseRaw : 0) - (Number.isFinite(totalDescRaw) ? totalDescRaw : 0) + (Number.isFinite(totalRecRaw) ? totalRecRaw : 0)),
+        });
+        const ajustesList = Array.isArray(p?.ajustes)
+          ? p.ajustes.map((aj: any) => ({
+              id: aj?.id,
+              tipo: aj?.tipo,
+              modo: aj?.modo,
+              valor: Number(aj?.valor ?? 0),
+              motivo: aj?.motivo ?? '',
+              monto_aplicado: Number(aj?.monto_aplicado ?? 0),
+            }))
+          : [];
+        setPedidoAjustes(ajustesList);
         // Si el pedido ya tiene pagos registrados, mapearlos al estado de pagos para mostrarlos y tomarlos en cuenta
         try {
           const rawPagos = p?.pagos || p?.pagos_venta || p?.pagosVenta || p?.payments || [];
@@ -179,6 +217,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       } catch (e) {
         // no bloquear si falla
         console.warn('No se pudo cargar pedido', e);
+        setPedidoTotal(null);
+        setPedidoResumen(null);
+        setPedidoAjustes([]);
       }
     }
     loadPedido();
@@ -1738,6 +1779,42 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                 </div>
                 {/** Mostrar conversiones para Total */}
                 {renderConversions(pedidoTotal)}
+
+                {pedidoResumen && (
+                  <div className="mt-3 space-y-1 text-xs text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span>${pedidoResumen.base.toFixed(2)}</span>
+                    </div>
+                    {pedidoResumen.descuentos > 0 && (
+                      <div className="flex justify-between text-red-500">
+                        <span>Descuentos</span>
+                        <span>- ${pedidoResumen.descuentos.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {pedidoResumen.recargos > 0 && (
+                      <div className="flex justify-between text-rose-600">
+                        <span>Recargos</span>
+                        <span>+ ${pedidoResumen.recargos.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {pedidoAjustes.length > 0 && (
+                  <div className="mt-3 space-y-1 text-xs text-gray-500">
+                    {pedidoAjustes.map((ajuste, idx) => (
+                      <div key={ajuste.id ?? `ajuste-${idx}`} className="flex justify-between gap-3">
+                        <span className="flex-1 truncate">
+                          {`${(ajuste.tipo || '').toString().toLowerCase() === 'recargo' ? 'Recargo' : 'Descuento'} · ${ajuste.modo === 'monto' ? '$' : '%'}${roundMoney(Number(ajuste.valor ?? 0)).toFixed(ajuste.modo === 'monto' ? 2 : 0)} — ${ajuste.motivo || 'Sin motivo'}`}
+                        </span>
+                        {Number.isFinite(Number(ajuste.monto_aplicado)) && (
+                          <span>${roundMoney(Number(ajuste.monto_aplicado)).toFixed(2)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="mt-4 text-sm text-gray-600">Pagado (equiv.)</div>
                 <div className="text-lg font-medium text-sky-600 mt-1">{paymentsEquivalenciaSum.toFixed(2)}</div>

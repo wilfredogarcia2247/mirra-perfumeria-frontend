@@ -775,31 +775,79 @@ export async function deleteTasaCambio(id: number) {
 }
 
 // Completar (despachar) un pedido de venta: POST /api/pedidos-venta/:id/completar
-// Ahora acepta opcionalmente un objeto { pago: { ... } } en el body para registrar el pago
-export async function completarPedidoVenta(id: number, pago?: any) {
-  const body = pago ? { pago } : undefined;
+// Acepta opcionalmente { pago, ajustes } en el body para registrar pago y/o ajustes en el mismo paso
+export async function completarPedidoVenta(
+  id: number,
+  payload?: { pago?: any; ajustes?: any } | any
+) {
+  let body: any = undefined;
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const hasPago = Object.prototype.hasOwnProperty.call(payload, 'pago');
+    const hasAjustes = Object.prototype.hasOwnProperty.call(payload, 'ajustes');
+    if (hasPago || hasAjustes) {
+      const data: any = {};
+      if (hasPago) data.pago = payload.pago;
+      if (hasAjustes) data.ajustes = payload.ajustes;
+      if (Object.keys(data).length > 0) body = data;
+    } else if (payload) {
+      body = { pago: payload };
+    }
+  } else if (payload) {
+    body = { pago: payload };
+  }
+
   try {
-    // Log exact payload that will be sent to the backend for diagnosis
-    // Esto facilita verificar en la consola del navegador si la tasa/símbolo vienen desde el frontend
-    // eslint-disable-next-line no-console
     console.debug('api.completarPedidoVenta.request', { id, body });
   } catch (e) {
     // noop
   }
-  return apiFetch(`/pedidos-venta/${id}/completar`, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+
+  return apiFetch(`/pedidos-venta/${id}/completar`, {
+    method: 'POST',
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
 
 // Finalizar pedido (alias explícito): POST /api/pedidos-venta/:id/finalizar
 // Funcionalmente equivalente a /completar y acepta el mismo body opcional { pago: {...} }
-export async function finalizarPedidoVenta(id: number, pago?: any) {
-  const body = pago ? { pago } : undefined;
-  return apiFetch(`/pedidos-venta/${id}/finalizar`, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+export async function finalizarPedidoVenta(
+  id: number,
+  payload?: { pago?: any; ajustes?: any } | any
+) {
+  let body: any = undefined;
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const hasPago = Object.prototype.hasOwnProperty.call(payload, 'pago');
+    const hasAjustes = Object.prototype.hasOwnProperty.call(payload, 'ajustes');
+    if (hasPago || hasAjustes) {
+      const data: any = {};
+      if (hasPago) data.pago = payload.pago;
+      if (hasAjustes) data.ajustes = payload.ajustes;
+      if (Object.keys(data).length > 0) body = data;
+    } else if (payload) {
+      body = { pago: payload };
+    }
+  } else if (payload) {
+    body = { pago: payload };
+  }
+
+  return apiFetch(`/pedidos-venta/${id}/finalizar`, {
+    method: 'POST',
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
 
 // Cambiar estado de pedido: PUT /api/pedidos-venta/:id/status
 // Permite enviar { estado: "Completado", pago: { ... } } para completar y registrar pago
 export async function updatePedidoStatus(id: number, data: { estado: string; pago?: any }) {
   return apiFetch(`/pedidos-venta/${id}/status`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function updatePedidoAjustes(id: number, ajustes: any[]) {
+  const payload = { ajustes: Array.isArray(ajustes) ? ajustes : [] };
+  return apiFetch(`/pedidos-venta/${id}/ajustes`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
 }
 
 /**
@@ -821,7 +869,21 @@ export async function updatePedidoStatus(id: number, data: { estado: string; pag
 export async function completarPedidoAtomico(
   id: number,
   almacen_venta_id: number,
-  pago: {
+  pagoOrOptions?: {
+    pago?: {
+      forma_pago_id: number;
+      banco_id: number;
+      monto: number;
+      referencia?: string;
+      fecha_transaccion?: string;
+      tasa?: number;
+      tasa_simbolo?: string;
+      tasa_monto?: number;
+      moneda?: string;
+      equivalencia?: number;
+    };
+    ajustes?: any;
+  } | {
     forma_pago_id: number;
     banco_id: number;
     monto: number;
@@ -839,13 +901,34 @@ export async function completarPedidoAtomico(
   try {
     console.log('🚀 [ATOMICO] Iniciando completar pedido atomico:', id);
 
-    const payload = {
+    let pago: any = null;
+    let ajustes: any = undefined;
+    if (pagoOrOptions && typeof pagoOrOptions === 'object' && !Array.isArray(pagoOrOptions)) {
+      const hasPago = Object.prototype.hasOwnProperty.call(pagoOrOptions, 'pago');
+      const hasAjustes = Object.prototype.hasOwnProperty.call(pagoOrOptions, 'ajustes');
+      if (hasPago || hasAjustes) {
+        if (hasPago) pago = pagoOrOptions.pago;
+        if (hasAjustes) ajustes = pagoOrOptions.ajustes;
+      } else {
+        pago = pagoOrOptions;
+      }
+    } else if (pagoOrOptions) {
+      pago = pagoOrOptions;
+    }
+
+    const payload: any = {
       almacen_venta_id,
-      pago: {
+    };
+
+    if (pago) {
+      payload.pago = {
         ...pago,
         fecha_transaccion: pago.fecha_transaccion || new Date().toISOString(),
-      }
-    };
+      };
+    }
+    if (ajustes !== undefined) {
+      payload.ajustes = ajustes;
+    }
 
     const result = await apiFetch(`/pedidos-venta/${id}/completar-todo-atomico`, {
       method: 'POST',
