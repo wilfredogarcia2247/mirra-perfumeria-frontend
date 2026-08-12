@@ -339,7 +339,11 @@ export default function Pedidos() {
     const val = p?.fecha || p?.created_at || p?.createdAt;
     if (!val) return '-';
     try {
-      return format(new Date(val), 'dd/MM/yyyy hh:mm a');
+      const raw = String(val);
+      // PostgreSQL devuelve TIMESTAMP WITHOUT TIME ZONE sin offset. Es una hora de Caracas.
+      const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+      const parsed = new Date(hasTimezone ? raw : `${raw.replace(' ', 'T')}-04:00`);
+      return format(parsed, 'dd/MM/yyyy hh:mm a');
     } catch (e) {
       return val;
     }
