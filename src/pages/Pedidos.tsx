@@ -353,19 +353,19 @@ export default function Pedidos() {
   const fmtTotal = (p: any) => {
     const base = roundMoney(
       p?.total_base ??
-        (typeof p?.total === 'number'
-          ? p.total
-          : (() => {
-              const numeric = Number(p?.total);
-              return Number.isFinite(numeric) ? numeric : 0;
-            })())
+      (typeof p?.total === 'number'
+        ? p.total
+        : (() => {
+          const numeric = Number(p?.total);
+          return Number.isFinite(numeric) ? numeric : 0;
+        })())
     );
     const descuentos = roundMoney(p?.total_descuentos ?? 0);
     const recargos = roundMoney(p?.total_recargos ?? 0);
     const final = roundMoney(
       p?.total_final ??
-        p?.total ??
-        (base - descuentos + recargos)
+      p?.total ??
+      (base - descuentos + recargos)
     );
 
     let label = `$${final.toFixed(2)}`;
@@ -398,8 +398,8 @@ export default function Pedidos() {
       let pagos = Array.isArray(p?.pagos)
         ? p.pagos
         : (Array.isArray(p?.pagos_venta)
-            ? p.pagos_venta
-            : (Array.isArray(p?.payments) ? p.payments : []));
+          ? p.pagos_venta
+          : (Array.isArray(p?.payments) ? p.payments : []));
 
       try {
         const candidate =
@@ -1790,15 +1790,15 @@ export default function Pedidos() {
                           <tr key={it.id} className="border-t">
                             <td className="py-2 w-16">
                               <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
-                                <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => { 
-                                const t = e.currentTarget as HTMLImageElement; 
-                                t.onerror = null; 
-                                // Usar una imagen aleatoria del asset folder como fallback
-                                const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
-                                const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                                t.src = randomFallback; 
-                                console.error('[Pedidos] image load failed, using fallback:', t.src); 
-                              }} />
+                                <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => {
+                                  const t = e.currentTarget as HTMLImageElement;
+                                  t.onerror = null;
+                                  // Usar una imagen aleatoria del asset folder como fallback
+                                  const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
+                                  const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+                                  t.src = randomFallback;
+                                  console.error('[Pedidos] image load failed, using fallback:', t.src);
+                                }} />
                               </div>
                             </td>
                             <td className="py-2 align-top">
