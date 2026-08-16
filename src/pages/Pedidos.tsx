@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, completarOrdenProduccion, searchPedidos } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText } from 'lucide-react';
@@ -706,6 +706,9 @@ export default function Pedidos() {
   const [presentacionesOptions, setPresentacionesOptions] = useState<any[]>([]);
   const [addPresentacionId, setAddPresentacionId] = useState<number | null>(null);
   const [productosOptions, setProductosOptions] = useState<any[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState<string>('');
+  const [productSearchLoading, setProductSearchLoading] = useState<boolean>(false);
+  const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
   const [addSubmitting, setAddSubmitting] = useState<boolean>(false);
   // Cuando cambie la cantidad a producir, recalcular las cantidades sugeridas
   // Cuando cambie la cantidad a producir, recalcular las cantidades sugeridas
@@ -1017,8 +1020,19 @@ export default function Pedidos() {
   }, []);
 
   // Cargar lista de productos para agregar (cuando se abre el modal)
-  const loadProductosOptions = async () => {
+  // Preferir el catálogo público (rápido, sin token). Hacemos fallback a /productos protegido.
+  const loadProductosOptions = async (force = false) => {
     try {
+      if (!force && Array.isArray(productosOptions) && productosOptions.length > 0) return;
+      try {
+        const res: any = await getCatalogoPaginated({ includeOutOfStock: true, limit: 1000 });
+        const list = Array.isArray(res) ? res : (res?.items || res?.data || []);
+        setProductosOptions(list || []);
+        return;
+      } catch (errCat) {
+        console.debug('getCatalogoPaginated falló, intentando fallback a /productos:', errCat);
+      }
+
       const res = await getProductos();
       const list = Array.isArray(res) ? res : (res?.data || res?.items || []);
       setProductosOptions(list || []);
@@ -1028,15 +1042,54 @@ export default function Pedidos() {
     }
   };
 
+  // Debounced search: cuando el usuario escribe en el campo de búsqueda del modal
+  useEffect(() => {
+    let mounted = true;
+    const term = (productSearchTerm || '').toString().trim();
+    const handle = setTimeout(async () => {
+      if (!mounted) return;
+      if (!term || term.length < 2) {
+        // si el término es muy corto, mostrar la lista cargada inicialmente
+        // (no disparar búsqueda en servidor)
+        return;
+      }
+      setProductSearchLoading(true);
+      try {
+        const res: any = await getCatalogoPaginated({ q: term, includeOutOfStock: true, limit: 50 });
+        const list = Array.isArray(res) ? res : (res?.items || res?.data || []);
+        if (!mounted) return;
+        setProductosOptions(list || []);
+        setShowProductDropdown(true);
+      } catch (err) {
+        console.debug('Error buscando productos:', err);
+      } finally {
+        if (mounted) setProductSearchLoading(false);
+      }
+    }, 300);
+    return () => { mounted = false; clearTimeout(handle); };
+  }, [productSearchTerm]);
+
   const loadPresentacionesForProduct = async (productId: number) => {
     try {
+      // Si el catálogo ya devolvió fórmulas adjuntas al producto, las usamos directamente
+      const prod = (productosOptions || []).find((p: any) => Number(p.id) === Number(productId));
+      if (prod) {
+        const variantes = Array.isArray(prod.formulas) && prod.formulas.length > 0 ? prod.formulas : (Array.isArray(prod.tamanos) ? prod.tamanos : []);
+        if (Array.isArray(variantes) && variantes.length > 0) {
+          const opts = variantes.map((f: any) => ({ id: f.id, nombre: f.nombre ?? f.titulo ?? f.nombre ?? `#${f.id}`, precio_venta: f.precio_venta ?? f.precio ?? f.precio_calculado ?? null }));
+          setPresentacionesOptions(opts);
+          setAddPresentacionId(opts.length > 0 ? opts[0].id : null);
+          setAddPrecio(opts.length > 0 ? (opts[0].precio_venta ?? null) : null);
+          return;
+        }
+      }
+
+      // Fallback: obtener fórmulas globalmente y filtrar
       const res = await getFormulas();
       const list = Array.isArray(res) ? res : (res?.data || res?.items || []);
       const matches = (list || []).filter((f: any) => Number(f.producto_terminado_id ?? f.producto_id) === Number(productId));
-      // Map to presentacion objects with id, nombre, precio_venta
-      const opts = matches.map((f: any) => ({ id: f.id, nombre: f.nombre ?? f.titulo ?? `#${f.id}`, precio_venta: f.precio_venta ?? f.precio ?? null }));
+      const opts = matches.map((f: any) => ({ id: f.id, nombre: f.nombre ?? `#${f.id}`, precio_venta: f.precio_venta ?? null }));
       setPresentacionesOptions(opts);
-      // reset selection
       setAddPresentacionId(opts.length > 0 ? opts[0].id : null);
       setAddPrecio(opts.length > 0 ? (opts[0].precio_venta ?? null) : null);
     } catch (e) {
@@ -1769,7 +1822,7 @@ export default function Pedidos() {
                   <div className="flex justify-between items-center">
                     <div />
                     <div>
-                      <Button size="sm" variant="outline" onClick={async () => { await loadProductosOptions(); setAddProductId(null); setAddPresentacionId(null); setAddPrecio(null); setAddCantidad(1); setAddModalOpen(true); }}>Agregar producto</Button>
+                      <Button size="sm" variant="outline" onClick={async () => { await loadProductosOptions(); setAddProductId(null); setAddPresentacionId(null); setAddPrecio(null); setAddCantidad(1); setProductSearchTerm(''); setShowProductDropdown(false); setAddModalOpen(true); }}>Agregar producto</Button>
                     </div>
                   </div>
                   <div className="overflow-auto">
@@ -2282,33 +2335,57 @@ export default function Pedidos() {
 
             {/* Modal para agregar producto al pedido */}
             <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-              <DialogContent className="max-w-md bg-gradient-to-br from-white to-rose-50 rounded-lg shadow-lg border border-rose-100">
+              <DialogContent className="max-w-md bg-gradient-to-br from-white to-rose-50 rounded-lg shadow-lg border border-rose-100 overflow-visible">
                 <DialogHeader>
                   <DialogTitle>Agregar producto</DialogTitle>
                   <DialogDescription>Agregar un nuevo producto a este pedido.</DialogDescription>
                 </DialogHeader>
                 <div className="p-2 space-y-3">
-                  <div>
+                  <div className="relative">
                     <label className="text-sm">Producto</label>
-                    <select className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={addProductId ?? ''} onChange={async (e) => { const v = e.target.value ? Number(e.target.value) : null; setAddProductId(v); if (v) await loadPresentacionesForProduct(v); else { setPresentacionesOptions([]); setAddPresentacionId(null); setAddPrecio(null); } }}>
-                      <option value="">-- selecciona un producto --</option>
-                      {productosOptions.map((pr: any) => (
-                        <option key={pr.id} value={pr.id}>{pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`}</option>
-                      ))}
-                    </select>
+                    <input type="text" placeholder="Escribe para buscar producto..." className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={productSearchTerm} onChange={(e) => { setProductSearchTerm(e.target.value); setShowProductDropdown(true); setAddProductId(null); setPresentacionesOptions([]); setAddPresentacionId(null); setAddPrecio(null); }} />
+                    {showProductDropdown && (
+                      <ul className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-auto bg-white border rounded shadow">
+                        {productSearchLoading ? (
+                          <li className="p-2 text-sm text-gray-500">Buscando...</li>
+                        ) : (productosOptions && productosOptions.length > 0) ? (
+                          productosOptions.map((pr: any) => (
+                            <li key={pr.id} className="p-2 hover:bg-rose-50 cursor-pointer text-sm" onClick={async () => { setAddProductId(Number(pr.id)); setProductSearchTerm(pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`); setShowProductDropdown(false); await loadPresentacionesForProduct(Number(pr.id)); }}>
+                              {pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="p-2 text-sm text-gray-500">No se encontraron productos</li>
+                        )}
+                      </ul>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm">Presentación</label>
-                    <select className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={addPresentacionId ?? ''} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setAddPresentacionId(v); const sel = presentacionesOptions.find((p) => Number(p.id) === Number(v)); setAddPrecio(sel ? (sel.precio_venta ?? null) : null); }}>
-                      <option value="">-- selecciona presentación --</option>
-                      {presentacionesOptions.map((pr: any) => (
-                        <option key={pr.id} value={pr.id}>{pr.nombre ?? `#${pr.id}`} {pr.precio_venta ? ` — ${pr.precio_venta}` : ''}</option>
-                      ))}
-                    </select>
+                    {!addProductId ? (
+                      <div className="mt-1 text-sm text-gray-500">Seleccione un producto primero</div>
+                    ) : (
+                      <div className="mt-1 grid gap-2">
+                        {presentacionesOptions.length === 0 ? (
+                          <div className="text-sm text-gray-500">No hay presentaciones disponibles</div>
+                        ) : (
+                          presentacionesOptions.map((pr: any) => (
+                            <label key={pr.id} className="flex items-center gap-2 p-2 border rounded hover:bg-rose-50 cursor-pointer">
+                              <input type="radio" name="presentacion" className="w-4 h-4" checked={Number(addPresentacionId) === Number(pr.id)} onChange={() => { setAddPresentacionId(Number(pr.id)); setAddPrecio(pr.precio_venta ?? null); }} />
+                              <div className="flex-1 text-sm">
+                                <div className="font-medium">{pr.nombre ?? `#${pr.id}`}</div>
+                                {pr.precio_venta ? <div className="text-xs text-gray-500">{pr.precio_venta}</div> : null}
+                              </div>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm">Cantidad</label>
-                    <input type="number" min={0.01} step={0.01} className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={addCantidad} onChange={(e) => setAddCantidad(Number(String(e.target.value).replace(',', '.')))} />
+                    <input type="number" min={1} step={1} className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={addCantidad} onChange={(e) => { const parsed = parseInt(String(e.target.value), 10); setAddCantidad(Number.isFinite(parsed) && parsed >= 1 ? parsed : 1); }} />
+                    <div className="text-xs text-gray-500 mt-1">Ingrese un número entero (unidades)</div>
                   </div>
                   <div>
                     <label className="text-sm">Precio unitario (desde presentación)</label>
@@ -2324,7 +2401,7 @@ export default function Pedidos() {
                       return;
                     }
                     if (!addProductId) { toast.error('Seleccione un producto'); return; }
-                    if (!addCantidad || Number(addCantidad) <= 0) { toast.error('Ingrese una cantidad válida'); return; }
+                    if (!addCantidad || Number(addCantidad) < 1) { toast.error('Ingrese una cantidad válida (entera mayor o igual a 1)'); return; }
                     // Si se seleccionó presentación, validar pertenece al producto
                     if (addPresentacionId) {
                       const ok = presentacionesOptions.find((p) => Number(p.id) === Number(addPresentacionId));
