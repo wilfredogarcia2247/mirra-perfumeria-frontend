@@ -85,10 +85,12 @@ export default function Productos() {
       proveedor_id: null,
       categoria_id: null,
       marca_id: null,
+      visible_en_catalogo: true,
     },
   });
 
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
+  const [visibleEnCatalogo, setVisibleEnCatalogo] = useState(true);
   const [marcaId, setMarcaId] = useState<number | null>(null);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [marcas, setMarcas] = useState<any[]>([]);
@@ -134,9 +136,11 @@ export default function Productos() {
       // Inicializar la URL de imagen con la existente del producto (si la tiene).
       // Soportar ambas propiedades por si la API usa `image_url` o `imagen_url`.
       setImageUrl(editingProduct?.imagen_url ?? editingProduct?.image_url ?? null);
-      // inicializar categoria/marca
+      // inicializar categoria/marca/visibilidad
       setCategoriaId(editingProduct?.categoria_id ?? null);
       setMarcaId(editingProduct?.marca_id ?? null);
+      setVisibleEnCatalogo(editingProduct?.visible_en_catalogo ?? true);
+      form.setValue('visible_en_catalogo', editingProduct?.visible_en_catalogo ?? true);
       // cargar categorías disponibles cuando se abre el modal
       (async () => {
         try {
@@ -212,6 +216,7 @@ export default function Productos() {
         image_url: imageUrl || null,
         categoria_id: categoriaId ?? null,
         marca_id: marcaId ?? null,
+        visible_en_catalogo: Boolean(visibleEnCatalogo),
       };
       console.log("Creando/actualizando producto, payload:", payload);
       if (editingProduct) {
@@ -237,10 +242,11 @@ export default function Productos() {
   // Asegurar que al abrir el modal en modo 'nuevo' el formulario esté vacío.
   useEffect(() => {
     if (isOpen && !editingProduct) {
-      form.reset({ nombre: '', unidad: 'unidad', stock: 0, costo: 0, precio_venta: 0, proveedor_id: null, categoria_id: null, marca_id: null });
+      form.reset({ nombre: '', unidad: 'unidad', stock: 0, costo: 0, precio_venta: 0, proveedor_id: null, categoria_id: null, marca_id: null, visible_en_catalogo: true });
       setImageUrl(null);
       setCategoriaId(null);
       setMarcaId(null);
+      setVisibleEnCatalogo(true);
       setProductDetalle(null);
     }
   }, [isOpen, editingProduct]);
@@ -285,6 +291,7 @@ export default function Productos() {
           image_url: url,
           categoria_id: categoriaId ?? (editingProduct?.categoria_id ?? null),
           marca_id: marcaId ?? (editingProduct?.marca_id ?? null),
+          visible_en_catalogo: Boolean(visibleEnCatalogo ?? true),
         };
 
         const updated = await updateProducto(editingProduct.id, payload);
@@ -580,6 +587,23 @@ export default function Productos() {
                             </FormControl>
                           </div>
                         </div>
+
+                        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+                          <input
+                            id="visible_en_catalogo"
+                            type="checkbox"
+                            checked={visibleEnCatalogo}
+                            onChange={(e) => {
+                              const next = e.target.checked;
+                              setVisibleEnCatalogo(next);
+                              form.setValue('visible_en_catalogo', next);
+                            }}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          <label htmlFor="visible_en_catalogo" className="text-sm font-medium text-foreground">
+                            Mostrar en catálogo público
+                          </label>
+                        </div>
                       </div>
 
                       {/* Columna Derecha - Imagen */}
@@ -757,7 +781,16 @@ export default function Productos() {
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{product.nombre}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{product.nombre}</span>
+                          {product.visible_en_catalogo === false ? (
+                            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-700">
+                              Oculto
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       {/* campo tipo eliminado */}
                       <TableCell>{product.unidad}</TableCell>
                       <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
@@ -799,6 +832,8 @@ export default function Productos() {
                               });
                               setCategoriaId(product.categoria_id ?? null);
                               setMarcaId(product.marca_id ?? null);
+                              setVisibleEnCatalogo(product.visible_en_catalogo ?? true);
+                              form.setValue('visible_en_catalogo', product.visible_en_catalogo ?? true);
                               setIsOpen(true);
                               // cargar detalle completo (incluye inventario por almacén)
                               setLoadingDetalle(true);
