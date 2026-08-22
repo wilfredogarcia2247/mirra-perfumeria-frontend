@@ -74,7 +74,7 @@ export default function Productos() {
   const [assignMotivo, setAssignMotivo] = useState<string>("");
   const [assignReferencia, setAssignReferencia] = useState<string>("");
   const [assignLoading, setAssignLoading] = useState(false);
-  
+
   const form = useForm({
     defaultValues: {
       nombre: "",
@@ -299,8 +299,8 @@ export default function Productos() {
         setProductos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
         setEditingProduct(updated);
         toast.success('Imagen guardada en el servidor');
-          // actualizar detalle de inventario si está presente
-          setProductDetalle(updated);
+        // actualizar detalle de inventario si está presente
+        setProductDetalle(updated);
       } catch (err) {
         console.error('Error guardando la imagen en el backend', err);
         const message = parseApiError(err) || 'No se pudo guardar la imagen en el servidor';
@@ -432,12 +432,12 @@ export default function Productos() {
     }
   }
 
-  
+
 
   return (
     <Layout>
       <div className="space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Productos</h2>
             <p className="text-muted-foreground">Gestión completa del catálogo de productos</p>
@@ -481,9 +481,9 @@ export default function Productos() {
                         <FormItem>
                           <FormLabel>Nombre del Producto</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="Ej: Jabón de Lavanda" 
-                              {...form.register("nombre", { required: true })} 
+                            <Input
+                              placeholder="Ej: Jabón de Lavanda"
+                              {...form.register("nombre", { required: true })}
                             />
                           </FormControl>
                         </FormItem>
@@ -511,8 +511,8 @@ export default function Productos() {
                           <div>
                             <FormItem>
                               <FormLabel>Stock</FormLabel>
-                                <FormControl>
-                                  <Input readOnly value={
+                              <FormControl>
+                                <Input readOnly value={
                                   // mostrar stock total calculado desde productDetalle si existe, si no usar editingProduct.stock o 0
                                   (() => {
                                     const inv = (productDetalle?.inventario) || (editingProduct as any)?.inventario;
@@ -521,20 +521,20 @@ export default function Productos() {
                                     }
                                     return Number(editingProduct?.stock ?? 0).toLocaleString('es-AR');
                                   })()
-                                  } className="w-full" />
-                                </FormControl>
+                                } className="w-full" />
+                              </FormControl>
                             </FormItem>
                           </div>
 
                           <FormItem>
                             <FormLabel>Costo</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
+                              <Input
+                                type="number"
+                                step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                {...form.register("costo", { valueAsNumber: true })} 
+                                {...form.register("costo", { valueAsNumber: true })}
                               />
                             </FormControl>
                           </FormItem>
@@ -542,12 +542,12 @@ export default function Productos() {
                           <FormItem>
                             <FormLabel>Precio Venta</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
+                              <Input
+                                type="number"
+                                step="0.01"
                                 min="0"
                                 placeholder="0.00"
-                                {...form.register("precio_venta", { valueAsNumber: true })} 
+                                {...form.register("precio_venta", { valueAsNumber: true })}
                               />
                             </FormControl>
                           </FormItem>
@@ -608,14 +608,14 @@ export default function Productos() {
 
                       {/* Columna Derecha - Imagen */}
                       <div className="space-y-4">
-                        
-                        
+
+
 
                         {/* Contenedor de subida separado y más claro */}
                         <FormItem className="col-span-2">
                           <FormLabel>Subir nueva imagen (opcional)</FormLabel>
                           <div className="mt-2 p-3 border rounded-md bg-background">
-                            <ImageUpload 
+                            <ImageUpload
                               onImageUpload={handleImageUpload}
                               // Pasar la imagen que viene de la base de datos o la última subida
                               // (imageUrl) para que el uploader muestre la preview anterior/alterna al editar.
@@ -625,7 +625,7 @@ export default function Productos() {
                           </div>
                         </FormItem>
                         {/* Inventario por almacén (solo en modo edición) */}
-                        {editingProduct && ( <>
+                        {editingProduct && (<>
                           <div className="col-span-2 mt-4">
                             <h4 className="text-sm font-semibold mb-2">Inventario por almacén</h4>
                             {loadingDetalle ? (
@@ -692,9 +692,9 @@ export default function Productos() {
                     </div>
 
                     <DialogFooter className="border-t pt-4">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => {
                           setIsOpen(false);
                           setImageUrl(null);
@@ -769,14 +769,14 @@ export default function Productos() {
                             src={getImageUrl(product) ?? ''}
                             alt={product.nombre ?? 'imagen producto'}
                             className="w-full h-full object-cover"
-                            onError={(e) => { 
-                              const t = e.currentTarget as HTMLImageElement; 
-                              t.onerror = null; 
+                            onError={(e) => {
+                              const t = e.currentTarget as HTMLImageElement;
+                              t.onerror = null;
                               // Usar una imagen aleatoria del asset folder como fallback
                               const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
                               const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                              t.src = randomFallback; 
-                              console.error('[Productos] image load failed, using fallback:', t.src); 
+                              t.src = randomFallback;
+                              console.error('[Productos] image load failed, using fallback:', t.src);
                             }}
                           />
                         </div>
@@ -813,7 +813,7 @@ export default function Productos() {
                       <TableCell>{product.precio_venta ?? "-"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                         
+
                           <Button
                             variant="ghost"
                             size="icon"
@@ -859,7 +859,7 @@ export default function Productos() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          
+
                           <Button
                             variant="ghost"
                             size="icon"
