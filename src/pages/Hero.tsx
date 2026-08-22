@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
@@ -34,6 +34,13 @@ export default function Hero() {
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
+  const catalogRouteKey = categorySlug || 'all';
+  const randomCatalogPageRef = useRef<string | null>(null);
+
+  const getRandomCatalogPage = (totalItems: number, itemsPerPage: number): number => {
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    return totalPages <= 1 ? 1 : (Math.floor(Math.random() * totalPages) + 1);
+  };
 
   // Load public catalog - fetch all products once and handle pagination client-side
   // Backend returns all products without server-side pagination
@@ -97,7 +104,17 @@ export default function Hero() {
 
         // Calculate pagination for current page
         const totalCount = categoryFiltered.length;
-        const start = (page - 1) * perPage;
+        const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
+        const isFirstRouteLoad = randomCatalogPageRef.current !== catalogRouteKey;
+
+        let activePage = page;
+        if (isFirstRouteLoad) {
+          randomCatalogPageRef.current = catalogRouteKey;
+          activePage = getRandomCatalogPage(totalCount, perPage);
+          setPage(activePage);
+        }
+
+        const start = (activePage - 1) * perPage;
         const pageItems = categoryFiltered.slice(start, start + perPage);
 
         setProducts(pageItems);
