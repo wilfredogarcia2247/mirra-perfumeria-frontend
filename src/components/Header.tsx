@@ -92,11 +92,15 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo y nombre */}
           <div className="flex items-center space-x-3">
-            <Link to="/" className="flex items-center space-x-3">
-              <div className=" bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm">
+            <Link to="/" className="flex items-center space-x-3" aria-label="Mirra Perfumería · Inicio">
+              <div className="bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm overflow-hidden">
                 <img
                   src="/logoColor.png"
-                  alt="Mirra Perfumería"
+                  alt="Logo de Mirra Perfumería, marca de fragancias selectas"
+                  width={56}
+                  height={56}
+                  loading="eager"
+                  decoding="async"
                   className="w-14 h-14 md:w-14 md:h-14 rounded-full object-cover"
                 />
               </div>
