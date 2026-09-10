@@ -7,7 +7,7 @@ import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Loader2, X, Search, User, Phone, FileText, Trash2, Send } from 'lucide-react';
+import { Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle } from 'lucide-react';
 
 import Footer from '@/components/Footer';
 import ProductCarousel from '@/components/SocialMediaCarousel';
@@ -378,6 +378,19 @@ export default function Hero() {
           </div>
         </div>
       </div>
+
+      <a
+        href="https://wa.me/584141454086?text=Hola%20Mirra%20Perfumer%C3%ADa%2C%20quiero%20consultar%20sobre%20un%20producto%20del%20cat%C3%A1logo."
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Hablar con Mirra Perfumería por WhatsApp"
+        className="group fixed bottom-5 right-4 sm:bottom-7 sm:right-7 z-40 inline-flex items-center gap-2 rounded-full border border-white/70 bg-gradient-to-r from-primary-500 to-amber-600 px-3 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(158,108,57,0.28)] transition-all duration-300 hover:-translate-y-1 hover:from-primary-600 hover:to-amber-700 hover:shadow-[0_14px_32px_rgba(158,108,57,0.36)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-primary-300/40"
+      >
+        <MessageCircle className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
+        <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-40 group-hover:opacity-100 group-focus-visible:max-w-40 group-focus-visible:opacity-100">
+          Habla con nosotros
+        </span>
+      </a>
 
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
