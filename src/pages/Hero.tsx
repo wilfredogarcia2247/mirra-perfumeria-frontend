@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
-import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic } from '@/integrations/api';
+import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula } from '@/integrations/api';
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
@@ -28,7 +28,12 @@ export default function Hero() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
+  const [tipoDocumento, setTipoDocumento] = useState('V');
   const [cedulaCliente, setCedulaCliente] = useState('');
+  const [clienteId, setClienteId] = useState<number | null>(null);
+  const [clienteExistente, setClienteExistente] = useState(false);
+  const [documentoConsultado, setDocumentoConsultado] = useState(false);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
@@ -36,6 +41,49 @@ export default function Hero() {
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
   const catalogRouteKey = categorySlug || 'all';
   const randomCatalogPageRef = useRef<string | null>(null);
+
+  const buscarClientePorCedula = async (value: string) => {
+    const cedula = value.trim();
+    if (!cedula) {
+      setClienteId(null);
+      setClienteExistente(false);
+      setDocumentoConsultado(false);
+      setNombreCliente('');
+      setTelefonoCliente('');
+      return null;
+    }
+
+    try {
+      setBuscandoCliente(true);
+      setDocumentoConsultado(false);
+      const response = await lookupClienteByCedula(cedula);
+      const cliente = response?.exists ? response.cliente : null;
+
+      if (cliente) {
+        setClienteId(Number(cliente.id));
+        setClienteExistente(true);
+        setDocumentoConsultado(true);
+        setNombreCliente(String(cliente.nombre || ''));
+        setTelefonoCliente(String(cliente.telefono || ''));
+        return cliente;
+      }
+
+      setClienteId(null);
+      setClienteExistente(false);
+      setDocumentoConsultado(true);
+      setNombreCliente('');
+      setTelefonoCliente('');
+      return null;
+    } catch (error) {
+      setClienteId(null);
+      setClienteExistente(false);
+      setDocumentoConsultado(false);
+      toast.error('No se pudo consultar el cliente');
+      return null;
+    } finally {
+      setBuscandoCliente(false);
+    }
+  };
 
   const getRandomCatalogPage = (totalItems: number, itemsPerPage: number): number => {
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -526,8 +574,13 @@ export default function Hero() {
                       <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
-                        if (!nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
-                        if (!telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
+                        if (!cedulaCliente.trim()) { toast.error('Ingrese el documento de identificación'); return; }
+                        const documentoCompleto = `${tipoDocumento}-${cedulaCliente.trim()}`;
+                        const clienteConsultado = clienteExistente ? null : await buscarClientePorCedula(documentoCompleto);
+                        const clienteEncontrado = clienteExistente || Boolean(clienteConsultado);
+                        const clienteIdActual = clienteId ?? (clienteConsultado ? Number(clienteConsultado.id) : null);
+                        if (!clienteEncontrado && !nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
+                        if (!clienteEncontrado && !telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
 
                         const lineas = cartItems.map((it) => {
                           const p: any = it.product as any;
@@ -568,9 +621,10 @@ export default function Hero() {
                         });
 
                         const payload = {
+                          cliente_id: clienteIdActual ?? undefined,
                           nombre_cliente: nombreCliente.trim(),
                           telefono: telefonoCliente.trim(),
-                          cedula: cedulaCliente.trim() || undefined,
+                          cedula: documentoCompleto,
                           lineas,
                           _preserve_productos: true,
                           productos: productosSnapshot,
@@ -588,7 +642,8 @@ export default function Hero() {
                           clear();
                           setIsCartOpen(false);
                           setIsCheckoutOpen(false);
-                          setNombreCliente(''); setTelefonoCliente(''); setCedulaCliente('');
+                          setNombreCliente(''); setTelefonoCliente(''); setCedulaCliente(''); setTipoDocumento('V');
+                          setClienteId(null); setClienteExistente(false); setDocumentoConsultado(false);
                         } catch (err: any) {
                           console.error('Error creando pedido:', err);
                           toast.error(err?.message || 'Error al crear pedido');
@@ -598,6 +653,51 @@ export default function Hero() {
                       }} className="space-y-4">
                         <div className="space-y-3">
                           <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Documento de identificación</label>
+                            <div className="flex gap-2">
+                              <select
+                                aria-label="Tipo de documento"
+                                value={tipoDocumento}
+                                onChange={(e) => {
+                                  setTipoDocumento(e.target.value);
+                                  setClienteId(null);
+                                  setClienteExistente(false);
+                                  setDocumentoConsultado(false);
+                                  setNombreCliente('');
+                                  setTelefonoCliente('');
+                                }}
+                                className="w-20 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                              >
+                                <option value="V">V</option>
+                                <option value="J">J</option>
+                                <option value="G">G</option>
+                                <option value="E">E</option>
+                              </select>
+                              <div className="relative flex-1">
+                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="12345678"
+                                  value={cedulaCliente}
+                                  onChange={(e) => {
+                                    setCedulaCliente(e.target.value.replace(/\D/g, ''));
+                                    setClienteId(null);
+                                    setClienteExistente(false);
+                                    setDocumentoConsultado(false);
+                                    setNombreCliente('');
+                                    setTelefonoCliente('');
+                                  }}
+                                  onBlur={() => void buscarClientePorCedula(`${tipoDocumento}-${cedulaCliente}`)}
+                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                />
+                              </div>
+                            </div>
+                            {buscandoCliente && <p className="mt-1 ml-1 text-xs text-gray-500">Consultando cliente...</p>}
+                            {clienteExistente && <p className="mt-1 ml-1 text-xs text-green-600">Cliente encontrado. Usaremos sus datos guardados.</p>}
+                          </div>
+
+                          {documentoConsultado && !clienteExistente && <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Nombre Completo</label>
                             <div className="relative">
                               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -609,9 +709,22 @@ export default function Hero() {
                                 className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
                               />
                             </div>
-                          </div>
+                          </div>}
 
-                          <div className="grid grid-cols-2 gap-3">
+                          {clienteExistente && <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Nombre Completo</label>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input
+                                type="text"
+                                value={nombreCliente}
+                                readOnly
+                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700"
+                              />
+                            </div>
+                          </div>}
+
+                          {documentoConsultado && !clienteExistente && <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Teléfono</label>
                               <div className="relative">
@@ -625,20 +738,7 @@ export default function Hero() {
                                 />
                               </div>
                             </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Cédula (Opcional)</label>
-                              <div className="relative">
-                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                  type="text"
-                                  placeholder="V-12345678"
-                                  value={cedulaCliente}
-                                  onChange={(e) => setCedulaCliente(e.target.value)}
-                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
-                                />
-                              </div>
-                            </div>
-                          </div>
+                          </div>}
                         </div>
 
                         <div className="flex gap-3 pt-2">

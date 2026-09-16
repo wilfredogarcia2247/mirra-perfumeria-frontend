@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
-import { createPedidoVentaPublic, getFormulas, getProducto, getTasaActiva } from '@/integrations/api';
+import { createPedidoVentaPublic, getFormulas, getProducto, getTasaActiva, lookupClienteByCedula } from '@/integrations/api';
 
 interface Props {
   open: boolean;
@@ -15,6 +15,9 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
   const [nombreCliente, setNombreCliente] = useState<string>('');
   const [telefono, setTelefono] = useState<string>('');
   const [cedula, setCedula] = useState<string>('');
+  const [clienteId, setClienteId] = useState<number | null>(null);
+  const [clienteExistente, setClienteExistente] = useState<boolean>(false);
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tasaActiva, setTasaActiva] = useState<any | null>(null);
   const [useTasaActiva, setUseTasaActiva] = useState<boolean>(true);
@@ -37,10 +40,46 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
 
   if (!open) return null;
 
+  const buscarClientePorCedula = async (cedulaIngresada: string) => {
+    const value = cedulaIngresada.trim();
+    if (!value) {
+      setClienteId(null);
+      setClienteExistente(false);
+      setNombreCliente('');
+      setTelefono('');
+      return;
+    }
+
+    try {
+      setBuscandoCliente(true);
+      const data = await lookupClienteByCedula(value);
+      if (data?.exists && data?.cliente) {
+        setClienteExistente(true);
+        setClienteId(Number(data.cliente.id));
+        setNombreCliente(String(data.cliente.nombre || ''));
+        setTelefono(String(data.cliente.telefono || ''));
+        return;
+      }
+
+      setClienteExistente(false);
+      setClienteId(null);
+      setNombreCliente('');
+      setTelefono('');
+    } catch (error) {
+      setClienteExistente(false);
+      setClienteId(null);
+      setNombreCliente('');
+      setTelefono('');
+    } finally {
+      setBuscandoCliente(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombreCliente.trim()) return toast.error('Ingrese el nombre del cliente');
-    if (!telefono.trim()) return toast.error('Ingrese el teléfono del cliente');
+    if (!cedula.trim()) return toast.error('Ingrese la cédula del cliente');
+    if (!clienteExistente && !nombreCliente.trim()) return toast.error('Ingrese el nombre del cliente');
+    if (!clienteExistente && !telefono.trim()) return toast.error('Ingrese el teléfono del cliente');
 
     const lineas = items.map((it) => ({ producto_id: it.product.id, cantidad: Number(it.qty || 0) }));
 
@@ -161,6 +200,7 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
     });
 
     const payload: any = {
+      cliente_id: clienteId ?? undefined,
       nombre_cliente: nombreCliente.trim(),
       telefono: telefono.trim(),
       cedula: cedula.trim() || undefined,
@@ -268,9 +308,43 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <div>
-              <label className="block text-sm font-medium text-copper-800">Nombre del cliente</label>
-              <input type="text" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: Cliente Publico Demo" />
+              <label className="block text-sm font-medium text-copper-800">Cédula / RIF</label>
+              <input
+                type="text"
+                value={cedula}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCedula(next);
+                  if (next.trim().length >= 4) {
+                    void buscarClientePorCedula(next);
+                  }
+                }}
+                onBlur={() => {
+                  if (cedula.trim()) void buscarClientePorCedula(cedula);
+                }}
+                className="mt-1 block w-full rounded-md border p-2"
+                placeholder="Ej: V55555555"
+              />
+              {buscandoCliente && <p className="mt-1 text-xs text-slate-500">Verificando cliente...</p>}
             </div>
+
+            {!clienteExistente && (
+              <div>
+                <label className="block text-sm font-medium text-copper-800">Nombre del cliente</label>
+                <input type="text" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: Cliente Publico Demo" />
+              </div>
+            )}
+            {!clienteExistente && (
+              <div>
+                <label className="block text-sm font-medium text-copper-800">Teléfono</label>
+                <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: 04140000001" />
+              </div>
+            )}
+            {clienteExistente && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                Cliente encontrado. Se reutilizarán sus datos guardados.
+              </div>
+            )}
             {tasaActiva ? (
               <div className="mt-2 flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">Tasa activa: <strong>{tasaActiva.simbolo} {typeof tasaActiva.monto === 'number' ? tasaActiva.monto : tasaActiva.monto}</strong></div>
@@ -284,14 +358,6 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
             ) : (
               <div className="mt-2 text-sm text-muted-foreground">No hay tasa activa disponible</div>
             )}
-            <div>
-              <label className="block text-sm font-medium text-copper-800">Teléfono</label>
-              <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: 04140000001" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-copper-800">Cédula / RIF (opcional)</label>
-              <input type="text" value={cedula} onChange={(e) => setCedula(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: V55555555" />
-            </div>
           </div>
 
           <div>

@@ -137,6 +137,20 @@ export async function getPedidosStats() {
 export async function getPedidoVenta(id: number) {
   return apiFetch(`/pedidos-venta/${id}`);
 }
+
+export async function lookupClienteByCedula(cedula: string) {
+  const cleanCedula = String(cedula || '').trim();
+  if (!cleanCedula) throw new Error('cedula requerida');
+  return apiFetch(`/clientes/lookup?cedula=${encodeURIComponent(cleanCedula)}`);
+}
+
+export async function lookupOrCreateCliente(data: any) {
+  return apiFetch('/clientes/lookup-or-create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function createProducto(data: any) {
   return apiFetch("/productos", { method: "POST", body: JSON.stringify(data) });
 }
@@ -1059,6 +1073,9 @@ export async function createPedidoVentaPublic(data: any) {
   // Construir payload final: por defecto minimalista, pero si el caller incluye `_preserve_productos: true`
   // se enviarán `productos` (snapshots) y `total` calculado cuando sea posible.
   const finalPayload: any = {};
+  if (payload.cliente_id !== undefined && payload.cliente_id !== null && payload.cliente_id !== '') {
+    finalPayload.cliente_id = Number(payload.cliente_id);
+  }
   finalPayload.nombre_cliente = payload.nombre_cliente;
   finalPayload.telefono = normalizePhoneForWhatsapp(payload.telefono);
   if (payload.cedula !== undefined) finalPayload.cedula = payload.cedula;
