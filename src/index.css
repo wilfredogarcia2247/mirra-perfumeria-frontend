@@ -20,42 +20,42 @@
     --popover: 0 0% 98%;
     --popover-foreground: 0 0% 20%;
 
-  /* Primary brand color: #ca9e67 */
-  --primary: 32 45% 60%;
-  --primary-foreground: 0 0% 100%;
+    /* Primary brand color: #ca9e67 */
+    --primary: 32 45% 60%;
+    --primary-foreground: 0 0% 100%;
 
-  /* Secondary color: #878787 */
-  --secondary: 0 0% 53%;
-  --secondary-foreground: 0 0% 20%;
+    /* Secondary color: #878787 */
+    --secondary: 0 0% 53%;
+    --secondary-foreground: 0 0% 20%;
 
     --muted: 270 20% 96%;
     --muted-foreground: 270 20% 45%;
 
-  /* Accent default (can be mapped to amber/rose/green depending on context) */
-  --accent: 30 85% 50%;
-  --accent-foreground: 20 30% 18%;
+    /* Accent default (can be mapped to amber/rose/green depending on context) */
+    --accent: 30 85% 50%;
+    --accent-foreground: 20 30% 18%;
 
-  /* Acentos de la marca (paleta secundaria) */
-  --rose-500: 340 90% 52%;
-  --earth-500: 20 40% 35%;
-  --amber-500: 40 90% 50%;
-  --green-500: 140 50% 36%;
-  --sky-500: 200 80% 52%;
-  --neutral-500: 35 20% 80%;
+    /* Acentos de la marca (paleta secundaria) */
+    --rose-500: 340 90% 52%;
+    --earth-500: 20 40% 35%;
+    --amber-500: 40 90% 50%;
+    --green-500: 140 50% 36%;
+    --sky-500: 200 80% 52%;
+    --neutral-500: 35 20% 80%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 90%;
-  --input: 0 0% 100%;
-  --ring: 0 0% 90%;
-  --ring: 20 35% 40%;
+    --border: 0 0% 90%;
+    --input: 0 0% 100%;
+    --ring: 0 0% 90%;
+    --ring: 20 35% 40%;
 
     --radius: 0.5rem;
 
-  --sidebar-background: 38 30% 12%;
-  --sidebar-foreground: 38 30% 96%;
-  --sidebar-primary: 20 35% 40%;
+    --sidebar-background: 38 30% 12%;
+    --sidebar-foreground: 38 30% 96%;
+    --sidebar-primary: 20 35% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 270 50% 15%;
     --sidebar-accent-foreground: 270 20% 95%;
@@ -67,10 +67,10 @@
     --chart-3: 200 70% 50%;
     --chart-4: 340 75% 55%;
     --chart-5: 160 60% 45%;
-    
-  --gradient-primary: linear-gradient(135deg, hsl(20 35% 40%) 0%, hsl(20 45% 55%) 100%);
-  --gradient-accent: linear-gradient(135deg, hsl(40 90% 55%) 0%, hsl(340 80% 53%) 100%);
-  --shadow-elegant: 0 10px 30px -10px hsl(20 35% 40% / 0.12);
+
+    --gradient-primary: linear-gradient(135deg, hsl(20 35% 40%) 0%, hsl(20 45% 55%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(40 90% 55%) 0%, hsl(340 80% 53%) 100%);
+    --shadow-elegant: 0 10px 30px -10px hsl(20 35% 40% / 0.12);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -124,7 +124,12 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-bell-mt font-semibold tracking-tight;
   }
 
@@ -156,6 +161,7 @@
     opacity: 0;
     transform: translateY(8px) scale(0.995);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -163,11 +169,11 @@
 }
 
 .animate-slide-up {
-  animation: slideUpFade 260ms cubic-bezier(.2,.9,.3,1) both;
+  animation: slideUpFade 260ms cubic-bezier(.2, .9, .3, 1) both;
 }
 
 .input-focus-ring:focus-within {
-  box-shadow: 0 6px 18px rgba(20,20,20,0.04), 0 0 0 4px rgba(194,125,77,0.10);
+  box-shadow: 0 6px 18px rgba(20, 20, 20, 0.04), 0 0 0 4px rgba(194, 125, 77, 0.10);
 }
 
 .btn-cta {
@@ -177,22 +183,56 @@
 
 /* staggered fields animation */
 @keyframes fieldEntrance {
-  from { opacity: 0; transform: translateY(10px) translateZ(0); }
-  to { opacity: 1; transform: translateY(0) translateZ(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) translateZ(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
 }
-.field-animate { animation: fieldEntrance 340ms cubic-bezier(.2,.9,.3,1) both; }
-.field-animate:nth-child(1) { animation-delay: 0ms; }
-.field-animate:nth-child(2) { animation-delay: 80ms; }
-.field-animate:nth-child(3) { animation-delay: 160ms; }
+
+.field-animate {
+  animation: fieldEntrance 340ms cubic-bezier(.2, .9, .3, 1) both;
+}
+
+.field-animate:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.field-animate:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.field-animate:nth-child(3) {
+  animation-delay: 160ms;
+}
 
 @keyframes catalogWhatsappFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 @keyframes catalogWhatsappPulse {
-  0% { opacity: 0.65; transform: scale(0.92); }
-  70%, 100% { opacity: 0; transform: scale(1.2); }
+  0% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
 }
 
 @media (max-width: 767px) {
@@ -214,6 +254,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .catalog-whatsapp,
   .catalog-whatsapp::before {
     animation: none;
@@ -222,9 +263,15 @@
 
 /* success check animation */
 @keyframes drawCheck {
-  0% { stroke-dashoffset: 22; }
-  100% { stroke-dashoffset: 0; }
+  0% {
+    stroke-dashoffset: 22;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
 }
+
 .success-badge {
   display: inline-grid;
   place-items: center;
@@ -232,9 +279,21 @@
   height: 44px;
   border-radius: 9999px;
   background: linear-gradient(90deg, hsl(120 60% 30%), hsl(150 60% 40%));
-  box-shadow: 0 8px 20px rgba(20,20,20,0.12);
+  box-shadow: 0 8px 20px rgba(20, 20, 20, 0.12);
 }
-.success-badge svg { width: 22px; height: 22px; }
-.success-check { stroke: white; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke-dasharray: 22; stroke-dashoffset: 22; animation: drawCheck 420ms ease-out forwards; }
 
+.success-badge svg {
+  width: 22px;
+  height: 22px;
+}
 
+.success-check {
+  stroke: white;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  animation: drawCheck 420ms ease-out forwards;
+}

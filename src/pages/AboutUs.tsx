@@ -184,7 +184,7 @@ export default function AboutUs() {
                       <a href="https://wa.me/04141454086" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-800 font-medium">
                         (0414) 145-40-86
                       </a>
-                      <p className="text-sm text-gray-500 mt-1">Lunes a Domingo 10:00 AM - 7:00 PM</p>
+                      <p className="text-sm text-gray-500 mt-1">Lunes a Sábado 9:00 AM - 6:00 PM</p>
                     </div>
                   </div>
 
@@ -194,8 +194,8 @@ export default function AboutUs() {
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">Instagram</h3>
-                      <a href="https://www.instagram.com/mirraperfumeria.ve/" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800 font-medium">
-                        @mirraperfumeria.ve
+                      <a href="https://www.instagram.com/mirraperfumeria/" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800 font-medium">
+                        @mirraperfumeria
                       </a>
                       <p className="text-sm text-gray-500 mt-1">Descubre nuestras promociones</p>
                     </div>
@@ -209,8 +209,8 @@ export default function AboutUs() {
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">TikTok</h3>
-                      <a href="https://www.tiktok.com/@mirraperfumeria.ve" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-black font-medium">
-                        @mirraperfumeria.ve
+                      <a href="https://www.tiktok.com/@mirraperfumeria" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-black font-medium">
+                        @mirraperfumeria
                       </a>
                     </div>
                   </div>
