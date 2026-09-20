@@ -5,10 +5,11 @@ import { getCatalogoPaginated } from '@/integrations/api';
 
 interface HeaderProps {
   cartItemsCount: number;
+  cartPulseKey: number;
   onCartClick: () => void;
 }
 
-export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
+export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -168,13 +169,14 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </Link>
 
             <button
+              key={cartPulseKey}
               onClick={onCartClick}
-              className="relative p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-all duration-300"
+              className="relative p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-all duration-300 cart-button-pop"
               aria-label="Carrito de compras"
             >
               <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
               {cartItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#CA9E67] text-white text-[10px] md:text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-[#CA9E67] text-white text-[10px] md:text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center cart-badge-pop">
                   {cartItemsCount > 9 ? '9+' : cartItemsCount}
                 </span>
               )}

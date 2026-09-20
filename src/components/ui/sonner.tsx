@@ -9,14 +9,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      position="top-right"
+      closeButton
+      duration={1400}
+      visibleToasts={3}
+      offset={16}
       className="toaster group"
       toastOptions={{
+        duration: 1400,
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-background/95 group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-md group-[.toaster]:rounded-md group-[.toaster]:px-3 group-[.toaster]:py-2 group-[.toaster]:text-[11px] group-[.toaster]:min-h-0 group-[.toaster]:max-w-[240px] group-[.toaster]:translate-x-0",
+          description: "group-[.toast]:text-muted-foreground group-[.toast]:text-[10px]",
+          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:h-7 group-[.toast]:px-2 group-[.toast]:text-[10px]",
+          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground group-[.toast]:h-7 group-[.toast]:px-2 group-[.toast]:text-[10px]",
+          closeButton: "group-[.toast]:bg-muted group-[.toast]:text-foreground",
         },
       }}
       {...props}

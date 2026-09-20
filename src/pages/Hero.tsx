@@ -36,6 +36,7 @@ export default function Hero() {
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [cartPulseKey, setCartPulseKey] = useState(0);
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
@@ -210,6 +211,7 @@ export default function Hero() {
 
   function handleAddToCart(product: Product) {
     addItem(product, 1);
+    setCartPulseKey((prev) => prev + 1);
     toast.success(`${product.name} agregado al carrito`);
   }
 
@@ -230,7 +232,7 @@ export default function Hero() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-gradient-radial from-primary-100 to-transparent rounded-full opacity-10"></div>
       </div>
 
-      <Header cartItemsCount={count} onCartClick={() => setIsCartOpen(true)} />
+      <Header cartItemsCount={count} cartPulseKey={cartPulseKey} onCartClick={() => setIsCartOpen(true)} />
 
       <section className="relative z-10 px-4 sm:px-6 pt-24 sm:pt-24">
         <div className="max-w-7xl mx-auto pb-12 sm:pb-20 md:pb-28 text-center">
