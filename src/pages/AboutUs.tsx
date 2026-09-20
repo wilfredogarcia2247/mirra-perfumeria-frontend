@@ -194,8 +194,8 @@ export default function AboutUs() {
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">Instagram</h3>
-                      <a href="https://www.instagram.com/mirraperfumeria/" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800 font-medium">
-                        @mirraperfumeria
+                      <a href="https://www.instagram.com/mirraperfumeria.ve" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-800 font-medium">
+                        @mirraperfumeria.ve
                       </a>
                       <p className="text-sm text-gray-500 mt-1">Descubre nuestras promociones</p>
                     </div>
