@@ -110,12 +110,20 @@ export async function getPedidos() {
   return apiFetch(`/pedidos-venta`);
 }
 
-export async function getPedidosResumenReportes() {
-  return apiFetch('/pedidos-venta/reportes-resumen');
+export async function getPedidosResumenReportes(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/reportes-resumen${qs}`);
 }
 
-export async function getVentasPorPresentacion() {
-  return apiFetch('/pedidos-venta/reportes-presentaciones');
+export async function getVentasPorPresentacion(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/reportes-presentaciones${qs}`);
 }
 
 export async function getPedidosPaginated(page = 1, limit = 12, estado?: string) {
@@ -588,8 +596,11 @@ export async function getVentasPorMetodoMoneda(fechaInicio?: string, fechaFin?: 
   return apiFetch(`/pagos/resumen-metodo-moneda${qs}`);
 }
 
-export async function getClientesTopResumen(limit = 10, pedidosLimit = 5) {
-  return apiFetch(`/pedidos-venta/clientes-top-resumen?limit=${encodeURIComponent(String(limit))}&pedidos_limit=${encodeURIComponent(String(pedidosLimit))}`);
+export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit) });
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  return apiFetch(`/pedidos-venta/clientes-top-resumen?${params.toString()}`);
 }
 
 // Obtener pagos por pedido: GET /api/pedidos-venta/:id/pagos

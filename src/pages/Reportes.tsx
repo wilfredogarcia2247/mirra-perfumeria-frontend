@@ -64,6 +64,19 @@ const DATA_LABELS: Record<DataKey, string> = {
   presentaciones: 'ventas por presentacion',
 };
 
+const DATE_FILTER_REPORTS = new Set<ReportSlug>([
+  'resumen-general',
+  'ventas-periodo',
+  'ventas-metodo',
+  'ventas-presentacion',
+  'productos-favoritos',
+  'pedidos-estado',
+  'clientes',
+  'compras',
+  'rentabilidad',
+  'ticket-promedio',
+]);
+
 const MONTH_SHORT_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const PRESENTATION_CHART_COLORS = [
   'hsl(var(--primary))',
@@ -128,8 +141,8 @@ export default function Reportes() {
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
-  const [ventasMetodoFechaInicio, setVentasMetodoFechaInicio] = useState('');
-  const [ventasMetodoFechaFin, setVentasMetodoFechaFin] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
@@ -145,7 +158,7 @@ export default function Reportes() {
     const run = async () => {
       setLoadingInfo({ active: true, progress: 0, message: 'Cargando ventas por método de pago...', etaSeconds: 0 });
       try {
-        const res = await getVentasPorMetodoMoneda(ventasMetodoFechaInicio || undefined, ventasMetodoFechaFin || undefined);
+        const res = await getVentasPorMetodoMoneda(fechaInicio || undefined, fechaFin || undefined);
         if (cancelled) return;
         setVentasMetodo(Array.isArray(res) ? res : (res?.data || []));
       } catch (error) {
@@ -157,7 +170,17 @@ export default function Reportes() {
 
     run();
     return () => { cancelled = true; };
-  }, [selectedReport, ventasMetodoFechaInicio, ventasMetodoFechaFin]);
+  }, [selectedReport, fechaInicio, fechaFin]);
+
+  useEffect(() => {
+    if (selectedReport === 'ventas-metodo') return;
+    setLoaded((prev) => ({
+      ...prev,
+      pedidos: false,
+      presentaciones: false,
+      clientesResumen: false,
+    }));
+  }, [fechaInicio, fechaFin, selectedReport]);
 
   useEffect(() => {
     if (selectedReport === 'ventas-metodo') return;
@@ -185,7 +208,7 @@ export default function Reportes() {
         if (cancelled) return;
         try {
           if (key === 'pedidos') {
-            const res = await getPedidosResumenReportes();
+            const res = await getPedidosResumenReportes(fechaInicio || undefined, fechaFin || undefined);
             if (cancelled) return;
             setPedidos(Array.isArray(res) ? res : (res?.data || []));
           }
@@ -195,7 +218,7 @@ export default function Reportes() {
             setVentasMetodo(Array.isArray(res) ? res : (res?.data || []));
           }
           if (key === 'presentaciones') {
-            const res = await getVentasPorPresentacion();
+            const res = await getVentasPorPresentacion(fechaInicio || undefined, fechaFin || undefined);
             if (cancelled) return;
             setPresentaciones(Array.isArray(res) ? res : (res?.data || []));
           }
@@ -205,7 +228,7 @@ export default function Reportes() {
             setProductos(Array.isArray(res) ? res : (res?.data || []));
           }
           if (key === 'clientesResumen') {
-            const res = await getClientesTopResumen(10, 6);
+            const res = await getClientesTopResumen(10, 6, fechaInicio || undefined, fechaFin || undefined);
             if (cancelled) return;
             setClientesResumen(Array.isArray(res) ? res : (res?.data || []));
           }
@@ -236,7 +259,7 @@ export default function Reportes() {
     return () => {
       cancelled = true;
     };
-  }, [loaded, selectedReport]);
+  }, [loaded, selectedReport, fechaInicio, fechaFin]);
 
   const metrics = useMemo(() => {
     const ordersByStatus: Record<string, number> = {};
@@ -571,39 +594,6 @@ export default function Reportes() {
         <Card>
           <CardHeader><CardTitle>Ventas por metodo de pago</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Fecha inicio</label>
-                <input
-                  type="date"
-                  value={ventasMetodoFechaInicio}
-                  onChange={(e) => setVentasMetodoFechaInicio(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Fecha fin</label>
-                <input
-                  type="date"
-                  value={ventasMetodoFechaFin}
-                  onChange={(e) => setVentasMetodoFechaFin(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVentasMetodoFechaInicio('');
-                    setVentasMetodoFechaFin('');
-                  }}
-                  className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-muted/80"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-
             {ventasMetodo.length === 0 && <p className="text-sm text-muted-foreground">No hay pagos para mostrar en este periodo.</p>}
             {ventasMetodo.map((data: any) => (
               <div key={data.metodo} className="rounded-md border p-3">
@@ -878,6 +868,45 @@ export default function Reportes() {
             );
           })}
         </div>
+
+        {DATE_FILTER_REPORTS.has(selectedReport) && (
+          <Card>
+            <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="reporte-fecha-inicio">Fecha inicio</label>
+                <input
+                  id="reporte-fecha-inicio"
+                  type="date"
+                  value={fechaInicio}
+                  max={fechaFin || undefined}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="reporte-fecha-fin">Fecha fin</label>
+                <input
+                  id="reporte-fecha-fin"
+                  type="date"
+                  value={fechaFin}
+                  min={fechaInicio || undefined}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFechaInicio('');
+                  setFechaFin('');
+                }}
+                className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-muted/80"
+              >
+                Limpiar periodo
+              </button>
+            </CardContent>
+          </Card>
+        )}
 
         {renderReport()}
       </div>
