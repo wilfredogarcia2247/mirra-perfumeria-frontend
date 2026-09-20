@@ -128,6 +128,8 @@ export default function Reportes() {
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
+  const [ventasMetodoFechaInicio, setVentasMetodoFechaInicio] = useState('');
+  const [ventasMetodoFechaFin, setVentasMetodoFechaFin] = useState('');
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
@@ -137,6 +139,29 @@ export default function Reportes() {
   });
 
   useEffect(() => {
+    if (selectedReport !== 'ventas-metodo') return;
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingInfo({ active: true, progress: 0, message: 'Cargando ventas por método de pago...', etaSeconds: 0 });
+      try {
+        const res = await getVentasPorMetodoMoneda(ventasMetodoFechaInicio || undefined, ventasMetodoFechaFin || undefined);
+        if (cancelled) return;
+        setVentasMetodo(Array.isArray(res) ? res : (res?.data || []));
+      } catch (error) {
+        if (!cancelled) setVentasMetodo([]);
+      } finally {
+        if (!cancelled) setLoadingInfo({ active: false, progress: 100, message: 'Reporte listo', etaSeconds: 0 });
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [selectedReport, ventasMetodoFechaInicio, ventasMetodoFechaFin]);
+
+  useEffect(() => {
+    if (selectedReport === 'ventas-metodo') return;
+
     let cancelled = false;
 
     const run = async () => {
@@ -545,21 +570,54 @@ export default function Reportes() {
       return (
         <Card>
           <CardHeader><CardTitle>Ventas por metodo de pago</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {metrics.pagosPorMetodo.length === 0 && <p className="text-sm text-muted-foreground">No hay pagos para mostrar.</p>}
-            {metrics.pagosPorMetodo.map((data: any) => (
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Fecha inicio</label>
+                <input
+                  type="date"
+                  value={ventasMetodoFechaInicio}
+                  onChange={(e) => setVentasMetodoFechaInicio(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Fecha fin</label>
+                <input
+                  type="date"
+                  value={ventasMetodoFechaFin}
+                  onChange={(e) => setVentasMetodoFechaFin(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVentasMetodoFechaInicio('');
+                    setVentasMetodoFechaFin('');
+                  }}
+                  className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-muted/80"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            {ventasMetodo.length === 0 && <p className="text-sm text-muted-foreground">No hay pagos para mostrar en este periodo.</p>}
+            {ventasMetodo.map((data: any) => (
               <div key={data.metodo} className="rounded-md border p-3">
                 <div className="flex items-center justify-between">
                   <span>{data.metodo}</span>
                   <div className="text-right">
-                    <strong>{data.monto_total.toFixed(2)}</strong>
-                    <p className="text-xs text-muted-foreground">{data.cantidad_total} pagos</p>
+                    <strong>{Number(data.monto_total || 0).toFixed(2)}</strong>
+                    <p className="text-xs text-muted-foreground">{Number(data.cantidad_total || 0)} pagos</p>
                   </div>
                 </div>
                 {data.monedas.map((m: any) => (
                   <div key={`${data.metodo}-${m.moneda}`} className="mt-2 flex items-center justify-between rounded border bg-muted/40 px-2 py-1 text-sm">
                     <span>{m.moneda}</span>
-                    <span>{m.monto.toFixed(2)} ({m.cantidad} pagos)</span>
+                    <span>{Number(m.monto || 0).toFixed(2)} ({Number(m.cantidad || 0)} pagos)</span>
                   </div>
                 ))}
               </div>

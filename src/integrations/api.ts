@@ -580,8 +580,12 @@ export async function getPagos() {
   return apiFetch("/pagos");
 }
 
-export async function getVentasPorMetodoMoneda() {
-  return apiFetch('/pagos/resumen-metodo-moneda');
+export async function getVentasPorMetodoMoneda(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pagos/resumen-metodo-moneda${qs}`);
 }
 
 export async function getClientesTopResumen(limit = 10, pedidosLimit = 5) {
