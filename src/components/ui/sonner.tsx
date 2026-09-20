@@ -13,7 +13,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       closeButton
       duration={1400}
       visibleToasts={3}
-      offset={16}
+      offset={12}
       className="toaster group"
       toastOptions={{
         duration: 1400,
@@ -25,6 +25,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground group-[.toast]:h-7 group-[.toast]:px-2 group-[.toast]:text-[10px]",
           closeButton: "group-[.toast]:bg-muted group-[.toast]:text-foreground",
         },
+      }}
+      style={{
+        position: 'fixed',
+        top: '1rem',
+        right: '1rem',
+        left: 'auto',
+        bottom: 'auto',
+        zIndex: 9999,
       }}
       {...props}
     />

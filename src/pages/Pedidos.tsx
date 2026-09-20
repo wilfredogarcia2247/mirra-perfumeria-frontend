@@ -302,28 +302,27 @@ export default function Pedidos() {
   // For now, let's disable polling to avoid overwriting pagination state unexpectedly or making too many requests.
   // If real-time updates are needed, we should poll only the current page.
   useEffect(() => {
+    const hasActiveFilter = Boolean(selectedStatus) || Boolean(searchTerm.trim());
+    if (hasActiveFilter) {
+      return undefined;
+    }
+
     let polling: any = null;
     polling = setInterval(async () => {
       try {
-        // Poll current page
-        const res = await getPedidosPaginated(page, limit);
+        const res = await getPedidosPaginated(page, limit, undefined);
         const fresh = Array.isArray(res) ? res : (res?.data || []);
 
         if (Array.isArray(fresh)) {
           const sortedFresh = sortPedidosByDateDesc(fresh);
-          setPedidos((prev) => {
-            // Check if there are new orders (this logic is harder with pagination, 
-            // as new orders might push current orders to next page)
-            // For simplicity, just update the list if it changed significantly or just replace it.
-            // We won't show "new orders count" easily without a global check.
-            return sortedFresh;
-          });
+          setPedidos(sortedFresh);
           if (res && typeof res === 'object' && !Array.isArray(res)) {
             setTotalPages(res.totalPages || 1);
             setTotalOrders(res.total || fresh.length);
           }
-          try { await refreshPagosMap(); } catch (e) { console.debug(e); }
         }
+
+        try { await refreshPagosMap(); } catch (e) { console.debug(e); }
       } catch (e) {
         console.debug(e);
       }
@@ -332,7 +331,7 @@ export default function Pedidos() {
     return () => {
       if (polling) clearInterval(polling);
     };
-  }, [page, limit]);
+  }, [page, limit, selectedStatus, searchTerm]);
 
   const fmtCliente = (p: any) => p?.nombre_cliente || p?.cliente_nombre || p?.cliente?.nombre || 'Anónimo';
   const fmtFecha = (p: any) => {
