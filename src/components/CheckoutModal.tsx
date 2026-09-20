@@ -342,7 +342,7 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
             )}
             {clienteExistente && (
               <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                Cliente encontrado. Se reutilizarán sus datos guardados.
+                ¡Bienvenido de vuelta! Tu lealtad hace crecer la familia Mirra. Disfruta tu compra de hoy.
               </div>
             )}
             {tasaActiva ? (

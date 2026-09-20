@@ -577,12 +577,26 @@ export default function Hero() {
                         e.preventDefault();
                         if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
                         if (!cedulaCliente.trim()) { toast.error('Ingrese el documento de identificación'); return; }
+
                         const documentoCompleto = `${tipoDocumento}-${cedulaCliente.trim()}`;
-                        const clienteConsultado = clienteExistente ? null : await buscarClientePorCedula(documentoCompleto);
-                        const clienteEncontrado = clienteExistente || Boolean(clienteConsultado);
+                        const clienteConsultado = await buscarClientePorCedula(documentoCompleto);
+                        const clienteEncontrado = Boolean(clienteConsultado) || clienteExistente;
                         const clienteIdActual = clienteId ?? (clienteConsultado ? Number(clienteConsultado.id) : null);
-                        if (!clienteEncontrado && !nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
-                        if (!clienteEncontrado && !telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
+                        const nombreClienteFinal = (clienteConsultado?.nombre ?? nombreCliente ?? '').trim();
+                        const telefonoClienteFinal = (clienteConsultado?.telefono ?? telefonoCliente ?? '').trim();
+
+                        if (clienteEncontrado) {
+                          if (clienteConsultado) {
+                            setClienteId(Number(clienteConsultado.id));
+                            setClienteExistente(true);
+                            setDocumentoConsultado(true);
+                            setNombreCliente(String(clienteConsultado.nombre || ''));
+                            setTelefonoCliente(String(clienteConsultado.telefono || ''));
+                          }
+                        } else {
+                          if (!nombreCliente.trim()) { toast.error('Ingrese nombre del cliente'); return; }
+                          if (!telefonoCliente.trim()) { toast.error('Ingrese teléfono del cliente'); return; }
+                        }
 
                         const lineas = cartItems.map((it) => {
                           const p: any = it.product as any;
@@ -624,8 +638,8 @@ export default function Hero() {
 
                         const payload = {
                           cliente_id: clienteIdActual ?? undefined,
-                          nombre_cliente: nombreCliente.trim(),
-                          telefono: telefonoCliente.trim(),
+                          nombre_cliente: nombreClienteFinal,
+                          telefono: telefonoClienteFinal,
                           cedula: documentoCompleto,
                           lineas,
                           _preserve_productos: true,
@@ -696,7 +710,7 @@ export default function Hero() {
                               </div>
                             </div>
                             {buscandoCliente && <p className="mt-1 ml-1 text-xs text-gray-500">Consultando cliente...</p>}
-                            {clienteExistente && <p className="mt-1 ml-1 text-xs text-green-600">Cliente encontrado. Usaremos sus datos guardados.</p>}
+                            {clienteExistente && <p className="mt-1 ml-1 text-xs text-green-600">¡Bienvenido de vuelta! Tu lealtad hace crecer la familia Mirra. Disfruta tu compra de hoy.</p>}
                           </div>
 
                           {documentoConsultado && !clienteExistente && <div>
