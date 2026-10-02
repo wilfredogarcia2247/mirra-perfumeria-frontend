@@ -10,25 +10,29 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-card px-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-semibold text-card-foreground">Sistema de Gestión — Mirra Perfumería</h1>
+        <div className="flex flex-1 flex-col min-w-0">
+          <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border/60 bg-card/80 backdrop-blur-sm px-4 gap-4">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger className="h-8 w-8 text-muted-foreground hover:text-foreground" />
+              <span className="text-[13px] font-medium text-muted-foreground/70 hidden sm:block tracking-wide">
+                Mirra Perfumería
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5" />
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                <Bell className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon">
-                <User className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                <User className="h-4 w-4" />
               </Button>
             </div>
           </header>
-          <main className="flex-1 overflow-auto bg-background p-6">
-            {children}
+          <main className="flex-1 overflow-auto">
+            <div className="mx-auto max-w-[1400px] p-6">
+              {children}
+            </div>
           </main>
         </div>
       </div>

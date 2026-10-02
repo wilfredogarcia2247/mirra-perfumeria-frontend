@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/table';
+import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/integrations/api';
 import { useAuth } from '@/hooks/use-auth';
+import { Plus, Loader2 } from 'lucide-react';
 
 // Página básica para CRUD de usuarios y gestión de permisos por módulo.
 export default function Usuarios() {
@@ -303,57 +306,55 @@ export default function Usuarios() {
 
   return (
     <Layout>
-      <div className="p-4">
-        <h1 className="text-2xl font-semibold mb-4">Usuarios</h1>
-        <div className="mb-4">
-          <Button onClick={loadUsers}>Recargar lista</Button>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Usuarios</h2>
+            <p className="text-sm text-muted-foreground">Gestión de usuarios y permisos</p>
+          </div>
+          <Button className="gap-2" onClick={openCreateUser}>
+            <Plus className="h-4 w-4" />
+            Crear usuario
+          </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <div className="bg-white border rounded p-4">
-              <div className="font-medium mb-2">Listado</div>
-              <div className="mb-2 flex items-center justify-between">
-                <div />
-                <div>
-                  <Button size="sm" onClick={openCreateUser} className="mr-2">Crear usuario</Button>
-                  <Button size="sm" onClick={loadUsers}>Recargar</Button>
-                </div>
+
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
               </div>
+            ) : (
               <Table>
                 <TableHeader>
-                  <tr>
-                    <th>Id</th>
-                    <th>Nombre / Email</th>
-                    <th>Rol</th>
-                    <th>Acciones</th>
-                  </tr>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre / Email</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Rol</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading ? (
-                    <TableRow><TableCell>...</TableCell></TableRow>
-                  ) : (
-                    users.map((u: any) => (
-                      <TableRow key={u.id}>
-                        <TableCell>{u.id}</TableCell>
-                        <TableCell>{u.nombre || u.name || u.email}</TableCell>
-                        <TableCell>{u.rol || u.role || '—'}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {isAdmin && <Button size="sm" onClick={() => loadPermisosFor(u)}>Permisos</Button>}
-                            <Button size="sm" variant="outline" onClick={() => openEditUser(u)}>Editar</Button>
-                            <Button size="sm" variant="destructive" onClick={() => deleteUser(u)}>Eliminar</Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                  {users.map((u: any) => (
+                    <TableRow key={u.id} className="hover:bg-muted/40 transition-colors duration-150">
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{u.id}</TableCell>
+                      <TableCell className="font-medium">{u.nombre || u.name || u.email}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{u.rol || u.role || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {isAdmin && <Button size="sm" variant="outline" onClick={() => loadPermisosFor(u)}>Permisos</Button>}
+                          <Button size="sm" variant="outline" onClick={() => openEditUser(u)}>Editar</Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteUser(u)}>Eliminar</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
-            </div>
-          </div>
-
-         
-        </div>
+            )}
+          </CardContent>
+        </Card>
         {/* Modal: Crear / Editar usuario */}
         <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
           <DialogContent>
@@ -362,21 +363,21 @@ export default function Usuarios() {
               <DialogDescription>{isCreating ? 'Complete los datos para crear un usuario.' : 'Modifique los datos del usuario.'}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 mt-2">
-              <div>
-                <label className="block text-sm">Nombre</label>
-                <input className="w-full border rounded p-1" value={userForm.nombre || ''} onChange={(e) => setUserForm((s) => ({ ...s, nombre: e.target.value }))} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Nombre</label>
+                <Input value={userForm.nombre || ''} onChange={(e) => setUserForm((s) => ({ ...s, nombre: e.target.value }))} />
               </div>
-              <div>
-                <label className="block text-sm">Email</label>
-                <input className="w-full border rounded p-1" value={userForm.email || ''} onChange={(e) => setUserForm((s) => ({ ...s, email: e.target.value }))} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Email</label>
+                <Input type="email" value={userForm.email || ''} onChange={(e) => setUserForm((s) => ({ ...s, email: e.target.value }))} />
               </div>
-              <div>
-                <label className="block text-sm">Password {editingUser ? '(dejar vacío para no cambiar)' : ''}</label>
-                <input type="password" className="w-full border rounded p-1" value={userForm.password || ''} onChange={(e) => setUserForm((s) => ({ ...s, password: e.target.value }))} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Password {editingUser ? <span className="text-muted-foreground font-normal">(vacío = no cambiar)</span> : ''}</label>
+                <Input type="password" value={userForm.password || ''} onChange={(e) => setUserForm((s) => ({ ...s, password: e.target.value }))} />
               </div>
-              <div>
-                <label className="block text-sm">Rol</label>
-                <select className="w-full border rounded p-1" value={userForm.rol || 'user'} onChange={(e) => setUserForm((s) => ({ ...s, rol: e.target.value }))}>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Rol</label>
+                <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={userForm.rol || 'user'} onChange={(e) => setUserForm((s) => ({ ...s, rol: e.target.value }))}>
                   <option value="user">user</option>
                   <option value="admin">admin</option>
                 </select>

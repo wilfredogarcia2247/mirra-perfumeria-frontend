@@ -1,16 +1,15 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, ShoppingCart, TrendingUp, Users, Warehouse, DollarSign } from "lucide-react";
+import { Package, ShoppingCart, Warehouse, DollarSign, Loader2 } from "lucide-react";
 import { useEffect, useState, useRef } from 'react';
 import { getProductos, getPedidos, getAlmacenes, getProducto } from '@/integrations/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
-// initial placeholders; replaced by runtime values where available
 const defaultStats = [
-  { title: "Total Productos", value: "...", icon: Package, trend: "+0%", color: "text-primary" },
-  { title: "Pedidos Activos", value: "...", icon: ShoppingCart, trend: "+0%", color: "text-accent" },
-  { title: "Almacenes", value: "...", icon: Warehouse, trend: "+0%", color: "text-chart-3" },
-  { title: "Ventas del Mes", value: "...", icon: DollarSign, trend: "+0%", color: "text-chart-4" },
+  { title: "Total Productos", value: "...", icon: Package, sub: "En catálogo activo" },
+  { title: "Pedidos Activos", value: "...", icon: ShoppingCart, sub: "Pendientes de despacho" },
+  { title: "Almacenes", value: "...", icon: Warehouse, sub: "Ubicaciones registradas" },
+  { title: "Ventas del Mes", value: "...", icon: DollarSign, sub: "Órdenes completadas" },
 ];
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -18,12 +17,10 @@ const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct'
 const defaultTopProducts: any[] = [];
 
 export default function Dashboard() {
-  const [totalProductos, setTotalProductos] = useState<number | null>(null);
   const [statsData, setStatsData] = useState(defaultStats);
-  const [salesChartData, setSalesChartData] = useState(MONTH_NAMES.slice(0,6).map((m,i) => ({ name: m, ventas: 0, compras: 0 })));
+  const [salesChartData, setSalesChartData] = useState(MONTH_NAMES.map((m) => ({ name: m, ventas: 0, compras: 0 })));
   const [topProductsState, setTopProductsState] = useState<any[]>(defaultTopProducts);
   const productNameCacheRef = useRef<Map<number, string>>(new Map());
-  const [diag, setDiag] = useState<{ pedidosFetched: number; completedCount: number; aggregatedProducts: number; sampleKeys: string[] } | null>(null);
 
   // Helper: compute numeric total for an order (fallbacks included)
   const computeOrderNumericTotal = (p: any) => {
@@ -157,22 +154,6 @@ export default function Dashboard() {
           }
         }
         if (!mounted) return;
-        // Diagnostics: expose counts so we can verify why top-sellers fallback to defaults
-        try {
-          const completedCount = Array.isArray(list) ? list.filter((pp: any) => {
-            const st = (pp?.estado || pp?.status || '').toString().toLowerCase();
-            const completedStates = ['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado'];
-            return completedStates.includes(st);
-          }).length : 0;
-          const aggregatedProducts = productMap.size;
-          const sampleKeys = Array.from(productMap.keys()).slice(0, 10).map(String);
-          setDiag({ pedidosFetched: Array.isArray(list) ? list.length : 0, completedCount, aggregatedProducts, sampleKeys });
-          // debug to console as well
-          // eslint-disable-next-line no-console
-          console.debug('Dashboard diagnostics', { pedidosFetched: Array.isArray(list) ? list.length : 0, completedCount, aggregatedProducts, sampleKeys });
-        } catch (e) {
-          // ignore diagnostics errors
-        }
         setStatsData((prev) => prev.map((s) => {
           if (s.title === 'Pedidos Activos') return { ...s, value: pendingCount.toString() };
           if (s.title === 'Ventas del Mes') return { ...s, value: `$${ventasMes.toFixed(2)}` };
@@ -237,61 +218,72 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Page header */}
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">Resumen general del sistema</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Resumen general del sistema</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* KPI Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statsData.map((stat) => (
-            <Card key={stat.title} className="transition-smooth hover:shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-accent">{stat.trend}</span> vs mes anterior
-                </p>
+            <Card key={stat.title} className="overflow-hidden">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{stat.title}</p>
+                    <p className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
+                      {stat.value === '...' ? <Loader2 className="h-6 w-6 animate-spin mt-1" /> : stat.value}
+                    </p>
+                    <p className="mt-1.5 text-[11.5px] text-muted-foreground">{stat.sub}</p>
+                  </div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <stat.icon className="h-4 w-4 text-primary" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {/* Charts */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Ventas y Compras</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Ventas por mes</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={salesChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="ventas" fill="hsl(var(--primary))" />
-                  <Bar dataKey="compras" fill="hsl(var(--accent))" />
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={salesChartData} barGap={2}>
+                  <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={45} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                    cursor={{ fill: 'hsl(var(--muted))', radius: 4 }}
+                  />
+                  <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Ventas $" />
+                  <Bar dataKey="compras" fill="hsl(var(--primary) / 0.25)" radius={[4, 4, 0, 0]} name="Pedidos" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Tendencia de Ventas</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Tendencia de ventas</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={salesChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="ventas" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={45} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                    cursor={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <Line type="monotone" dataKey="ventas" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="Ventas $" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -300,32 +292,32 @@ export default function Dashboard() {
 
         {/* Top Products */}
         <Card>
-          <CardHeader>
-            <CardTitle>Productos Más Vendidos</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Productos más vendidos</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topProductsState.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No hay datos de ventas disponibles aún (esperando pedidos completados).</div>
-              ) : (
-                topProductsState.map((product, index) => (
-                  <div key={`${product.name}-${index}`} className="flex items-center justify-between border-b pb-3 last:border-0">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+          <CardContent className="pt-0">
+            {topProductsState.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Sin datos de ventas aún — aparecerán al completar pedidos.
+              </div>
+            ) : (
+              <div>
+                {topProductsState.map((product, index) => (
+                  <div key={`${product.name}-${index}`} className="flex items-center justify-between py-3 border-b border-border/60 last:border-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold text-primary tabular-nums">
                         {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.sales} unidades vendidas</p>
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.sales} unidades</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{product.revenue}</p>
-                    </div>
+                    <p className="text-sm font-semibold tabular-nums shrink-0 ml-4">{product.revenue}</p>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

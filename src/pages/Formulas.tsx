@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { parseApiError } from '@/lib/utils';
 import { Combobox } from "@/components/ui/combobox";
+import { Search, Plus, Trash2, Loader2, DollarSign, ChevronRight } from 'lucide-react';
 
 export default function Formulas() {
   const [formulas, setFormulas] = useState<any[]>([]);
@@ -570,51 +571,44 @@ export default function Formulas() {
 
   return (
     <Layout>
-      <div className="p-4">
-        <div className="space-y-4 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold">Fórmulas</h1>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => { resetBulkModal(); setBulkPriceOpen(true); }}
-                className="gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-                </svg>
-                Actualizar Precios
-              </Button>
-              <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva fórmula</Button>
-            </div>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Fórmulas</h2>
+            <p className="text-sm text-muted-foreground">Gestión de fórmulas y producción</p>
           </div>
-
-          <div className="relative max-w-md">
-            <input
-              type="text"
-              placeholder="Buscar por nombre de fórmula..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 pl-10 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-copper-500 focus:border-transparent"
-            />
-            <svg
-              className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { resetBulkModal(); setBulkPriceOpen(true); }}
+              className="gap-2"
             >
-              <path
-                fillRule="evenodd"
-                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                clipRule="evenodd"
-              />
-            </svg>
+              <DollarSign className="h-4 w-4" />
+              Actualizar Precios
+            </Button>
+            <Button onClick={() => { resetForm(); setIsOpen(true); }} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nueva fórmula
+            </Button>
           </div>
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar por nombre..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
         {loading ? (
-          <div>Cargando fórmulas...</div>
+          <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Cargando fórmulas...</span>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -663,17 +657,17 @@ export default function Formulas() {
                           <span className="truncate">{f.producto_terminado_nombre ?? f.producto_terminado_id}</span>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-1 mb-2 text-xs bg-gray-50 p-1.5 rounded">
+                      <div className="grid grid-cols-2 gap-1 mb-2 text-xs bg-muted/50 p-1.5 rounded">
                         <div className="text-center">
-                          <div className="font-medium text-gray-500">Costo</div>
-                          <div className="font-semibold text-amber-700">
+                          <div className="font-medium text-muted-foreground">Costo</div>
+                          <div className="font-semibold text-foreground">
                             {f.costo !== undefined && f.costo !== null ?
                               `$${Number(f.costo).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-gray-500">Precio</div>
-                          <div className="font-semibold text-green-700">
+                          <div className="font-medium text-muted-foreground">Precio</div>
+                          <div className="font-semibold text-foreground">
                             {f.precio_venta !== undefined && f.precio_venta !== null ?
                               `$${Number(f.precio_venta).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                           </div>
@@ -699,7 +693,7 @@ export default function Formulas() {
             {/* Pagination controls (server-side) */}
             {total > perPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between mt-8 gap-4 pt-6 border-t">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                   Mostrando página {page} de {totalPages} — {total} fórmulas
                 </div>
                 <div className="flex items-center gap-2">
@@ -777,12 +771,10 @@ export default function Formulas() {
                     size="sm"
                     variant="outline"
                     onClick={addComponente}
-                    className="gap-1 hover:bg-primary/10"
+                    className="gap-1.5 hover:bg-primary/10"
                     type="button"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
+                    <Plus className="h-4 w-4" />
                     Agregar componente
                   </Button>
                 </div>
@@ -795,9 +787,9 @@ export default function Formulas() {
                     const compCost = unitCost * qty;
                     const compPrice = unitPrice * qty;
                     return (
-                      <div key={idx} className="grid grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg mb-2">
+                      <div key={idx} className="grid grid-cols-12 gap-3 items-end p-3 bg-muted/30 rounded-lg mb-2">
                         <div className="col-span-12 md:col-span-6">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Materia prima</label>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Materia prima</label>
                           <Combobox
                             options={materiasOptions}
                             value={comp.materia_prima_id ? String(comp.materia_prima_id) : ""}
@@ -814,7 +806,7 @@ export default function Formulas() {
                         </div>
 
                         <div className="col-span-6 sm:col-span-2">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Cantidad</label>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Cantidad</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -836,8 +828,8 @@ export default function Formulas() {
                         </div>
 
                         <div className="col-span-4 sm:col-span-2">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Costo/u</label>
-                          <div className="text-sm p-2 bg-white rounded border border-gray-200">
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Costo/u</label>
+                          <div className="text-sm p-2 bg-background rounded border border-border">
                             ${getUnitCost(comp.materia_prima_id ?? null).toFixed(2)}
                           </div>
                         </div>
@@ -850,9 +842,7 @@ export default function Formulas() {
                             onClick={() => removeComponente(idx)}
                             title="Eliminar"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -927,10 +917,7 @@ export default function Formulas() {
               >
                 {submitting ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     {editingId ? 'Guardando...' : 'Creando...'}
                   </>
                 ) : editingId ? (
@@ -1212,10 +1199,7 @@ export default function Formulas() {
                   >
                     {bulkUpdating ? (
                       <>
-                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Actualizando...
                       </>
                     ) : (

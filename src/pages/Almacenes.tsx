@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Edit, Trash2, Warehouse } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Search, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -139,7 +139,7 @@ export default function Almacenes() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Almacenes</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Almacenes</h2>
             <p className="text-muted-foreground">Gestión de almacenes</p>
           </div>
 
@@ -214,38 +214,34 @@ export default function Almacenes() {
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Warehouse className="h-5 w-5" />
-              Listado de Almacenes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="pt-2 pb-4 flex gap-4">
+          <CardContent className="p-0">
+            <div className="px-4 pt-4 pb-3 flex gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Buscar por nombre, ubicación o responsable..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
               </div>
-              <Button variant="outline">Filtros</Button>
             </div>
 
             {loading ? (
-              <div>Cargando...</div>
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Ubicación</TableHead>
-                    <TableHead>Responsable</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Ubicación</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Responsable</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((p: any) => (
-                    <TableRow key={p.id} className="hover:bg-muted/50 transition-smooth">
-                      <TableCell className="font-mono text-sm">{p.id}</TableCell>
+                    <TableRow key={p.id} className="hover:bg-muted/40 transition-colors duration-150">
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{p.id}</TableCell>
                       <TableCell className="font-medium">{p.nombre}</TableCell>
                       <TableCell>{p.ubicacion ?? "-"}</TableCell>
                       <TableCell>{p.responsable ?? "-"}</TableCell>

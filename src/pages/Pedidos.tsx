@@ -145,19 +145,26 @@ export default function Pedidos() {
     return arr;
   };
 
-  const getRowClasses = (p: any) => {
-    const s = (p?.estado || p?.status || '').toString().toLowerCase();
-    let bg = 'bg-white';
-    let border = 'border-transparent';
-    let borderColor = 'border-transparent';
-    if (s === 'pendiente') { bg = 'bg-yellow-50/60'; borderColor = 'border-yellow-400'; }
-    else if (s === 'enviado') { bg = 'bg-sky-50/60'; borderColor = 'border-sky-400'; }
-    else if (s === 'completado') { bg = 'bg-green-50/60'; borderColor = 'border-green-400'; }
-    else if (s === 'cancelado') { bg = 'bg-red-50/60'; borderColor = 'border-red-400'; }
-    const ts = Date.parse(p?.fecha || p?.created_at || p?.createdAt || '') || 0;
-    const recent = (Date.now() - ts) < (1000 * 60 * 60 * 24); // 24h
-    // more lively styles: rounded cards, subtle shadow, left accent border and hover scale
-    return `transition-transform transform hover:scale-[1.01] duration-150 rounded-md ${bg} ${borderColor} border-l-4 ${recent ? 'shadow-md' : 'shadow-sm'}`;
+  const getRowClasses = (_p: any) => {
+    return 'transition-colors duration-150 hover:bg-muted/40';
+  };
+
+  const statusDotClass = (s: string) => {
+    const k = s.toLowerCase();
+    if (k === 'pendiente') return 'bg-amber-500';
+    if (k === 'enviado') return 'bg-blue-500';
+    if (k === 'completado') return 'bg-green-500';
+    if (k === 'cancelado') return 'bg-red-500';
+    return 'bg-gray-400';
+  };
+
+  const statusBadgeClass = (s: string) => {
+    const k = s.toLowerCase();
+    if (k === 'pendiente') return 'bg-amber-50 text-amber-800 border border-amber-200';
+    if (k === 'enviado') return 'bg-blue-50 text-blue-800 border border-blue-200';
+    if (k === 'completado') return 'bg-green-50 text-green-800 border border-green-200';
+    if (k === 'cancelado') return 'bg-red-50 text-red-800 border border-red-200';
+    return 'bg-muted text-muted-foreground border border-border';
   };
 
   const fetchStats = async () => {
@@ -217,27 +224,18 @@ export default function Pedidos() {
       setLoading(true);
       try {
         if (searchTerm.trim()) {
-          // Si el término de búsqueda es un número, buscar por ID exacto
-          const searchTermStr = searchTerm.trim();
-          const isNumericSearch = /^\d+$/.test(searchTermStr);
-
-          let results;
-          if (isNumericSearch) {
-            // Para búsqueda por ID, forzamos búsqueda exacta
-            results = await searchPedidos(searchTermStr);
-            // Si es un solo resultado, lo convertimos a array
-            const list = Array.isArray(results) ? results : [results];
-            // Filtramos por ID exacto por si la API devolvió más resultados
-            const filteredList = list.filter(p => p?.id?.toString() === searchTermStr);
-            setPedidos(filteredList);
-            setTotalOrders(filteredList.length);
-          } else {
-            // Para búsqueda por texto
-            results = await searchPedidos(searchTermStr);
-            const list = Array.isArray(results) ? results : [results];
-            setPedidos(list);
-            setTotalOrders(list.length);
-          }
+          const term = searchTerm.trim().toLowerCase();
+          const all = await getPedidos();
+          const allList = Array.isArray(all) ? all : (all?.data || []);
+          const list = allList.filter((p: any) => {
+            const nombre = (p?.nombre_cliente || p?.cliente_nombre || p?.cliente?.nombre || '').toLowerCase();
+            const cedula = String(p?.cedula || p?.cliente_cedula || '');
+            const telefono = String(p?.telefono || p?.cliente_telefono || '');
+            const id = String(p?.id || '');
+            return nombre.includes(term) || cedula.includes(term) || telefono.includes(term) || id === term;
+          });
+          setPedidos(list);
+          setTotalOrders(list.length);
           setTotalPages(1);
         } else {
           // Si no hay búsqueda, usar la paginación normal
@@ -388,6 +386,19 @@ export default function Pedidos() {
     const t = p?.tasa_cambio_monto ?? p?.tasa ?? null;
     const n = typeof t === 'number' ? t : (t ? Number(String(t).replace(',', '.')) : null);
     return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const fmtTotalParts = (p: any): { usd: string; bs: string | null } => {
+    const base = roundMoney(p?.total_base ?? (typeof p?.total === 'number' ? p.total : (Number(p?.total) || 0)));
+    const descuentos = roundMoney(p?.total_descuentos ?? 0);
+    const recargos = roundMoney(p?.total_recargos ?? 0);
+    const final = roundMoney(p?.total_final ?? p?.total ?? (base - descuentos + recargos));
+    const tasaVal = fmtTasa(p);
+    const usd = `$${final.toFixed(2)}`;
+    if (!tasaVal) return { usd, bs: null };
+    const simbolo = p?.tasa_simbolo || (p?.tasa && p.tasa.simbolo) || 'Bs';
+    const converted = roundMoney(final * tasaVal);
+    return { usd, bs: `${simbolo} ${converted.toFixed(2)}` };
   };
 
   function isPedidoPaid(p: any) {
@@ -1641,7 +1652,7 @@ export default function Pedidos() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Buscar por ID, nombre o cédula..."
+                placeholder="Buscar por nombre, cédula o teléfono..."
                 className="w-full pl-4 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -1657,70 +1668,84 @@ export default function Pedidos() {
           </form>
         </div>
 
-        {/* Filtros rápidos por estado (ubicados arriba del listado) */}
-        <div className="flex gap-2">
-          <Button size="sm" variant={selectedStatus === '' ? 'default' : 'ghost'} onClick={() => setSelectedStatus('')}>Todos ({pedidos.length})</Button>
+        {/* Filtros rápidos por estado */}
+        <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit">
+          <button
+            className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setSelectedStatus('')}
+          >
+            Todos <span className="text-xs opacity-60">{stats.todos || totalOrders}</span>
+          </button>
           {allStatuses.map((s) => (
-            <Button key={s} size="sm" variant={selectedStatus === s ? 'default' : 'ghost'} onClick={() => setSelectedStatus(selectedStatus === s ? '' : s)}>
-              <div className="flex items-center gap-2">
-                <Badge variant={estadoColor(s.toLowerCase()) as any}>{s}</Badge>
-                <span className="text-sm text-muted-foreground">{countFor(s)}</span>
-              </div>
-            </Button>
+            <button
+              key={s}
+              className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setSelectedStatus(selectedStatus === s ? '' : s)}
+            >
+              <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
+              {s} <span className="text-xs opacity-60">{countFor(s)}</span>
+            </button>
           ))}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pedidos</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
             {loading ? (
-              <div>Cargando pedidos...</div>
+              <div className="flex items-center justify-center py-12 text-muted-foreground text-sm gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Cargando pedidos…
+              </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>#Productos</TableHead>
-                    <TableHead>Tasa</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 w-16">ID</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-center w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortPedidosByDateDesc(visiblePedidos).map((p: any) => (
-                    <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
-                      <TableCell className="font-mono text-sm">{p.id ?? '-'}</TableCell>
-                      <TableCell>{fmtCliente(p)}</TableCell>
-                      <TableCell>{fmtFecha(p)}</TableCell>
-                      <TableCell>
-                        <div className="inline-flex items-center gap-2">
-                          <Badge className="px-2 py-0.5" variant={estadoColor(fmtEstado(p)) as any}>{fmtEstado(p)}</Badge>
-                          {fmtEstado(p).toString().toLowerCase() === 'completado' && (
-                            isPedidoPaid(p) ? (
-                              <Badge className="ml-2 bg-green-600 text-white" variant="default">Pagado</Badge>
-                            ) : (
-                              <Badge className="ml-2" variant="destructive">Sin pago</Badge>
-                            )
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{fmtProductosCount(p)}</TableCell>
-                      <TableCell>{(fmtTasa(p) || 0).toFixed(2)}</TableCell>
-                      <TableCell>{fmtTotal(p)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openDetalle(p.id); }}>
-                            <Eye className="w-4 h-4" />
+                  {sortPedidosByDateDesc(visiblePedidos).map((p: any) => {
+                    const totalParts = fmtTotalParts(p);
+                    const estado = fmtEstado(p);
+                    return (
+                      <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
+                        <TableCell className="text-xs tabular-nums text-muted-foreground pl-6">#{p.id ?? '-'}</TableCell>
+                        <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
+                        <TableCell>
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11.5px] font-medium ${statusBadgeClass(estado)}`}>
+                              <span className={`inline-block w-[5px] h-[5px] rounded-full flex-shrink-0 ${statusDotClass(estado)}`} />
+                              {estado}
+                            </span>
+                            {estado.toLowerCase() === 'completado' && (
+                              isPedidoPaid(p) ? (
+                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-green-100 text-green-700 border border-green-200">Pagado</span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
+                              )
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
+                        <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-sm font-medium tabular-nums">{totalParts.usd}</div>
+                          {totalParts.bs && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{totalParts.bs}</div>}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openDetalle(p.id); }}>
+                            <Eye className="w-[15px] h-[15px]" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

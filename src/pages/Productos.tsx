@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Package, Warehouse } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Warehouse, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -439,11 +439,8 @@ export default function Productos() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Productos</h2>
-            <p className="text-muted-foreground">Gestión completa del catálogo de productos</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <a href="/docs/inventario-produccion.txt" target="_blank" rel="noreferrer" className="text-sm text-muted-foreground underline">Docs: Inventario/Producción</a>
+            <h2 className="text-2xl font-semibold tracking-tight">Productos</h2>
+            <p className="text-sm text-muted-foreground">Gestión completa del catálogo de productos</p>
           </div>
           <div>
             <Button
@@ -713,58 +710,47 @@ export default function Productos() {
           </Dialog>
         </div>
 
-        {/* Search and Filters */}
+        {/* Products Table */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex gap-4">
-              <div className="relative flex-1">
+          <CardContent className="p-0">
+            <div className="px-4 pt-4 pb-3">
+              <div className="relative max-w-sm">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nombre o código..."
+                  placeholder="Buscar por nombre..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-              <Button variant="outline">Filtros</Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Products Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Listado de Productos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
             {loading ? (
-              <div>Cargando...</div>
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Imagen</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    {/* Tipo eliminado */}
-                    <TableHead>Unidad</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Marca</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Costo</TableHead>
-                    <TableHead>Precio Venta</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Imagen</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Unidad</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Categoría</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Marca</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Stock</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Costo</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Precio</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product: any) => (
-                    <TableRow key={product.id} className="hover:bg-muted/50 transition-smooth">
-                      <TableCell className="font-mono text-sm">{product.id}</TableCell>
+                    <TableRow key={product.id} className="hover:bg-muted/40 transition-colors duration-150">
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{product.id}</TableCell>
                       <TableCell>
-                        <div className="w-12 h-12 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
                           <img
                             src={getImageUrl(product) ?? ''}
                             alt={product.nombre ?? 'imagen producto'}
@@ -785,7 +771,7 @@ export default function Productos() {
                         <div className="flex items-center gap-2">
                           <span>{product.nombre}</span>
                           {product.visible_en_catalogo === false ? (
-                            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-700">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                               Oculto
                             </span>
                           ) : null}
@@ -931,7 +917,7 @@ export default function Productos() {
         {/* Modal de existencias por almacén (solo lectura) */}
         <Dialog open={viewStockOpen} onOpenChange={setViewStockOpen}>
           <DialogContent className="max-w-4xl w-[95vw] lg:w-3/4 max-h-[80vh] overflow-auto">
-            <DialogHeader className="sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+            <DialogHeader className="sticky top-0 bg-card/80 backdrop-blur-sm z-10">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div>
                   <DialogTitle className="text-lg">Existencias</DialogTitle>
@@ -950,11 +936,14 @@ export default function Productos() {
 
             <div className="p-4">
               {viewStockLoading ? (
-                <div className="text-sm text-copper-600">Cargando...</div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando...
+                </div>
               ) : (() => {
                 const inv = (viewStockDetalle?.inventario) || (viewStockProduct as any)?.inventario || [];
                 if (!Array.isArray(inv) || inv.length === 0) {
-                  return <div className="text-sm text-copper-600">No hay información de inventario por almacén.</div>;
+                  return <div className="text-sm text-muted-foreground">No hay información de inventario por almacén.</div>;
                 }
 
                 const totalDisponible = inv.reduce((s: number, it: any) => s + (Number(it.stock_disponible || 0)), 0);
@@ -964,7 +953,7 @@ export default function Productos() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm text-muted-foreground">Total disponible</div>
-                        <div className="text-3xl font-bold text-copper-800">{totalDisponible.toLocaleString('es-AR')}</div>
+                        <div className="text-3xl font-bold text-foreground">{totalDisponible.toLocaleString('es-AR')}</div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">Detalles</div>
@@ -974,11 +963,11 @@ export default function Productos() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {inv.map((it: any) => (
-                        <div key={it.id} className="p-4 bg-white rounded-lg shadow-sm border flex flex-col justify-between min-h-[140px]">
+                        <div key={it.id} className="p-4 bg-card rounded-lg border flex flex-col justify-between min-h-[140px]">
                           <div>
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="font-semibold text-copper-800">{it.almacen_nombre || `#${it.almacen_id}`}</div>
+                                <div className="font-semibold">{it.almacen_nombre || `#${it.almacen_id}`}</div>
                                 <div className="text-xs text-muted-foreground">{it.almacen_ubicacion || 'Sin ubicación'}</div>
                               </div>
                               <Badge className="text-xs" variant={it.almacen_tipo === 'Venta' ? 'secondary' : 'outline'}>{it.almacen_tipo}</Badge>
@@ -992,7 +981,7 @@ export default function Productos() {
                               <div className="font-medium text-right">{Number(it.stock_comprometido || 0).toLocaleString('es-AR')}</div>
 
                               <div className="text-muted-foreground">Disponible</div>
-                              <div className="font-bold text-copper-800 text-right">{Number(it.stock_disponible || 0).toLocaleString('es-AR')}</div>
+                              <div className="font-bold text-right">{Number(it.stock_disponible || 0).toLocaleString('es-AR')}</div>
                             </div>
                           </div>
                           <div className="mt-3 text-right flex gap-2 justify-end">

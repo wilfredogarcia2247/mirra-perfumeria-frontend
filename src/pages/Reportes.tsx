@@ -1,5 +1,7 @@
 import { Layout } from '@/components/Layout';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   getClientesTopResumen,
   getPedidosResumenReportes,
@@ -8,6 +10,7 @@ import {
   getVentasPorPresentacion,
 } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
@@ -141,8 +144,15 @@ export default function Reportes() {
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  const [fechaInicio, setFechaInicio] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [fechaFin, setFechaFin] = useState(() => {
+    const now = new Date();
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
+  });
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
@@ -548,9 +558,12 @@ export default function Reportes() {
     if (loadingInfo.active) {
       return (
         <Card>
-          <CardContent className="p-6 space-y-2">
-            <p className="text-sm font-medium">{loadingInfo.message}</p>
-            <p className="text-xs text-muted-foreground">Progreso: {loadingInfo.progress}%{loadingInfo.etaSeconds > 0 ? ` | Tiempo estimado: ~${loadingInfo.etaSeconds}s` : ''}</p>
+          <CardContent className="flex items-center gap-3 p-6">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">{loadingInfo.message}</p>
+              <p className="text-xs text-muted-foreground">{loadingInfo.progress}%{loadingInfo.etaSeconds > 0 ? ` · ~${loadingInfo.etaSeconds}s` : ''}</p>
+            </div>
           </CardContent>
         </Card>
       );
@@ -559,14 +572,14 @@ export default function Reportes() {
     if (selectedReport === 'resumen-general') {
       return (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card><CardHeader><CardTitle>Ventas de hoy</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.dailySales.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Ventas del mes</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.monthSales.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Pedidos completados (mes)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.monthCompletedOrders}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Estado del negocio</CardTitle></CardHeader><CardContent><p className="text-xl font-bold">{metrics.businessStatus}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.businessReason}</p></CardContent></Card>
-          <Card><CardHeader><CardTitle>Producto mas vendido</CardTitle></CardHeader><CardContent className="text-sm">{metrics.topProduct ? `${metrics.topProduct.nombre} (${metrics.topProduct.cantidad} uds)` : 'Sin datos'}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Presentacion mas vendida</CardTitle></CardHeader><CardContent className="text-sm">{metrics.topPresentation ? `${metrics.topPresentation.presentacion} (${metrics.topPresentation.cantidad} uds)` : 'Sin datos'}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Tasa de cancelacion</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.cancelRate.toFixed(1)}%</CardContent></Card>
-          <Card><CardHeader><CardTitle>Riesgo de inventario</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.stockRiskRate.toFixed(1)}%</CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ventas hoy</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.dailySales.toFixed(2)}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ventas del mes</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.monthSales.toFixed(2)}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pedidos completados (mes)</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.monthCompletedOrders}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado del negocio</p><p className="mt-2 text-xl font-semibold">{metrics.businessStatus}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.businessReason}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Producto más vendido</p><p className="mt-2 text-sm font-medium">{metrics.topProduct ? `${metrics.topProduct.nombre} (${metrics.topProduct.cantidad} uds)` : 'Sin datos'}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Presentación más vendida</p><p className="mt-2 text-sm font-medium">{metrics.topPresentation ? `${metrics.topPresentation.presentacion} (${metrics.topPresentation.cantidad} uds)` : 'Sin datos'}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tasa de cancelación</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.cancelRate.toFixed(1)}%</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Riesgo de inventario</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.stockRiskRate.toFixed(1)}%</p></CardContent></Card>
         </div>
       );
     }
@@ -575,8 +588,8 @@ export default function Reportes() {
       const months = Object.entries(metrics.monthlySales).sort((a, b) => a[0].localeCompare(b[0]));
       return (
         <Card>
-          <CardHeader><CardTitle>Ventas por mes</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
+          <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Ventas por mes</CardTitle></CardHeader>
+          <CardContent className="space-y-2 pt-4">
             {months.length === 0 && <p className="text-sm text-muted-foreground">No hay ventas completadas para mostrar.</p>}
             {months.map(([month, total]) => (
               <div key={month} className="flex items-center justify-between rounded-md border p-3">
@@ -592,8 +605,8 @@ export default function Reportes() {
     if (selectedReport === 'ventas-metodo') {
       return (
         <Card>
-          <CardHeader><CardTitle>Ventas por metodo de pago</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Ventas por método de pago</CardTitle></CardHeader>
+          <CardContent className="space-y-4 pt-4">
             {ventasMetodo.length === 0 && <p className="text-sm text-muted-foreground">No hay pagos para mostrar en este periodo.</p>}
             {ventasMetodo.map((data: any) => (
               <div key={data.metodo} className="rounded-md border p-3">
@@ -625,8 +638,8 @@ export default function Reportes() {
       return (
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Ventas por presentacion (ml)</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Ventas por presentación (ml)</CardTitle></CardHeader>
+            <CardContent className="space-y-2 pt-4">
               {rows.length === 0 && <p className="text-sm text-muted-foreground">Aun no hay ventas completadas con presentacion identificada.</p>}
               {rows.map((row: any) => {
                 const share = total > 0 ? (row.cantidad / total) * 100 : 0;
@@ -647,8 +660,8 @@ export default function Reportes() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Ventas mensuales por presentacion</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Ventas mensuales por presentación</CardTitle></CardHeader>
+            <CardContent className="space-y-3 pt-4">
               {chartData.length === 0 || chartKeys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay suficiente información mensual para graficar todavía.</p>
               ) : (
@@ -683,8 +696,8 @@ export default function Reportes() {
       return (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle>Mas vendidos por cantidad</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Más vendidos por cantidad</CardTitle></CardHeader>
+            <CardContent className="space-y-2 pt-4">
               {metrics.topProductosPorCantidad.map((item: any, index: number) => (
                 <div key={`cant-${item.nombreBase}-${index}`} className="rounded-md border p-3">
                   <div className="flex items-center justify-between gap-3">
@@ -701,8 +714,8 @@ export default function Reportes() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Mas frecuentes en pedidos</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Más frecuentes en pedidos</CardTitle></CardHeader>
+            <CardContent className="space-y-2 pt-4">
               {metrics.topProductosPorApariciones.map((item: any, index: number) => (
                 <div key={`ped-${item.nombreBase}-${index}`} className="rounded-md border p-3">
                   <div className="flex items-center justify-between gap-3">
@@ -725,29 +738,29 @@ export default function Reportes() {
       return (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card><CardHeader><CardTitle>Total productos</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.totalProductos}</CardContent></Card>
-            <Card><CardHeader><CardTitle>Sin stock</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.withoutStock}</CardContent></Card>
-            <Card><CardHeader><CardTitle>Stock bajo (max 5)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.lowStock}</CardContent></Card>
+            <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total productos</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.totalProductos}</p></CardContent></Card>
+            <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Sin stock</p><p className="mt-2 text-2xl font-semibold tabular-nums text-destructive">{metrics.withoutStock}</p></CardContent></Card>
+            <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Stock bajo (≤ 5)</p><p className="mt-2 text-2xl font-semibold tabular-nums text-amber-600">{metrics.lowStock}</p></CardContent></Card>
           </div>
 
           <Card>
-            <CardHeader><CardTitle>Productos con condiciones particulares de inventario</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Productos con condiciones de inventario</CardTitle></CardHeader>
+            <CardContent className="space-y-2 pt-4">
               {metrics.withoutStockProducts.slice(0, 12).map((item: any) => (
-                <div key={`oos-${item.id}`} className="rounded-md border border-red-200 bg-red-50 p-3">
+                <div key={`oos-${item.id}`} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span>{item.nombre}</span>
-                    <strong className="text-red-700">Sin stock</strong>
+                    <strong className="text-destructive text-sm">Sin stock</strong>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Stock actual: {item.stock} | Categoria: {item.categoriaId ?? 'N/A'}</p>
                 </div>
               ))}
 
               {metrics.lowStockProducts.slice(0, 20).map((item: any) => (
-                <div key={`low-${item.id}`} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                <div key={`low-${item.id}`} className="rounded-md border border-amber-400/30 bg-amber-50/60 dark:bg-amber-950/20 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span>{item.nombre}</span>
-                    <strong className="text-amber-700">Stock bajo</strong>
+                    <strong className="text-amber-700 dark:text-amber-400 text-sm">Stock bajo</strong>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Stock actual: {item.stock} | Categoria: {item.categoriaId ?? 'N/A'}</p>
                 </div>
@@ -765,8 +778,8 @@ export default function Reportes() {
     if (selectedReport === 'pedidos-estado') {
       return (
         <Card>
-          <CardHeader><CardTitle>Distribucion de pedidos por estado</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
+          <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Distribución por estado</CardTitle></CardHeader>
+          <CardContent className="space-y-2 pt-4">
             {Object.entries(metrics.ordersByStatus).sort((a, b) => b[1] - a[1]).map(([estado, total]) => (
               <div key={estado} className="flex items-center justify-between rounded-md border p-3">
                 <span className="capitalize">{estado}</span>
@@ -781,8 +794,8 @@ export default function Reportes() {
     if (selectedReport === 'clientes') {
       return (
         <Card>
-          <CardHeader><CardTitle>Clientes frecuentes</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
+          <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Clientes frecuentes</CardTitle></CardHeader>
+          <CardContent className="space-y-2 pt-4">
             {metrics.topCustomers.map((item, index) => (
               <details key={`${item.nombre}-${index}`} className="rounded-md border p-3">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
@@ -808,9 +821,9 @@ export default function Reportes() {
       const margen = metrics.salesTotal > 0 ? (metrics.utilidadEstimada / metrics.salesTotal) * 100 : 0;
       return (
         <div className="grid gap-4 md:grid-cols-3">
-          <Card><CardHeader><CardTitle>Ingresos estimados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.salesTotal.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Costos estimados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.totalCostoEstimado.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Margen estimado</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{margen.toFixed(1)}%</CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ingresos estimados</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.salesTotal.toFixed(2)}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Costos estimados</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.totalCostoEstimado.toFixed(2)}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Margen estimado</p><p className="mt-2 text-2xl font-semibold tabular-nums">{margen.toFixed(1)}%</p></CardContent></Card>
         </div>
       );
     }
@@ -818,17 +831,17 @@ export default function Reportes() {
     if (selectedReport === 'ticket-promedio') {
       return (
         <div className="grid gap-4 md:grid-cols-3">
-          <Card><CardHeader><CardTitle>Ticket promedio</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.ticketPromedio.toFixed(2)}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Pedidos completados</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{metrics.completedOrders}</CardContent></Card>
-          <Card><CardHeader><CardTitle>Ventas acumuladas</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${metrics.salesTotal.toFixed(2)}</CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ticket promedio</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.ticketPromedio.toFixed(2)}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pedidos completados</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.completedOrders}</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ventas acumuladas</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.salesTotal.toFixed(2)}</p></CardContent></Card>
         </div>
       );
     }
 
     return (
       <Card>
-        <CardHeader><CardTitle>Reposicion prioritaria basada en ventas</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
+        <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Reposición prioritaria basada en ventas</CardTitle></CardHeader>
+        <CardContent className="space-y-2 pt-4">
           {metrics.restockPriorities.map((row: any, idx: number) => (
             <div key={`${row.nombre}-${idx}`} className="rounded-md border p-3">
               <div className="flex items-center justify-between gap-3">
@@ -848,7 +861,7 @@ export default function Reportes() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold">Reportes de analisis</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Reportes de análisis</h2>
           <p className="text-sm text-muted-foreground">Panel informativo para evaluar ventas, clientes, productos y reposicion.</p>
         </div>
 
@@ -874,36 +887,36 @@ export default function Reportes() {
             <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="reporte-fecha-inicio">Fecha inicio</label>
-                <input
+                <Input
                   id="reporte-fecha-inicio"
                   type="date"
                   value={fechaInicio}
                   max={fechaFin || undefined}
                   onChange={(e) => setFechaInicio(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="reporte-fecha-fin">Fecha fin</label>
-                <input
+                <Input
                   id="reporte-fecha-fin"
                   type="date"
                   value={fechaFin}
                   min={fechaInicio || undefined}
                   onChange={(e) => setFechaFin(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
-                  setFechaInicio('');
-                  setFechaFin('');
+                  const now = new Date();
+                  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  setFechaInicio(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+                  setFechaFin(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`);
                 }}
-                className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-muted/80"
               >
                 Limpiar periodo
-              </button>
+              </Button>
             </CardContent>
           </Card>
         )}

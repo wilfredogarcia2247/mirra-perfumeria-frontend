@@ -1,8 +1,7 @@
-import { Home, Package, Users, Warehouse, FlaskConical, ShoppingCart, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3 } from "lucide-react";
+import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3 } from "lucide-react";
 import { useLocation } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
-// no module-based menu filtering — keep menu visible for all users except the Usuarios link which remains admin-only
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -20,34 +20,69 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import useCart from "@/hooks/use-cart";
 
-const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Home, module: 'dashboard' as const },
-  { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard, module: 'tasas_cambio' as const },
-  { title: "Bancos", url: "/bancos", icon: Building2, module: 'bancos' as const },
-  { title: "Marcas", url: "/marcas", icon: Award, module: 'marcas' as const },
-  { title: "Categorías", url: "/categorias", icon: Layers, module: 'categorias' as const },
-  { title: "Almacenes", url: "/almacenes", icon: Warehouse, module: 'almacenes' as const },
-  { title: "Productos", url: "/productos", icon: Package, module: 'productos' as const },
-  { title: "Fórmulas", url: "/formulas", icon: FlaskConical, module: 'formulas' as const },
-  { title: "Pedidos", url: "/pedidos", icon: Receipt, module: 'pedidos' as const },
-  { title: "Reportes", url: "/reportes", icon: BarChart3, module: 'dashboard' as const },
-  { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' as const },
-  { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' as const },
+type ModuleKey = 'dashboard' | 'tasas_cambio' | 'bancos' | 'marcas' | 'categorias' | 'almacenes' | 'productos' | 'formulas' | 'pedidos' | 'usuarios';
+
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ElementType;
+  module: ModuleKey;
+}
+
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
+
+const menuGroups: MenuGroup[] = [
+  {
+    label: "General",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: Home, module: 'dashboard' },
+      { title: "Reportes", url: "/reportes", icon: BarChart3, module: 'dashboard' },
+    ],
+  },
+  {
+    label: "Catálogo",
+    items: [
+      { title: "Marcas", url: "/marcas", icon: Award, module: 'marcas' },
+      { title: "Categorías", url: "/categorias", icon: Layers, module: 'categorias' },
+      { title: "Productos", url: "/productos", icon: Package, module: 'productos' },
+      { title: "Fórmulas", url: "/formulas", icon: FlaskConical, module: 'formulas' },
+    ],
+  },
+  {
+    label: "Operaciones",
+    items: [
+      { title: "Pedidos", url: "/pedidos", icon: Receipt, module: 'pedidos' },
+      { title: "Almacenes", url: "/almacenes", icon: Warehouse, module: 'almacenes' },
+    ],
+  },
+  {
+    label: "Finanzas",
+    items: [
+      { title: "Tasas de cambio", url: "/tasas-cambio", icon: CreditCard, module: 'tasas_cambio' },
+      { title: "Bancos", url: "/bancos", icon: Building2, module: 'bancos' },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' },
+      { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' },
+    ],
+  },
 ];
 
-const reportSubmenu = [
-  { title: "Resumen general", url: "/reportes" },
-  { title: "Ventas por periodo", url: "/reportes/ventas-periodo" },
-  { title: "Ventas por metodo", url: "/reportes/ventas-metodo" },
-  { title: "Ventas por presentación", url: "/reportes/ventas-presentacion" },
-  { title: "Productos favoritos", url: "/reportes/productos-favoritos" },
-  { title: "Estado de inventario", url: "/reportes/inventario" },
-  { title: "Pedidos por estado", url: "/reportes/pedidos-estado" },
-  { title: "Clientes frecuentes", url: "/reportes/clientes" },
-  { title: "Compras y reposicion", url: "/reportes/compras" },
-  { title: "Rentabilidad", url: "/reportes/rentabilidad" },
-  { title: "Ticket promedio", url: "/reportes/ticket-promedio" },
-];
+
+const activeItemClass = [
+  "relative pl-[calc(0.75rem+3px)]",
+  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
+  "before:w-[3px] before:h-[18px] before:rounded-r-full before:bg-primary",
+  "bg-primary/10 text-primary font-medium",
+].join(" ");
+
+const inactiveItemClass = "text-sidebar-foreground/60 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/90";
 
 export function AppSidebar() {
   const { open } = useSidebar();
@@ -103,98 +138,87 @@ export function AppSidebar() {
     }
   };
 
+  const isItemVisible = (item: MenuItem): boolean => {
+    if (item.module === 'usuarios') {
+      return isAdmin || hasPermission('usuarios');
+    }
+    return hasPermission(item.module);
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg">
-            <img src="/logo.png" alt="Mirra" className="h-8 w-8 object-contain" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 ring-1 ring-primary/30">
+            <img src="/logo.png" alt="Mirra" className="h-5 w-5 object-contain" />
           </div>
           {open && (
-            <div>
-              <h2 className="text-lg font-bold text-sidebar-foreground">Mirra</h2>
-              <p className="text-xs text-sidebar-foreground/60">Gestión de Perfumería</p>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-semibold leading-tight text-sidebar-foreground tracking-tight">Mirra</h2>
+              <p className="text-[10.5px] text-sidebar-foreground/40 leading-tight mt-0.5">Gestión de Perfumería</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => {
-                // If module key present, require permission
-                if (item.module) {
-                  // Usuarios should be visible to admins regardless of permiso flag
-                  if (item.module === 'usuarios') {
-                    if (isAdmin) return item;
-                    if (!hasPermission('usuarios')) return null;
-                    return item;
-                  }
-                  if (!hasPermission(item.module as any)) return null;
-                }
-                return item;
-              }).filter(Boolean).map((item: any) => {
-                const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
-                const isReportSection = item.url === '/reportes';
-                return (
-                  <div key={item.title}>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        onClick={() => navigate(item.url)}
-                        isActive={isActive}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? 'bg-primary-600 text-white' : 'text-sidebar-foreground hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
-                        title={!open ? item.title : undefined}
-                      >
-                        <span className="flex items-center justify-center w-6 h-6 shrink-0">
-                          {item.title === "Producción" ? (
-                            <i className="fa-solid fa-industry inline-block w-4 h-4" aria-hidden="true" />
-                          ) : (
-                            <item.icon className="h-5 w-5" />
-                          )}
-                        </span>
-                        {open && <span className="flex-1 text-sm font-medium">{item.title}</span>}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {open && isReportSection && isActive && (
-                      <div className="ml-9 mt-1 space-y-1">
-                        {reportSubmenu.map((subItem) => {
-                          const subActive = location.pathname === subItem.url;
-                          return (
-                            <button
-                              key={subItem.url}
-                              type="button"
-                              onClick={() => navigate(subItem.url)}
-                              className={`block w-full rounded-md px-2 py-1 text-left text-xs transition-colors ${subActive ? 'bg-primary-100 text-primary-700' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground'}`}
+      <SidebarContent className="py-2">
+        {menuGroups.map((group, groupIndex) => {
+          const visibleItems = group.items.filter(isItemVisible);
+          if (visibleItems.length === 0) return null;
+          return (
+            <React.Fragment key={group.label}>
+              {groupIndex > 0 && (
+                <div className="mx-3 my-1 h-px bg-sidebar-border/60" aria-hidden="true" />
+              )}
+              <SidebarGroup className="py-0">
+                {open && (
+                  <SidebarGroupLabel className="px-3 py-1 text-[9.5px] font-medium tracking-widest text-sidebar-foreground/30 uppercase">
+                    {group.label}
+                  </SidebarGroupLabel>
+                )}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {visibleItems.map((item) => {
+                      const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
+                      return (
+                        <div key={item.title}>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton
+                              onClick={() => navigate(item.url)}
+                              isActive={isActive}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? activeItemClass : inactiveItemClass}`}
+                              title={!open ? item.title : undefined}
                             >
-                              {subItem.title}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                              <span className="flex items-center justify-center w-5 h-5 shrink-0">
+                                <item.icon className="h-[18px] w-[18px]" />
+                              </span>
+                              {open && <span className="flex-1 text-[13px]">{item.title}</span>}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
 
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <div className="mt-auto p-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/50"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-            {open && <span>Cerrar Sesión</span>}
-          </Button>
-        </div>
+                        </div>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </React.Fragment>
+          );
+        })}
       </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-3 px-3 text-[13px] text-sidebar-foreground/40 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/70"
+          onClick={handleLogout}
+          title={!open ? "Cerrar sesión" : undefined}
+        >
+          <LogOut className="h-[18px] w-[18px] shrink-0" />
+          {open && <span>Cerrar sesión</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }

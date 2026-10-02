@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { parseApiError } from '@/lib/utils';
 import { getTasasCambio, createTasaCambio, updateTasaCambio, deleteTasaCambio, getTasaCambio } from '@/integrations/api';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 
 export default function TasasCambio() {
   const [tasas, setTasas] = useState<any[]>([]);
@@ -138,41 +139,41 @@ export default function TasasCambio() {
 
   return (
     <Layout>
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Tasas de cambio</h1>
+            <h2 className="text-2xl font-semibold tracking-tight">Tasas de cambio</h2>
             <p className="text-sm text-muted-foreground">Gestiona las tasas de conversión (USD, EUR, etc.)</p>
           </div>
-          <div>
-            <Button onClick={() => { resetForm(); setIsOpen(true); }}>Nueva tasa</Button>
-          </div>
+          <Button onClick={() => { resetForm(); setIsOpen(true); }}>
+            Nueva tasa
+          </Button>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Listado</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
-              <div>Cargando tasas...</div>
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Símbolo</TableHead>
-                    <TableHead>Activo</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Creado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Símbolo</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Monto</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Descripción</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Creado</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tasas.map((t: any) => (
-                    <TableRow key={t.id} className="hover:bg-muted/50">
-                      <TableCell className="font-mono text-sm">{t.id}</TableCell>
+                    <TableRow key={t.id} className="hover:bg-muted/40 transition-colors duration-150">
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{t.id}</TableCell>
                       <TableCell><div className="flex items-center gap-2"><Badge>{t.simbolo}</Badge></div></TableCell>
                       <TableCell>{t.activo ? <Badge variant="success">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}</TableCell>
                       <TableCell>{typeof t.monto === 'number' ? t.monto : (t.monto ?? '-')}</TableCell>

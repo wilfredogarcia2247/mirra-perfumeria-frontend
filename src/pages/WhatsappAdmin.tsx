@@ -7,6 +7,8 @@ import {
   getOutboundOrderWhatsAppMessages,
   sendWahaTextMessage,
 } from '@/integrations/api';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function WhatsappAdmin() {
   const [sessionName, setSessionName] = useState('default');
@@ -82,13 +84,13 @@ export default function WhatsappAdmin() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">WhatsApp (WAHA)</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">WhatsApp (WAHA)</h2>
           <p className="text-muted-foreground">Centro de mensajeria, contactos y seguimiento de pedidos.</p>
         </div>
 
         <Card>
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle>Estado de conexion</CardTitle>
+          <CardHeader className="border-b border-border/60 pb-3">
+            <CardTitle className="text-base font-medium">Estado de conexión</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 pt-4 text-sm md:grid-cols-5">
             <div className="rounded-lg border p-3">
@@ -117,31 +119,31 @@ export default function WhatsappAdmin() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle>Envio manual</CardTitle>
+          <CardHeader className="border-b border-border/60 pb-3">
+            <CardTitle className="text-base font-medium">Envío manual</CardTitle>
             <CardDescription>
-              La conexion/sesion se gestiona en el dashboard de WAHA. Aqui solo operas mensajes.
+              La conexión/sesión se gestiona en el dashboard de WAHA. Aquí solo operas mensajes.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2 md:grid-cols-12">
-              <label className="text-sm">Session:</label>
-              <input
+              <label className="text-sm self-center col-span-1">Sesión:</label>
+              <Input
                 value={sessionName}
                 onChange={(e) => setSessionName(e.target.value)}
-                className="h-9 rounded border px-2 text-sm md:col-span-2"
+                className="md:col-span-2"
                 placeholder="default"
               />
-              <input
+              <Input
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="h-9 rounded border px-2 text-sm md:col-span-3"
-                placeholder="Telefono o chatId"
+                className="md:col-span-3"
+                placeholder="Teléfono o chatId"
               />
-              <textarea
+              <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="min-h-20 rounded border px-2 py-2 text-sm md:col-span-4"
+                className="min-h-20 md:col-span-4"
                 placeholder="Escribe el mensaje"
               />
               <Button className="md:col-span-1" onClick={handleSend} disabled={sending}>
@@ -156,9 +158,9 @@ export default function WhatsappAdmin() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle>Mensajes enviados por pedidos</CardTitle>
-            <CardDescription>Registro interno de los envios automáticos del backend.</CardDescription>
+          <CardHeader className="border-b border-border/60 pb-3">
+            <CardTitle className="text-base font-medium">Mensajes enviados por pedidos</CardTitle>
+            <CardDescription>Registro interno de los envíos automáticos del backend.</CardDescription>
           </CardHeader>
           <CardContent className="max-h-[360px] space-y-2 overflow-auto pt-4">
             {orderMessages.length === 0 ? (

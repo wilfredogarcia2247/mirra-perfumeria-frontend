@@ -28,8 +28,8 @@
     --secondary: 0 0% 53%;
     --secondary-foreground: 0 0% 20%;
 
-    --muted: 270 20% 96%;
-    --muted-foreground: 270 20% 45%;
+    --muted: 35 15% 95%;
+    --muted-foreground: 35 8% 48%;
 
     /* Accent default (can be mapped to amber/rose/green depending on context) */
     --accent: 30 85% 50%;
@@ -46,9 +46,8 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 90%;
+    --border: 35 10% 88%;
     --input: 0 0% 100%;
-    --ring: 0 0% 90%;
     --ring: 20 35% 40%;
 
     --radius: 0.5rem;
@@ -75,42 +74,43 @@
   }
 
   .dark {
-    --background: 270 50% 8%;
-    --foreground: 270 20% 95%;
+    --background: 20 18% 8%;
+    --foreground: 35 25% 93%;
 
-    --card: 270 45% 12%;
-    --card-foreground: 270 20% 95%;
+    --card: 20 15% 11%;
+    --card-foreground: 35 20% 90%;
 
-    --popover: 270 45% 12%;
-    --popover-foreground: 270 20% 95%;
+    --popover: 20 15% 13%;
+    --popover-foreground: 35 20% 90%;
 
-    --primary: 270 70% 55%;
+    /* Dark mode keeps the warm amber brand identity */
+    --primary: 32 45% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 270 40% 18%;
-    --secondary-foreground: 270 20% 95%;
+    --secondary: 20 12% 20%;
+    --secondary-foreground: 35 15% 80%;
 
-    --muted: 270 40% 18%;
-    --muted-foreground: 270 20% 65%;
+    --muted: 20 12% 18%;
+    --muted-foreground: 35 8% 55%;
 
-    --accent: 40 90% 55%;
-    --accent-foreground: 270 50% 8%;
+    --accent: 32 45% 55%;
+    --accent-foreground: 20 18% 8%;
 
-    --destructive: 0 70% 50%;
+    --destructive: 0 65% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 270 40% 20%;
-    --input: 270 40% 20%;
-    --ring: 270 70% 55%;
+    --border: 20 12% 18%;
+    --input: 20 12% 15%;
+    --ring: 32 45% 55%;
 
-    --sidebar-background: 270 60% 8%;
-    --sidebar-foreground: 270 20% 95%;
-    --sidebar-primary: 270 70% 55%;
+    --sidebar-background: 20 18% 8%;
+    --sidebar-foreground: 38 30% 90%;
+    --sidebar-primary: 32 45% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 270 50% 15%;
-    --sidebar-accent-foreground: 270 20% 95%;
-    --sidebar-border: 270 40% 20%;
-    --sidebar-ring: 40 90% 55%;
+    --sidebar-accent: 20 15% 14%;
+    --sidebar-accent-foreground: 35 20% 85%;
+    --sidebar-border: 20 12% 15%;
+    --sidebar-ring: 32 45% 60%;
   }
 }
 

@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Layout } from '@/components/Layout';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Edit, Trash2, Eye, Loader2, Check, X } from 'lucide-react';
 
 export default function Bancos() {
   const [bancos, setBancos] = useState<any[]>([]);
@@ -270,10 +273,10 @@ export default function Bancos() {
   if (name.includes('móvil') || name.includes('movil') || name.includes('pago movil')) {
       return (
         <div className="space-y-2">
-          <input className="w-full border rounded p-2" placeholder="Número de teléfono" value={detallesObj.numero_telefono || ''} onChange={(e) => updateFormaDetalle(i, 'numero_telefono', e.target.value)} />
-          <input className="w-full border rounded p-2" placeholder="Documento (cedula/RIF)" value={detallesObj.documento || ''} onChange={(e) => updateFormaDetalle(i, 'documento', e.target.value)} />
-          <input className="w-full border rounded p-2" placeholder="Titular (opcional)" value={detallesObj.titular || ''} onChange={(e) => updateFormaDetalle(i, 'titular', e.target.value)} />
-          <input className="w-full border rounded p-2 bg-gray-100" placeholder="Banco (heredado)" value={detallesObj.banco || modalBanco?.nombre || ''} disabled />
+          <Input placeholder="Número de teléfono" value={detallesObj.numero_telefono || ''} onChange={(e) => updateFormaDetalle(i, 'numero_telefono', e.target.value)} />
+          <Input placeholder="Documento (cedula/RIF)" value={detallesObj.documento || ''} onChange={(e) => updateFormaDetalle(i, 'documento', e.target.value)} />
+          <Input placeholder="Titular (opcional)" value={detallesObj.titular || ''} onChange={(e) => updateFormaDetalle(i, 'titular', e.target.value)} />
+          <Input placeholder="Banco (heredado)" value={detallesObj.banco || modalBanco?.nombre || ''} disabled className="opacity-60" />
         </div>
       );
     }
@@ -281,10 +284,10 @@ export default function Bancos() {
     if (name.includes('transfer') || name.includes('cuenta') || name.includes('banco')) {
       return (
         <div className="space-y-2">
-          <input className="w-full border rounded p-2" placeholder="Número de cuenta" value={detallesObj.numero_cuenta || ''} onChange={(e) => updateFormaDetalle(i, 'numero_cuenta', e.target.value)} />
-          <input className="w-full border rounded p-2" placeholder="Documento (cedula/RIF)" value={detallesObj.documento || ''} onChange={(e) => updateFormaDetalle(i, 'documento', e.target.value)} />
-          <input className="w-full border rounded p-2 bg-gray-100" placeholder="Banco (heredado)" value={detallesObj.banco || modalBanco?.nombre || ''} disabled />
-          <input className="w-full border rounded p-2" placeholder="Titular" value={detallesObj.titular || ''} onChange={(e) => updateFormaDetalle(i, 'titular', e.target.value)} />
+          <Input placeholder="Número de cuenta" value={detallesObj.numero_cuenta || ''} onChange={(e) => updateFormaDetalle(i, 'numero_cuenta', e.target.value)} />
+          <Input placeholder="Documento (cedula/RIF)" value={detallesObj.documento || ''} onChange={(e) => updateFormaDetalle(i, 'documento', e.target.value)} />
+          <Input placeholder="Banco (heredado)" value={detallesObj.banco || modalBanco?.nombre || ''} disabled className="opacity-60" />
+          <Input placeholder="Titular" value={detallesObj.titular || ''} onChange={(e) => updateFormaDetalle(i, 'titular', e.target.value)} />
         </div>
       );
     }
@@ -376,106 +379,126 @@ export default function Bancos() {
 
   return (
     <Layout>
-      <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Bancos</h1>
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Input placeholder="Nombre del banco" value={name} onChange={(e: any) => setName(e.target.value)} />
-        {tasas && tasas.length > 0 ? (
-          <select className="w-full rounded border p-2" value={moneda} onChange={(e:any) => setMoneda(e.target.value)}>
-            <option value="">-- Selecciona moneda --</option>
-            {tasas.map((t:any) => (
-              <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
-            ))}
-          </select>
-        ) : (
-          <Input placeholder="Moneda (ej. USD)" value={moneda} onChange={(e: any) => setMoneda(e.target.value)} />
-        )}
-        <div className="flex gap-2">
-          <Button onClick={handleCreate} disabled={submitting}>{submitting ? 'Creando...' : 'Crear banco'}</Button>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Bancos</h2>
+            <p className="text-sm text-muted-foreground">Gestión de cuentas bancarias y formas de pago</p>
+          </div>
         </div>
-      </div>
 
-      {loading ? (
-        <div>Cargando...</div>
-      ) : (
-        <table className="w-full border">
-          <thead>
-            <tr>
-              <th className="text-left p-2">Nombre</th>
-              <th className="p-2">Moneda</th>
-              <th className="p-2">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bancos.map((b) => (
-              <tr key={b.id} className="border-t">
-                <td className="p-2">
-                  {editingId === b.id ? (
-                    <input className="w-full border rounded p-1" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
-                  ) : (
-                    b.nombre
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingId === b.id ? (
-                    tasas && tasas.length > 0 ? (
-                      <select className="w-full rounded border p-1" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
-                        <option value="">-- Selecciona moneda --</option>
-                        {tasas.map((t:any) => <option key={t.id ?? t.simbolo} value={t.simbolo}>{t.simbolo}</option>)}
-                      </select>
-                    ) : (
-                      <input className="w-full border rounded p-1" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
-                    )
-                  ) : (
-                    b.moneda ?? '-'
-                  )}
-                </td>
-                <td className="p-2">
-                  {editingId === b.id ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={handleUpdate} disabled={submitting}>{submitting ? 'Guardando...' : 'Guardar'}</Button>
-                      <Button size="sm" variant="outline" onClick={cancelEdit}>Cancelar</Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => startEdit(b)}>Editar</Button>
-                      <Button size="sm" onClick={() => openModal(b.id)}>Ver</Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(b.id)}>Eliminar</Button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        <Card>
+          <CardContent className="p-0">
+            <div className="px-4 pt-4 pb-3 flex flex-wrap gap-2 border-b border-border/60">
+              <Input placeholder="Nombre del banco" value={name} onChange={(e: any) => setName(e.target.value)} className="max-w-[200px]" />
+              {tasas && tasas.length > 0 ? (
+                <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={moneda} onChange={(e:any) => setMoneda(e.target.value)}>
+                  <option value="">-- Moneda --</option>
+                  {tasas.map((t:any) => (
+                    <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input placeholder="Moneda (ej. USD)" value={moneda} onChange={(e: any) => setMoneda(e.target.value)} className="max-w-[140px]" />
+              )}
+              <Button onClick={handleCreate} disabled={submitting} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {submitting ? 'Creando...' : 'Crear banco'}
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Moneda</TableHead>
+                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bancos.map((b) => (
+                    <TableRow key={b.id} className="hover:bg-muted/40 transition-colors duration-150">
+                      <TableCell className="font-medium">
+                        {editingId === b.id ? (
+                          <Input className="h-7 text-sm" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
+                        ) : b.nombre}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {editingId === b.id ? (
+                          tasas && tasas.length > 0 ? (
+                            <select className="h-7 rounded-md border border-input bg-background px-2 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
+                              <option value="">--</option>
+                              {tasas.map((t:any) => <option key={t.id ?? t.simbolo} value={t.simbolo}>{t.simbolo}</option>)}
+                            </select>
+                          ) : (
+                            <Input className="h-7 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
+                          )
+                        ) : (b.moneda ?? '—')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {editingId === b.id ? (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleUpdate} disabled={submitting}>
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEdit}>
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(b)}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openModal(b.id)}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(b.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Modal detalle banco */}
       {modalOpen && modalBanco && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={closeModal} />
-          <div className="relative bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 z-10">
-            <div className="flex justify-between items-start mb-4 gap-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
+          <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-2xl p-6 z-10">
+            <div className="flex justify-between items-start mb-5 gap-4">
               <div className="flex-1">
-                <h3 className="text-lg font-semibold">Banco: {modalBanco.nombre}</h3>
+                <h3 className="text-lg font-semibold">{modalBanco.nombre}</h3>
                 <div className="mt-2 flex gap-2 items-center">
-                  <label className="text-sm text-gray-600">Moneda</label>
+                  <span className="text-xs text-muted-foreground">Moneda</span>
                   {tasas && tasas.length > 0 ? (
-                    <select className="border rounded p-1 w-40" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)}>
-                      <option value="">-- Selecciona moneda --</option>
+                    <select className="h-7 rounded-md border border-input bg-background px-2 text-sm" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)}>
+                      <option value="">-- Selecciona --</option>
                       {tasas.map((t:any) => (
                         <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
                       ))}
                     </select>
                   ) : (
-                    <input className="border rounded p-1 w-32" placeholder="USD" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)} />
+                    <Input className="h-7 w-28 text-sm" placeholder="USD" value={modalMoneda} onChange={(e) => setModalMoneda(e.target.value)} />
                   )}
                 </div>
               </div>
-              <div>
-                <button onClick={closeModal} className="p-1">Cerrar</button>
-              </div>
+              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={closeModal}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -530,8 +553,10 @@ export default function Bancos() {
                       <div className="col-span-7">
                         {renderFormaFields(i, ef)}
                       </div>
-                      <div className="col-span-1">
-                        <button className="text-red-600" onClick={() => removeFormaRow(i)}>X</button>
+                      <div className="col-span-1 flex items-start pt-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFormaRow(i)}>
+                          <X className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </div>
                       {editingFormasErrors[i] ? (
                         <div className="col-span-12 text-sm text-red-600 mt-1">{editingFormasErrors[i]}</div>
@@ -539,7 +564,10 @@ export default function Bancos() {
                     </div>
                   ))}
                   <div>
-                    <button className="mt-2 px-3 py-1 rounded border" onClick={addFormaRow}>Agregar forma</button>
+                    <Button variant="outline" size="sm" className="mt-1 gap-1.5" onClick={addFormaRow}>
+                      <Plus className="h-3.5 w-3.5" />
+                      Agregar forma
+                    </Button>
                   </div>
                 </div>
               </div>
