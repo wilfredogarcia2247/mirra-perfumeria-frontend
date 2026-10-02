@@ -9,28 +9,38 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      position="top-right"
-      closeButton
-      duration={1400}
-      visibleToasts={3}
-      offset={12}
+      position="top-center"
+      closeButton={false}
+      duration={3500}
+      visibleToasts={4}
+      offset={16}
       className="toaster group"
       toastOptions={{
-        duration: 1400,
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background/95 group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-md group-[.toaster]:rounded-md group-[.toaster]:px-3 group-[.toaster]:py-2 group-[.toaster]:text-[11px] group-[.toaster]:min-h-0 group-[.toaster]:max-w-[240px] group-[.toaster]:translate-x-0",
-          description: "group-[.toast]:text-muted-foreground group-[.toast]:text-[10px]",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:h-7 group-[.toast]:px-2 group-[.toast]:text-[10px]",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground group-[.toast]:h-7 group-[.toast]:px-2 group-[.toast]:text-[10px]",
-          closeButton: "group-[.toast]:bg-muted group-[.toast]:text-foreground",
+            "group toast !bg-[hsl(32,30%,18%)] !text-[hsl(32,20%,92%)] !border-[hsl(32,25%,26%)] !shadow-2xl !rounded-2xl !px-5 !py-4 !text-[13px] !font-medium !max-w-[360px] !w-[360px] !gap-3.5",
+          title:
+            "!text-[hsl(32,20%,96%)] !font-semibold !text-[14px] !leading-tight",
+          description:
+            "!text-[hsl(32,12%,65%)] !text-[13px] !leading-snug !mt-1",
+          success:
+            "!bg-[hsl(32,30%,18%)] !border-[hsl(32,25%,26%)]",
+          error:
+            "!bg-[hsl(0,28%,16%)] !text-[hsl(0,20%,92%)] !border-[hsl(0,22%,26%)]",
+          info:
+            "!bg-[hsl(32,30%,18%)] !border-[hsl(32,25%,26%)]",
+          warning:
+            "!bg-[hsl(38,35%,16%)] !border-[hsl(38,30%,26%)]",
+          icon:
+            "!text-[hsl(32,55%,65%)]",
         },
       }}
       style={{
         position: 'fixed',
         top: '1rem',
-        right: '1rem',
-        left: 'auto',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        right: 'auto',
         bottom: 'auto',
         zIndex: 9999,
       }}

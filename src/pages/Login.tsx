@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FlaskConical } from "lucide-react";
 import { toast } from "sonner";
+import { parseApiError } from "@/lib/utils";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -21,14 +22,19 @@ export default function Login() {
 
     try {
       await login(email, password);
-      toast.success("Inicio de sesión exitoso");
-  // Si venimos de una ruta protegida, redirigir allí (pathname + search + hash preserved); si no, al dashboard
-  const state: any = (location as any).state;
-  const from = state?.from;
-  const redirectTo = from ? `${from.pathname || ''}${from.search || ''}${from.hash || ''}` : '/dashboard';
-  navigate(redirectTo || '/dashboard', { replace: true });
+      toast.success("Inicio de sesión exitoso", {
+        description: "Bienvenido al panel de Mirra Perfumería",
+        duration: 3000,
+      });
+      const state: any = (location as any).state;
+      const from = state?.from;
+      const redirectTo = from ? `${from.pathname || ''}${from.search || ''}${from.hash || ''}` : '/dashboard';
+      navigate(redirectTo || '/dashboard', { replace: true });
     } catch (err: any) {
-      toast.error(err.message || "Error de autenticación");
+      toast.error("Error de autenticación", {
+        description: parseApiError(err) || "Verifica tus credenciales e intenta de nuevo",
+        duration: 4000,
+      });
     } finally {
       setIsLoading(false);
     }

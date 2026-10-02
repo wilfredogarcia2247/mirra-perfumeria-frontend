@@ -527,7 +527,7 @@ export default function Formulas() {
       setBulkSearched(true);
     } catch (err: any) {
       console.error('Error buscando fórmulas by-like', err);
-      toast.error(err?.message || 'Error al buscar fórmulas');
+      toast.error(parseApiError(err) || 'Error al buscar fórmulas');
     } finally {
       setBulkSearching(false);
     }
@@ -554,7 +554,7 @@ export default function Formulas() {
       setBulkNewPrice('');
     } catch (err: any) {
       console.error('Error actualizando precios en masa', err);
-      toast.error(err?.message || 'Error al actualizar precios');
+      toast.error(parseApiError(err) || 'Error al actualizar precios');
     } finally {
       setBulkUpdating(false);
     }
