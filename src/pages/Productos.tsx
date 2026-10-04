@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { getImageUrl } from '@/lib/utils';
 import { Layout } from "@/components/Layout";
 import { getProductos, deleteProducto, getProducto, adjustInventario, getAlmacenes, addProductoAlmacen } from "@/integrations/api";

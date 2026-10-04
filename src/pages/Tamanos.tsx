@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { Layout } from '@/components/Layout';
 import { getTamanos, createTamano, updateTamano, deleteTamano, getProductos } from '@/integrations/api';
 import { Button } from '@/components/ui/button';

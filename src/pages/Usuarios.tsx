@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/table';

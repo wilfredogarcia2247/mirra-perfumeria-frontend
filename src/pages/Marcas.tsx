@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { Layout } from '@/components/Layout';
 import { getMarcas, createMarca, updateMarca, deleteMarca } from '@/integrations/api';
 import { Button } from '@/components/ui/button';

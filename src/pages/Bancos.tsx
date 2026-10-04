@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { getBancos, createBanco, updateBanco, deleteBanco, getFormasPago, getBanco, getTasasCambio } from "@/integrations/api";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";

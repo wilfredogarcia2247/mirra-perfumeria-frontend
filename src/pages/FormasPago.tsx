@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { getFormasPago, createFormaPago } from "@/integrations/api";
 import { toast } from "sonner";
 

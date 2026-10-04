@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { CardGridSkeleton } from '@/components/admin-skeletons';
 import { Layout } from "@/components/Layout";
 import { getFormulas, createFormula, getProductos, getFormula, updateFormula, deleteFormula, getAlmacenes, getProducto, createProduccion, searchFormulasByLike, updateFormulasByLike } from "@/integrations/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

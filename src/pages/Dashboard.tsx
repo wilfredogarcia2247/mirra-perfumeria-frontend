@@ -233,9 +233,9 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{stat.title}</p>
-                    <p className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
+                    <div className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
                       {stat.value === '...' ? <Skeleton className="mt-1 h-8 w-20" /> : stat.value}
-                    </p>
+                    </div>
                     <p className="mt-1.5 text-[11.5px] text-muted-foreground">{stat.sub}</p>
                   </div>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
