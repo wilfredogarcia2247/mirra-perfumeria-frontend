@@ -152,7 +152,7 @@ export default function Tamanos() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div>Cargando...</div>
+              <TableSkeleton columns={7} />
             ) : (
               <Table>
                 <TableHeader>

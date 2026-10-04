@@ -26,6 +26,7 @@ import Reportes from "./pages/Reportes";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
+import PublicSite from "./components/PublicSite";
 
 const queryClient = new QueryClient();
 
@@ -36,11 +37,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Rutas públicas */}
-          <Route path="/" element={<Hero />} />
-          <Route path="/categoria/:categorySlug" element={<Hero />} />
+          {/* Web pública. El panel y el login no cargan Google Ads. */}
+          <Route element={<PublicSite />}>
+            <Route path="/" element={<Hero />} />
+            <Route path="/categoria/:categorySlug" element={<Hero />} />
+            <Route path="/about" element={<AboutUs />} />
+          </Route>
           <Route path="/login" element={<Login />} />
-          <Route path="/about" element={<AboutUs />} />
 
           {/* Rutas protegidas */}
           <Route element={<ProtectedRoute />}>

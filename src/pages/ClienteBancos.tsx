@@ -79,7 +79,7 @@ export default function ClienteBancos() {
       </form>
       {error && <div className="text-red-500 mb-2">{error}</div>}
       {loading ? (
-        <div>Cargando...</div>
+        <TableSkeleton columns={3} />
       ) : (
         <table className="w-full border">
           <thead>

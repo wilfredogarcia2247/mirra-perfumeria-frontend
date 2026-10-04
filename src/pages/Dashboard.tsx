@@ -1,6 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, ShoppingCart, Warehouse, DollarSign, Loader2 } from "lucide-react";
+import { Package, ShoppingCart, Warehouse, DollarSign } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState, useRef } from 'react';
 import { getProductos, getPedidos, getAlmacenes, getProducto } from '@/integrations/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
@@ -233,7 +234,7 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{stat.title}</p>
                     <p className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
-                      {stat.value === '...' ? <Loader2 className="h-6 w-6 animate-spin mt-1" /> : stat.value}
+                      {stat.value === '...' ? <Skeleton className="mt-1 h-8 w-20" /> : stat.value}
                     </p>
                     <p className="mt-1.5 text-[11.5px] text-muted-foreground">{stat.sub}</p>
                   </div>

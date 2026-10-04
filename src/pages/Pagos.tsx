@@ -17,7 +17,7 @@ export default function Pagos() {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Pagos</h1>
       {loading ? (
-        <div>Cargando...</div>
+        <TableSkeleton columns={4} />
       ) : (
         <table className="w-full border">
           <thead>

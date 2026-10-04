@@ -223,10 +223,7 @@ export default function Almacenes() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Cargando...</span>
-              </div>
+              <TableSkeleton columns={5} />
             ) : (
               <Table>
                 <TableHeader>

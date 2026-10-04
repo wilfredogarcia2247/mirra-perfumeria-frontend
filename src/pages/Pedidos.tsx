@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,6 +7,7 @@ import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, compl
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText } from 'lucide-react';
+import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -184,6 +185,7 @@ export default function Pedidos() {
   };
 
   useEffect(() => {
+    if (searchTerm.trim()) return;
     setLoading(true);
     // Cargar pedidos paginados (filtrados por estado si aplica) y luego el mapa de pagos
     (async () => {
@@ -216,7 +218,7 @@ export default function Pedidos() {
         setLoading(false);
       }
     })();
-  }, [navigate, page, limit, selectedStatus]);
+  }, [navigate, page, limit, selectedStatus, searchTerm]);
 
   // Obtener pedidos paginados o resultados de búsqueda
   useEffect(() => {
@@ -225,19 +227,33 @@ export default function Pedidos() {
       try {
         if (searchTerm.trim()) {
           const term = searchTerm.trim().toLowerCase();
+          const compactTerm = term.replace(/[^a-z0-9]/g, '');
+          const digitTerm = term.replace(/\D/g, '');
           const all = await getPedidos();
           const allList = Array.isArray(all) ? all : (all?.data || []);
           const list = allList.filter((p: any) => {
             const nombre = (p?.nombre_cliente || p?.cliente_nombre || p?.cliente?.nombre || '').toLowerCase();
-            const cedula = String(p?.cedula || p?.cliente_cedula || '');
-            const telefono = String(p?.telefono || p?.cliente_telefono || '');
+            const cedula = String(p?.cedula || p?.cliente_cedula || p?.cliente?.cedula || '').toLowerCase();
+            const telefono = String(p?.telefono || p?.cliente_telefono || p?.cliente?.telefono || '').toLowerCase();
             const id = String(p?.id || '');
-            return nombre.includes(term) || cedula.includes(term) || telefono.includes(term) || id === term;
+            const cedulaCompact = cedula.replace(/[^a-z0-9]/g, '');
+            const telefonoDigits = telefono.replace(/\D/g, '');
+            return nombre.includes(term)
+              || cedula.includes(term)
+              || telefono.includes(term)
+              || (compactTerm.length >= 5 && cedulaCompact.includes(compactTerm))
+              || (digitTerm.length >= 7 && telefonoDigits.includes(digitTerm))
+              || id === term;
           });
-          setPedidos(list);
-          setTotalOrders(list.length);
+          setSearchResults(list);
+          const shown = selectedStatus
+            ? list.filter((p: any) => String(p?.estado || p?.status || '').toLowerCase() === selectedStatus.toLowerCase())
+            : list;
+          setPedidos(shown);
+          setTotalOrders(shown.length);
           setTotalPages(1);
         } else {
+          setSearchResults([]);
           // Si no hay búsqueda, usar la paginación normal
           const { data, total } = await getPedidosPaginated(page, limit, selectedStatus);
           setPedidos(data);
@@ -251,6 +267,7 @@ export default function Pedidos() {
         }
         // En caso de error, mostrar lista vacía
         setPedidos([]);
+        setSearchResults([]);
         setTotalOrders(0);
       } finally {
         setLoading(false);
@@ -286,12 +303,25 @@ export default function Pedidos() {
   };
 
   const allStatuses = ['Pendiente', 'Enviado', 'Completado', 'Cancelado'];
+  const searchStats = useMemo(() => {
+    const counts = { todos: 0, pendiente: 0, enviado: 0, completado: 0, cancelado: 0 };
+    for (const p of searchResults) {
+      counts.todos += 1;
+      const k = String(p?.estado || p?.status || '').toLowerCase();
+      if (k === 'pendiente') counts.pendiente += 1;
+      else if (k === 'enviado') counts.enviado += 1;
+      else if (k === 'completado') counts.completado += 1;
+      else if (k === 'cancelado') counts.cancelado += 1;
+    }
+    return counts;
+  }, [searchResults]);
+  const chipStats = searchTerm.trim() ? searchStats : stats;
   const countFor = (st: string) => {
     const k = st.toLowerCase();
-    if (k === 'pendiente') return stats.pendiente;
-    if (k === 'enviado') return stats.enviado;
-    if (k === 'completado') return stats.completado;
-    if (k === 'cancelado') return stats.cancelado;
+    if (k === 'pendiente') return chipStats.pendiente;
+    if (k === 'enviado') return chipStats.enviado;
+    if (k === 'completado') return chipStats.completado;
+    if (k === 'cancelado') return chipStats.cancelado;
     return 0;
   };
 
@@ -1674,7 +1704,7 @@ export default function Pedidos() {
             className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setSelectedStatus('')}
           >
-            Todos <span className="text-xs opacity-60">{stats.todos || totalOrders}</span>
+            Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
           </button>
           {allStatuses.map((s) => (
             <button
@@ -1691,9 +1721,7 @@ export default function Pedidos() {
         <Card className="overflow-hidden">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground text-sm gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> Cargando pedidos…
-              </div>
+              <TableSkeleton columns={8} rows={10} />
             ) : (
               <Table>
                 <TableHeader>

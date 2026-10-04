@@ -605,10 +605,7 @@ export default function Formulas() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Cargando fórmulas...</span>
-          </div>
+          <CardGridSkeleton />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

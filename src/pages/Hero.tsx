@@ -6,6 +6,7 @@ import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, loo
 import useCart from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
+import { trackCatalogPageView } from '@/lib/google-ads';
 import { toast } from 'sonner';
 import { Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle } from 'lucide-react';
 
@@ -42,6 +43,10 @@ export default function Hero() {
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
   const catalogRouteKey = categorySlug || 'all';
   const randomCatalogPageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    trackCatalogPageView();
+  }, []);
 
   const buscarClientePorCedula = async (value: string) => {
     const cedula = value.trim();

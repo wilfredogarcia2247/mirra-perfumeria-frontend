@@ -178,7 +178,7 @@ export default function Proveedores() {
             </div>
 
             {loading ? (
-              <div>Cargando...</div>
+              <TableSkeleton columns={6} />
             ) : (
               <Table>
                 <TableHeader>
