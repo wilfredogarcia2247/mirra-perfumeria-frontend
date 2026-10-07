@@ -390,6 +390,27 @@ export async function getOrdenProduccion(id: number) {
   return apiFetch(`/ordenes-produccion/${id}`);
 }
 
+// Resumen de producciones por producto: cuántas veces se agregó esencia a cada producto terminado.
+// Responde: [{ producto_terminado_id, producto_nombre, veces_producido, cantidad_total_producida, ultima_produccion }]
+export async function getOrdenesProduccionResumen(desde?: string, hasta?: string) {
+  const ps = new URLSearchParams();
+  if (desde) ps.set('desde', desde);
+  if (hasta) ps.set('hasta', hasta);
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  return apiFetch(`/ordenes-produccion/resumen-por-producto${qs}`);
+}
+
+// Historial de movimientos de inventario (kardex).
+// Filtros: producto_id, tipo ('entrada'|'salida'), limit (default 200).
+export async function getInventarioMovimientos(opts: { producto_id?: number; tipo?: 'entrada' | 'salida'; limit?: number } = {}) {
+  const ps = new URLSearchParams();
+  if (opts.producto_id != null) ps.set('producto_id', String(opts.producto_id));
+  if (opts.tipo) ps.set('tipo', opts.tipo);
+  if (opts.limit) ps.set('limit', String(opts.limit));
+  const qs = ps.toString() ? `?${ps.toString()}` : '';
+  return apiFetch(`/inventario/movimientos${qs}`);
+}
+
 // Obtener detalle extendido de una orden de producción (incluye componentes).
 // Intenta llamar al endpoint /ordenes-produccion/detailed?id=123 que algunos backends exponen.
 export async function getOrdenProduccionDetailed(id: number) {

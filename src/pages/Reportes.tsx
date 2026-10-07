@@ -6,6 +6,7 @@ import {
   getCategorias,
   getClientesTopResumen,
   getFormulas,
+  getOrdenesProduccionResumen,
   getPedidos,
   getPedidosResumenReportes,
   getProductos,
@@ -29,9 +30,10 @@ type ReportSlug =
   | 'clientes'
   | 'compras'
   | 'rentabilidad'
-  | 'ticket-promedio';
+  | 'ticket-promedio'
+  | 'historial-produccion';
 
-type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
+type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'produccionResumen' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
@@ -41,6 +43,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'productos-favoritos', title: 'Productos favoritos', description: 'Top productos mas vendidos' },
   { slug: 'inventario', title: 'Estado de inventario', description: 'Stock, productos sin stock y reposicion' },
   { slug: 'rotacion-inventario', title: 'Rotación de inventario', description: 'Tiempo sin venta por producto, identifica stock muerto' },
+  { slug: 'historial-produccion', title: 'Historial de producción', description: 'Cuántas veces se añadió esencia a cada producto terminado' },
   { slug: 'pedidos-estado', title: 'Pedidos por estado', description: 'Completados, cancelados y pendientes' },
   { slug: 'clientes', title: 'Clientes frecuentes', description: 'Clientes con mayor recurrencia de compra' },
   { slug: 'compras', title: 'Compras y reposicion', description: 'Indicadores para planificar compras' },
@@ -58,6 +61,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   'productos-favoritos': ['pedidos'],
   inventario: ['productos'],
   'rotacion-inventario': ['productos', 'pedidosTodos', 'categorias', 'formulasAll'],
+  'historial-produccion': ['produccionResumen', 'productos', 'categorias'],
   'pedidos-estado': ['pedidos'],
   clientes: ['clientesResumen'],
   compras: ['pedidos', 'productos'],
@@ -71,6 +75,7 @@ const DATA_LABELS: Record<DataKey, string> = {
   pedidosTodos: 'historial de ventas',
   categorias: 'categorías',
   formulasAll: 'fórmulas',
+  produccionResumen: 'historial de producción',
   ventasMetodo: 'ventas por metodo',
   clientesResumen: 'clientes top',
   presentaciones: 'ventas por presentacion',
@@ -156,6 +161,7 @@ export default function Reportes() {
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
+  const [produccionResumen, setProduccionResumen] = useState<any[]>([]);
   const [fechaInicio, setFechaInicio] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -169,6 +175,18 @@ export default function Reportes() {
   const [rotacionSearch, setRotacionSearch] = useState('');
   const [rotacionCategoria, setRotacionCategoria] = useState('');
   const [rotacionPeriodo, setRotacionPeriodo] = useState<number | null>(null);
+  const [prodSearch, setProdSearch] = useState('');
+  const [prodCategoria, setProdCategoria] = useState('');
+  const [prodOrden, setProdOrden] = useState<'veces' | 'reciente' | 'nombre'>('veces');
+  const [prodFechaInicio, setProdFechaInicio] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [prodFechaFin, setProdFechaFin] = useState(() => {
+    const now = new Date();
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
+  });
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
@@ -178,6 +196,7 @@ export default function Reportes() {
     ventasMetodo: false,
     presentaciones: false,
     clientesResumen: false,
+    produccionResumen: false,
   });
 
   useEffect(() => {
@@ -202,7 +221,34 @@ export default function Reportes() {
   }, [selectedReport, fechaInicio, fechaFin]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo') return;
+    if (selectedReport !== 'historial-produccion') return;
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingInfo({ active: true, progress: 0, message: 'Cargando historial de producción...', etaSeconds: 0 });
+      try {
+        const [resProd, resCats, resProdList] = await Promise.all([
+          getOrdenesProduccionResumen(prodFechaInicio || undefined, prodFechaFin || undefined),
+          getCategorias(),
+          getProductos(),
+        ]);
+        if (cancelled) return;
+        setProduccionResumen(Array.isArray(resProd) ? resProd : (resProd?.data || []));
+        setCategorias(Array.isArray(resCats) ? resCats : (resCats?.data || []));
+        setProductos(Array.isArray(resProdList) ? resProdList : (resProdList?.data || []));
+      } catch (error) {
+        if (!cancelled) setProduccionResumen([]);
+      } finally {
+        if (!cancelled) setLoadingInfo({ active: false, progress: 100, message: 'Reporte listo', etaSeconds: 0 });
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [selectedReport, prodFechaInicio, prodFechaFin]);
+
+  useEffect(() => {
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion') return;
     setLoaded((prev) => ({
       ...prev,
       pedidos: false,
@@ -212,7 +258,7 @@ export default function Reportes() {
   }, [fechaInicio, fechaFin, selectedReport]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion') return;
 
     let cancelled = false;
 
@@ -286,6 +332,11 @@ export default function Reportes() {
             if (cancelled) return;
             setClientesResumen(Array.isArray(res) ? res : (res?.data || []));
           }
+          if (key === 'produccionResumen') {
+            const res = await getOrdenesProduccionResumen();
+            if (cancelled) return;
+            setProduccionResumen(Array.isArray(res) ? res : (res?.data || []));
+          }
         } catch (error) {
           if (cancelled) return;
           if (key === 'pedidos') setPedidos([]);
@@ -296,6 +347,7 @@ export default function Reportes() {
           if (key === 'ventasMetodo') setVentasMetodo([]);
           if (key === 'presentaciones') setPresentaciones([]);
           if (key === 'clientesResumen') setClientesResumen([]);
+          if (key === 'produccionResumen') setProduccionResumen([]);
         }
 
         if (cancelled) return;
@@ -1123,6 +1175,154 @@ export default function Reportes() {
               {filtered.length > 0 && (
                 <p className="text-xs text-muted-foreground pt-2">
                   Mostrando {filtered.length} de {rows.length} productos. Basado en pedidos completados de todo el historial.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (selectedReport === 'historial-produccion') {
+      const productosMap: Record<string, { nombre: string; categoriaId: string }> = {};
+      for (const p of productos) {
+        if (p?.id != null) productosMap[String(p.id)] = { nombre: String(p.nombre ?? p.id), categoriaId: String(p.categoria_id ?? '') };
+      }
+      const categoriasMap: Record<string, string> = {};
+      for (const c of categorias) {
+        if (c?.id != null) categoriasMap[String(c.id)] = String(c.nombre ?? c.name ?? c.id);
+      }
+      const today = new Date();
+
+      // Enrich produccionResumen with categoria
+      const enriched = produccionResumen.map((pr: any) => {
+        const pid = String(pr.producto_terminado_id ?? '');
+        const pm = productosMap[pid];
+        const nombre = pr.producto_nombre || pm?.nombre || `Producto #${pid}`;
+        const categoriaId = pm?.categoriaId ?? '';
+        const categoriaNombre = categoriasMap[categoriaId] ?? null;
+        const rawDate = pr.ultima_produccion;
+        const ultimaFecha = rawDate ? new Date(rawDate) : null;
+        const validDate = ultimaFecha && !isNaN(ultimaFecha.getTime()) ? ultimaFecha : null;
+        return { pid, nombre, categoriaId, categoriaNombre, veces: Number(pr.veces_producido ?? 0), cantidadTotal: Number(pr.cantidad_total_producida ?? 0), ultimaFecha: validDate };
+      });
+
+      // Categories present
+      const categoriasEnProd = Array.from(
+        new Map(enriched.filter((r) => r.categoriaId).map((r) => [r.categoriaId, r.categoriaNombre ?? r.categoriaId])).entries()
+      ).map(([id, nombre]) => ({ id, nombre: String(nombre) })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+      // Filter
+      const searchLow = prodSearch.toLowerCase();
+      let filtered = enriched.filter((r) => {
+        if (searchLow && !r.nombre.toLowerCase().includes(searchLow)) return false;
+        if (prodCategoria && r.categoriaId !== prodCategoria) return false;
+        return true;
+      });
+
+      // Sort
+      filtered = [...filtered].sort((a, b) => {
+        if (prodOrden === 'nombre') return a.nombre.localeCompare(b.nombre);
+        if (prodOrden === 'reciente') {
+          if (!a.ultimaFecha && !b.ultimaFecha) return 0;
+          if (!a.ultimaFecha) return 1;
+          if (!b.ultimaFecha) return -1;
+          return b.ultimaFecha.getTime() - a.ultimaFecha.getTime();
+        }
+        return b.veces - a.veces;
+      });
+
+      return (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="border-b border-border/60 pb-4 space-y-3">
+              <CardTitle className="text-base font-medium">Historial de producción por producto</CardTitle>
+              <p className="text-xs text-muted-foreground">Órdenes completadas — cuántas veces se añadió esencia a cada producto terminado</p>
+
+              {/* Rango de fechas */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap">Desde</label>
+                  <input
+                    type="date"
+                    value={prodFechaInicio}
+                    onChange={(e) => setProdFechaInicio(e.target.value)}
+                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap">Hasta</label>
+                  <input
+                    type="date"
+                    value={prodFechaFin}
+                    onChange={(e) => setProdFechaFin(e.target.value)}
+                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+
+              {/* Búsqueda + Categoría + Orden */}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={prodSearch}
+                  onChange={(e) => setProdSearch(e.target.value)}
+                  className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <select
+                  value={prodCategoria}
+                  onChange={(e) => setProdCategoria(e.target.value)}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:w-44"
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasEnProd.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+                <select
+                  value={prodOrden}
+                  onChange={(e) => setProdOrden(e.target.value as 'veces' | 'reciente' | 'nombre')}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:w-44"
+                >
+                  <option value="veces">Más producidos</option>
+                  <option value="reciente">Más recientes</option>
+                  <option value="nombre">Nombre A–Z</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-2">
+              {filtered.length === 0 && (
+                <p className="text-sm text-muted-foreground py-4 text-center">No hay producciones para mostrar.</p>
+              )}
+              {filtered.map((r) => {
+                const ultimaStr = r.ultimaFecha
+                  ? r.ultimaFecha.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : null;
+                return (
+                  <div key={r.pid} className="flex flex-col gap-1 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm leading-tight truncate">{r.nombre}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {r.categoriaNombre && <span className="mr-1.5">{r.categoriaNombre} ·</span>}
+                        {ultimaStr ? `Última producción: ${ultimaStr}` : 'Sin fecha registrada'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      <div className="text-xs text-muted-foreground">
+                        <div>Total producido: <strong>{r.cantidadTotal.toLocaleString('es-VE')}</strong></div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 whitespace-nowrap">
+                        {r.veces} {r.veces === 1 ? 'vez' : 'veces'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length > 0 && (
+                <p className="text-xs text-muted-foreground pt-2">
+                  Mostrando {filtered.length} de {enriched.length} productos con historial de producción.
                 </p>
               )}
             </CardContent>
