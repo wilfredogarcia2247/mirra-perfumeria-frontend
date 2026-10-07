@@ -141,7 +141,7 @@ export default function Tamanos() {
             <p className="text-muted-foreground">Gestiona formatos / tamaños de venta</p>
           </div>
           <div>
-            <Button onClick={openNew} className="gap-2">
+            <Button onClick={openNew} className="h-11 px-4 gap-2">
               <Plus className="h-4 w-4" /> Nuevo Tamaño
             </Button>
           </div>
@@ -155,47 +155,71 @@ export default function Tamanos() {
             {loading ? (
               <TableSkeleton columns={7} />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Cantidad</TableHead>
-                    <TableHead>Unidad</TableHead>
-                    <TableHead>Precio venta</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="sm:hidden divide-y">
                   {tamanos.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-mono">{t.id}</TableCell>
-                      <TableCell>{t.producto_nombre ?? t.producto?.nombre ?? (productos.find((p) => p.id === t.producto_id)?.nombre ?? `#${t.producto_id}`)}</TableCell>
-                      <TableCell>{t.nombre}</TableCell>
-                      <TableCell>{t.cantidad}</TableCell>
-                      <TableCell>{t.unidad}</TableCell>
-                      <TableCell>{t.precio_venta ?? '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(t)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(t); setConfirmOpen(true); }}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <div key={t.id} className="px-4 py-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{t.nombre}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">#{t.id}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{t.producto_nombre ?? t.producto?.nombre ?? (productos.find((p) => p.id === t.producto_id)?.nombre ?? `#${t.producto_id}`)}</p>
+                      <p className="text-sm">{t.cantidad} {t.unidad}{t.precio_venta != null ? ` · $${t.precio_venta}` : ''}</p>
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="flex-1 min-h-[44px]" onClick={() => openEdit(t)}>
+                          <Edit className="h-4 w-4 mr-1" /> Editar
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-destructive border-destructive/40" onClick={() => { setDeleteTarget(t); setConfirmOpen(true); }}>
+                          <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Unidad</TableHead>
+                        <TableHead>Precio venta</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tamanos.map((t) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="font-mono">{t.id}</TableCell>
+                          <TableCell>{t.producto_nombre ?? t.producto?.nombre ?? (productos.find((p) => p.id === t.producto_id)?.nombre ?? `#${t.producto_id}`)}</TableCell>
+                          <TableCell>{t.nombre}</TableCell>
+                          <TableCell>{t.cantidad}</TableCell>
+                          <TableCell>{t.unidad}</TableCell>
+                          <TableCell>{t.precio_venta ?? '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => openEdit(t)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(t); setConfirmOpen(true); }}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>{editing ? 'Editar Tamaño' : 'Nuevo Tamaño'}</DialogTitle>
               <DialogDescription>{editing ? 'Modifica los datos del tamaño' : 'Crea un nuevo tamaño/format'}</DialogDescription>
@@ -204,7 +228,7 @@ export default function Tamanos() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="text-sm">Producto</label>
-                <select className="mt-1 w-full rounded-md border px-2 py-2" {...form.register('producto_id', { required: true })}>
+                <select className="mt-1 w-full rounded-md border px-2 h-11 text-base" {...form.register('producto_id', { required: true })}>
                   <option value="">-- Seleccione producto --</option>
                   {productos.map((p) => (
                     <option key={p.id} value={p.id}>{p.nombre}</option>
@@ -214,49 +238,48 @@ export default function Tamanos() {
 
               <div>
                 <label className="text-sm">Nombre</label>
-                <Input {...form.register('nombre', { required: true })} />
+                <Input className="h-11 text-base" {...form.register('nombre', { required: true })} />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-sm">Cantidad</label>
-                  <Input type="number" {...form.register('cantidad', { valueAsNumber: true })} />
+                  <Input className="h-11 text-base" type="number" {...form.register('cantidad', { valueAsNumber: true })} />
                 </div>
                 <div>
                   <label className="text-sm">Unidad</label>
-                  <Input {...form.register('unidad')} />
+                  <Input className="h-11 text-base" {...form.register('unidad')} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-sm">Costo (opcional)</label>
-                  <Input type="number" step="0.01" {...form.register('costo')} />
+                  <Input className="h-11 text-base" type="number" step="0.01" {...form.register('costo')} />
                 </div>
                 <div>
                   <label className="text-sm">Precio venta (opcional)</label>
-                  <Input type="number" step="0.01" {...form.register('precio_venta')} />
+                  <Input className="h-11 text-base" type="number" step="0.01" {...form.register('precio_venta')} />
                 </div>
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
-                <Button type="submit">{editing ? 'Guardar' : 'Crear'}</Button>
+                <Button variant="outline" className="h-11" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
+                <Button type="submit" className="h-11">{editing ? 'Guardar' : 'Crear'}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        {/* Confirmación de borrado simple */}
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Eliminar Tamaño</DialogTitle>
               <DialogDescription>¿Confirmas eliminar {deleteTarget?.nombre}?</DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-              <Button onClick={confirmDelete} className="ml-2">Eliminar</Button>
+              <Button variant="outline" className="h-11" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+              <Button onClick={confirmDelete} className="h-11 ml-2">Eliminar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

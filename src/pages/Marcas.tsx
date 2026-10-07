@@ -134,7 +134,7 @@ export default function Marcas() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button className="gap-2" onClick={startCreate}>
+            <Button className="h-11 px-4 gap-2" onClick={startCreate}>
               <Plus className="h-4 w-4" />
               Nueva Marca
             </Button>
@@ -153,41 +153,64 @@ export default function Marcas() {
             {loading ? (
               <TableSkeleton columns={4} />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Descripción</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="sm:hidden divide-y">
                   {filtered.map((c: any) => (
-                    <TableRow key={c.id} className="hover:bg-muted/40 transition-colors duration-150">
-                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{c.id}</TableCell>
-                      <TableCell className="font-medium">{c.nombre}</TableCell>
-                      <TableCell>{c.descripcion ?? '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => startEdit(c)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(c); setAlertOpen(true); }}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <div key={c.id} className="px-4 py-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{c.nombre}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">#{c.id}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{c.descripcion ?? '-'}</p>
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="flex-1 min-h-[44px]" onClick={() => startEdit(c)}>
+                          <Edit className="h-4 w-4 mr-1" /> Editar
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-destructive border-destructive/40" onClick={() => { setDeleteTarget(c); setAlertOpen(true); }}>
+                          <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Descripción</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((c: any) => (
+                        <TableRow key={c.id} className="hover:bg-muted/40 transition-colors duration-150">
+                          <TableCell className="text-xs tabular-nums text-muted-foreground">#{c.id}</TableCell>
+                          <TableCell className="font-medium">{c.nombre}</TableCell>
+                          <TableCell>{c.descripcion ?? '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => startEdit(c)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(c); setAlertOpen(true); }}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent>
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{editing ? 'Editar Marca' : 'Nueva Marca'}</DialogTitle>
               <DialogDescription>Rellena los datos de la marca</DialogDescription>
@@ -198,20 +221,20 @@ export default function Marcas() {
                 <FormItem>
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input {...form.register('nombre', { required: true })} />
+                    <Input className="h-11 text-base" {...form.register('nombre', { required: true })} />
                   </FormControl>
                 </FormItem>
 
                 <FormItem>
                   <FormLabel>Descripción</FormLabel>
                   <FormControl>
-                    <Input {...form.register('descripcion')} />
+                    <Input className="h-11 text-base" {...form.register('descripcion')} />
                   </FormControl>
                 </FormItem>
 
                 <DialogFooter>
-                  <Button variant="outline" type="button" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
-                  <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
+                  <Button variant="outline" type="button" className="h-11" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
+                  <Button type="submit" className="h-11">{editing ? 'Actualizar' : 'Crear'}</Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -219,14 +242,14 @@ export default function Marcas() {
         </Dialog>
 
         <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-lg">
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
               <AlertDialogDescription>¿Eliminar marca {deleteTarget?.nombre}? Esta acción no se puede deshacer.</AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex justify-end gap-2">
-              <AlertDialogCancel onClick={() => setAlertOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={async () => { if (!deleteTarget) return; await remove(deleteTarget); }}>Eliminar</AlertDialogAction>
+              <AlertDialogCancel className="h-11" onClick={() => setAlertOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="h-11" onClick={async () => { if (!deleteTarget) return; await remove(deleteTarget); }}>Eliminar</AlertDialogAction>
             </div>
           </AlertDialogContent>
         </AlertDialog>

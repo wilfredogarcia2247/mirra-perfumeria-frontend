@@ -40,53 +40,90 @@ export default function Login() {
     }
   };
 
+  const form = (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-sm font-medium">
+          Correo Electrónico
+        </Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="correo@ejemplo.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="h-12 text-base"
+          autoComplete="email"
+          inputMode="email"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password" className="text-sm font-medium">
+          Contraseña
+        </Label>
+        <Input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="h-12 text-base"
+          autoComplete="current-password"
+        />
+      </div>
+      <Button
+        type="submit"
+        className="w-full h-12 text-base font-semibold"
+        disabled={isLoading}
+      >
+        {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+      </Button>
+      <div className="text-center text-sm text-muted-foreground pt-1">
+        <a href="#" className="hover:text-primary transition-smooth">
+          ¿Olvidaste tu contraseña?
+        </a>
+      </div>
+    </form>
+  );
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
-      <Card className="w-full max-w-md shadow-elegant">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
-            <FlaskConical className="h-8 w-8 text-primary-foreground" />
+    <>
+      {/* ── Mobile: pantalla completa, estilo app nativa ── */}
+      <div className="flex min-h-[100dvh] flex-col bg-background px-6 pt-safe-top pb-safe-bottom sm:hidden">
+        {/* Hero area */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 pb-4">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary shadow-lg">
+            <FlaskConical className="h-10 w-10 text-primary-foreground" />
           </div>
-          <div>
-            <CardTitle className="text-2xl">Mirra Perfumería</CardTitle>
-            <CardDescription>Sistema de Gestión — Mirra Perfumería</CardDescription>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold tracking-tight">Mirra Perfumería</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Sistema de Gestión</p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Correo Electrónico</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+        </div>
+
+        {/* Form area — pegado a la parte inferior en móvil */}
+        <div className="w-full pb-8">
+          {form}
+        </div>
+      </div>
+
+      {/* ── Desktop/Tablet: card centrada ── */}
+      <div className="hidden sm:flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
+        <Card className="w-full max-w-md shadow-elegant">
+          <CardHeader className="space-y-4 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
+              <FlaskConical className="h-8 w-8 text-primary-foreground" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <div>
+              <CardTitle className="text-2xl">Mirra Perfumería</CardTitle>
+              <CardDescription>Sistema de Gestión — Mirra Perfumería</CardDescription>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-            </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              <a href="#" className="hover:text-primary transition-smooth">
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </CardHeader>
+          <CardContent>{form}</CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

@@ -16,7 +16,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="flex flex-1 flex-col min-w-0">
           <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border/60 bg-card/80 backdrop-blur-sm px-4 gap-4">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="h-8 w-8 text-muted-foreground hover:text-foreground" />
+              <SidebarTrigger className="h-10 w-10 text-muted-foreground hover:text-foreground" />
               <span className="text-[13px] font-medium text-muted-foreground/70 hidden sm:block tracking-wide">
                 Mirra Perfumería
               </span>
@@ -29,7 +29,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </header>
           <main className="flex-1 overflow-auto">
-            <div className="mx-auto max-w-[1400px] p-6">
+            <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
               {children}
             </div>
           </main>

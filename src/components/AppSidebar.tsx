@@ -186,7 +186,7 @@ export function AppSidebar() {
                             <SidebarMenuButton
                               onClick={() => navigate(item.url)}
                               isActive={isActive}
-                              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 ${isActive ? activeItemClass : inactiveItemClass}`}
+                              className={`flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-md transition-colors duration-150 ${isActive ? activeItemClass : inactiveItemClass}`}
                               title={!open ? item.title : undefined}
                             >
                               <span className="flex items-center justify-center w-5 h-5 shrink-0">
@@ -211,7 +211,7 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-3 px-3 text-[13px] text-sidebar-foreground/40 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/70"
+          className="w-full justify-start gap-3 px-3 min-h-[44px] text-[13px] text-sidebar-foreground/40 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/70"
           onClick={handleLogout}
           title={!open ? "Cerrar sesión" : undefined}
         >

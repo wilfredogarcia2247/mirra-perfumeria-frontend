@@ -582,12 +582,12 @@ export default function Formulas() {
             <Button
               variant="outline"
               onClick={() => { resetBulkModal(); setBulkPriceOpen(true); }}
-              className="gap-2"
+              className="h-11 px-4 gap-2"
             >
               <DollarSign className="h-4 w-4" />
               Actualizar Precios
             </Button>
-            <Button onClick={() => { resetForm(); setIsOpen(true); }} className="gap-2">
+            <Button onClick={() => { resetForm(); setIsOpen(true); }} className="h-11 px-4 gap-2">
               <Plus className="h-4 w-4" />
               Nueva fórmula
             </Button>
@@ -718,7 +718,7 @@ export default function Formulas() {
         )}
 
         <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
-          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:w-[95vw] sm:max-w-4xl">
             <DialogHeader className="pb-2">
               <DialogTitle className="text-xl font-semibold">
                 {editingId ? 'Editar fórmula' : 'Nueva fórmula'}
@@ -739,7 +739,7 @@ export default function Formulas() {
                     onChange={(e) => setNombre(e.target.value)}
                     maxLength={200}
                     placeholder="Ej: Perfume Floral N°5 - Fórmula A"
-                    className="w-full"
+                    className="w-full h-11 text-base"
                   />
                 </div>
 
@@ -930,7 +930,7 @@ export default function Formulas() {
 
         {/* Producción dialog */}
         <Dialog open={produceOpen} onOpenChange={(open) => { setProduceOpen(open); if (!open) setProduceFormula(null); }}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Producir desde fórmula</DialogTitle>
               <DialogDescription>Verifica materias primas y ejecuta la producción.</DialogDescription>
@@ -941,11 +941,11 @@ export default function Formulas() {
                 <div className="text-sm">Fórmula: <strong>{produceFormula.nombre}</strong></div>
                 <div>
                   <label className="text-sm">Cantidad a producir</label>
-                  <Input type="number" min={1} value={produceCantidad} onChange={(e) => setProduceCantidad(Number(e.target.value || 1))} />
+                  <Input type="number" min={1} value={produceCantidad} onChange={(e) => setProduceCantidad(Number(e.target.value || 1))} className="h-11 text-base" />
                 </div>
                 <div>
                   <label className="text-sm">Almacén de venta (destino)</label>
-                  <select className="w-full rounded-md border px-2 py-2" value={produceAlmacenId ?? ''} onChange={(e) => setProduceAlmacenId(e.target.value ? Number(e.target.value) : null)}>
+                  <select className="w-full rounded-md border px-2 h-11 text-base" value={produceAlmacenId ?? ''} onChange={(e) => setProduceAlmacenId(e.target.value ? Number(e.target.value) : null)}>
                     <option value="">-- seleccione almacén destino --</option>
                     {(almacenes || []).filter((a: any) => !a.es_materia_prima).map((a: any) => (
                       <option key={a.id} value={a.id}>{a.nombre || a.id}</option>
@@ -965,8 +965,8 @@ export default function Formulas() {
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setProduceOpen(false); setProduceFormula(null); }}>Cancelar</Button>
-                  <Button disabled={produceChecking} onClick={handleProduce}>{produceChecking ? 'Procesando...' : 'Ejecutar producción'}</Button>
+                  <Button variant="outline" className="h-11" onClick={() => { setProduceOpen(false); setProduceFormula(null); }}>Cancelar</Button>
+                  <Button className="h-11" disabled={produceChecking} onClick={handleProduce}>{produceChecking ? 'Procesando...' : 'Ejecutar producción'}</Button>
                 </div>
               </div>
             ) : (
@@ -977,7 +977,7 @@ export default function Formulas() {
 
         {/* Bulk price update dialog */}
         <Dialog open={bulkPriceOpen} onOpenChange={(open) => { setBulkPriceOpen(open); if (!open) resetBulkModal(); }}>
-          <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:w-[95vw] sm:max-w-3xl">
             <DialogHeader className="pb-2">
               <DialogTitle className="text-xl font-semibold flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
@@ -1024,7 +1024,7 @@ export default function Formulas() {
                         value={bulkQuery}
                         onChange={(e) => { setBulkQuery(e.target.value); setBulkSearched(false); }}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleBulkSearch(); }}
-                        className="pl-10"
+                        className="pl-10 h-11 text-base"
                       />
                       <svg
                         className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"

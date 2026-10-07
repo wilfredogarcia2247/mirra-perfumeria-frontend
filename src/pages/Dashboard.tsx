@@ -218,28 +218,28 @@ export default function Dashboard() {
   }, []);
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Page header */}
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Resumen general del sistema</p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* KPI Cards — 2 columnas en móvil, 4 en desktop */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
           {statsData.map((stat) => (
             <Card key={stat.title} className="overflow-hidden">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{stat.title}</p>
-                    <div className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
-                      {stat.value === '...' ? <Skeleton className="mt-1 h-8 w-20" /> : stat.value}
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground leading-tight">{stat.title}</p>
+                    <div className={`mt-1.5 text-2xl sm:text-3xl font-semibold tabular-nums tracking-tight ${stat.value === '...' ? 'text-muted-foreground/40' : 'text-foreground'}`}>
+                      {stat.value === '...' ? <Skeleton className="mt-1 h-7 w-16 sm:h-8 sm:w-20" /> : stat.value}
                     </div>
-                    <p className="mt-1.5 text-[11.5px] text-muted-foreground">{stat.sub}</p>
+                    <p className="mt-1 text-[10.5px] sm:text-[11.5px] text-muted-foreground leading-tight hidden sm:block">{stat.sub}</p>
                   </div>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <stat.icon className="h-4 w-4 text-primary" />
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 self-start">
+                    <stat.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -247,18 +247,18 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts */}
+        {/* Charts — apiladas en móvil, lado a lado en desktop */}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 px-4 sm:px-6">
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Ventas por mes</CardTitle>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={salesChartData} barGap={2}>
+            <CardContent className="px-2 sm:px-6">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={salesChartData} barGap={2} margin={{ left: -10, right: 4 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={45} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
                     cursor={{ fill: 'hsl(var(--muted))', radius: 4 }}
@@ -271,15 +271,15 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 px-4 sm:px-6">
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Tendencia de ventas</CardTitle>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={salesChartData}>
+            <CardContent className="px-2 sm:px-6">
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={salesChartData} margin={{ left: -10, right: 4 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={45} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
                     cursor={{ stroke: 'hsl(var(--border))' }}
@@ -293,10 +293,10 @@ export default function Dashboard() {
 
         {/* Top Products */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 px-4 sm:px-6">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Productos más vendidos</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 px-4 sm:px-6">
             {topProductsState.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 Sin datos de ventas aún — aparecerán al completar pedidos.
@@ -304,7 +304,7 @@ export default function Dashboard() {
             ) : (
               <div>
                 {topProductsState.map((product, index) => (
-                  <div key={`${product.name}-${index}`} className="flex items-center justify-between py-3 border-b border-border/60 last:border-0">
+                  <div key={`${product.name}-${index}`} className="flex items-center justify-between py-3 border-b border-border/60 last:border-0 min-h-[52px]">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold text-primary tabular-nums">
                         {index + 1}

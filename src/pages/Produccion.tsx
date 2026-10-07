@@ -243,7 +243,7 @@ export default function ProduccionPage() {
 
         {/* Modal de producción */}
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Producir desde fórmula</DialogTitle>
               <DialogDescription>Crear el producto compuesto en un almacén de venta.</DialogDescription>
@@ -258,7 +258,7 @@ export default function ProduccionPage() {
 
               <div>
                 <label className="text-sm">Cantidad a producir</label>
-                <Input type="number" min={1} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))} />
+                <Input type="number" min={1} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))} className="h-11 text-base" />
               </div>
 
                 <div>
@@ -266,7 +266,7 @@ export default function ProduccionPage() {
                 {ventaAlmacenes.length === 0 ? (
                   <div className="text-sm text-red-600">No hay almacenes de venta disponibles. Configure al menos un almacén que no sea materia prima.</div>
                 ) : (
-                  <select className="w-full rounded-md border px-2 py-2" value={selectedAlmacen ?? ''} onChange={(e) => setSelectedAlmacen(e.target.value ? Number(e.target.value) : null)}>
+                  <select className="w-full rounded-md border px-2 h-11 text-base" value={selectedAlmacen ?? ''} onChange={(e) => setSelectedAlmacen(e.target.value ? Number(e.target.value) : null)}>
                     <option value="">-- selecciona un almacén --</option>
                     {ventaAlmacenes.map((a) => (
                       <option key={a.id} value={a.id}>{a.nombre || `#${a.id}`}{a.tipo ? ` — ${a.tipo}` : ''}</option>
@@ -288,8 +288,8 @@ export default function ProduccionPage() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-              <Button disabled={submitting} onClick={handleProduce}>{submitting ? 'Generando...' : 'Producir'}</Button>
+              <Button variant="outline" className="h-11" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button className="h-11" disabled={submitting} onClick={handleProduce}>{submitting ? 'Generando...' : 'Producir'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

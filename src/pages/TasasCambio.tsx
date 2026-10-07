@@ -146,7 +146,7 @@ export default function TasasCambio() {
             <h2 className="text-2xl font-semibold tracking-tight">Tasas de cambio</h2>
             <p className="text-sm text-muted-foreground">Gestiona las tasas de conversión (USD, EUR, etc.)</p>
           </div>
-          <Button onClick={() => { resetForm(); setIsOpen(true); }}>
+          <Button className="h-11 px-4 gap-2" onClick={() => { resetForm(); setIsOpen(true); }}>
             Nueva tasa
           </Button>
         </div>
@@ -156,46 +156,76 @@ export default function TasasCambio() {
             {loading ? (
               <TableSkeleton columns={7} />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Símbolo</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Monto</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Descripción</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Creado</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y">
                   {tasas.map((t: any) => (
-                    <TableRow key={t.id} className="hover:bg-muted/40 transition-colors duration-150">
-                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{t.id}</TableCell>
-                      <TableCell><div className="flex items-center gap-2"><Badge>{t.simbolo}</Badge></div></TableCell>
-                      <TableCell>{t.activo ? <Badge variant="success">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}</TableCell>
-                      <TableCell>{typeof t.monto === 'number' ? t.monto : (t.monto ?? '-')}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.descripcion ?? '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.creado_en ? new Date(t.creado_en).toLocaleString() : '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => openEdit(t.id)}>Editar</Button>
-                          {!t.activo && (
-                            <Button size="sm" variant="outline" onClick={() => openConfirmActivate(t.id)}>Activar</Button>
-                          )}
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(t.id)}>Eliminar</Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <div key={t.id} className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge>{t.simbolo}</Badge>
+                        {t.activo ? <Badge variant="success">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Monto: </span>
+                        {typeof t.monto === 'number' ? t.monto : (t.monto ?? '-')}
+                      </div>
+                      {t.descripcion && <div className="text-sm text-muted-foreground">{t.descripcion}</div>}
+                      <div className="text-xs text-muted-foreground">{t.creado_en ? new Date(t.creado_en).toLocaleString() : ''}</div>
+                      <div className="flex gap-2 pt-1">
+                        <Button className="flex-1 min-h-[44px]" size="sm" variant="ghost" onClick={() => openEdit(t.id)}>Editar</Button>
+                        {!t.activo && (
+                          <Button className="flex-1 min-h-[44px]" size="sm" variant="outline" onClick={() => openConfirmActivate(t.id)}>Activar</Button>
+                        )}
+                        <Button className="flex-1 min-h-[44px]" size="sm" variant="destructive" onClick={() => handleDelete(t.id)}>Eliminar</Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Símbolo</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Monto</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Descripción</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Creado</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tasas.map((t: any) => (
+                        <TableRow key={t.id} className="hover:bg-muted/40 transition-colors duration-150">
+                          <TableCell className="text-xs tabular-nums text-muted-foreground">#{t.id}</TableCell>
+                          <TableCell><div className="flex items-center gap-2"><Badge>{t.simbolo}</Badge></div></TableCell>
+                          <TableCell>{t.activo ? <Badge variant="success">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}</TableCell>
+                          <TableCell>{typeof t.monto === 'number' ? t.monto : (t.monto ?? '-')}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.descripcion ?? '-'}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.creado_en ? new Date(t.creado_en).toLocaleString() : '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="ghost" onClick={() => openEdit(t.id)}>Editar</Button>
+                              {!t.activo && (
+                                <Button size="sm" variant="outline" onClick={() => openConfirmActivate(t.id)}>Activar</Button>
+                              )}
+                              <Button size="sm" variant="destructive" onClick={() => handleDelete(t.id)}>Eliminar</Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         <Dialog open={isOpen} onOpenChange={(v) => { setIsOpen(v); if (!v) resetForm(); }}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingId ? 'Editar tasa' : 'Nueva tasa'}</DialogTitle>
               <DialogDescription>Define el símbolo y monto de conversión.</DialogDescription>
@@ -204,11 +234,11 @@ export default function TasasCambio() {
               <div className="space-y-4 p-2">
               <div>
                 <label className="text-sm">Símbolo</label>
-                <Input value={simbolo} onChange={(e) => setSimbolo(e.target.value)} placeholder="USD" maxLength={10} />
+                <Input className="h-11 text-base" value={simbolo} onChange={(e) => setSimbolo(e.target.value)} placeholder="USD" maxLength={10} />
               </div>
               <div>
                 <label className="text-sm">Monto</label>
-                <Input value={monto as any} onChange={(e) => setMonto(e.target.value)} placeholder="1.12" />
+                <Input className="h-11 text-base" value={monto as any} onChange={(e) => setMonto(e.target.value)} placeholder="1.12" />
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -224,15 +254,15 @@ export default function TasasCambio() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>Cancelar</Button>
-              <Button disabled={submitting} onClick={handleSave}>{submitting ? 'Guardando...' : (editingId ? 'Guardar' : 'Crear')}</Button>
+              <Button className="h-11" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>Cancelar</Button>
+              <Button className="h-11" disabled={submitting} onClick={handleSave}>{submitting ? 'Guardando...' : (editingId ? 'Guardar' : 'Crear')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Confirmar activación */}
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Confirmar activación</DialogTitle>
               <DialogDescription>Al activar esta tasa, se desactivarán las demás tasas. ¿Deseas continuar?</DialogDescription>
@@ -242,8 +272,8 @@ export default function TasasCambio() {
             </div>
             <DialogFooter>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { setConfirmOpen(false); setConfirmTargetId(null); }} disabled={confirmLoading}>Cancelar</Button>
-                <Button onClick={confirmActivate} disabled={confirmLoading}>{confirmLoading ? 'Procesando...' : 'Confirmar activación'}</Button>
+                <Button className="h-11" variant="outline" onClick={() => { setConfirmOpen(false); setConfirmTargetId(null); }} disabled={confirmLoading}>Cancelar</Button>
+                <Button className="h-11" onClick={confirmActivate} disabled={confirmLoading}>{confirmLoading ? 'Procesando...' : 'Confirmar activación'}</Button>
               </div>
             </DialogFooter>
           </DialogContent>

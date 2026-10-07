@@ -109,14 +109,14 @@ export default function Proveedores() {
           </div>
 
           <div>
-            <Button className="gap-2" onClick={() => { setEditing(null); form.reset(); setIsOpen(true); }}>
+            <Button className="h-11 px-4 gap-2" onClick={() => { setEditing(null); form.reset(); setIsOpen(true); }}>
               <Plus className="h-4 w-4" />
               Nuevo Proveedor
             </Button>
           </div>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent>
+            <DialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto">
               <DialogHeader>
                 <DialogTitle>{editing ? "Editar Proveedor" : "Nuevo Proveedor"}</DialogTitle>
                 <DialogDescription>Rellena los datos del proveedor</DialogDescription>
@@ -127,34 +127,34 @@ export default function Proveedores() {
                   <FormItem>
                     <FormLabel>Nombre</FormLabel>
                     <FormControl>
-                      <Input {...form.register("nombre", { required: true })} />
+                      <Input className="h-11 text-base" {...form.register("nombre", { required: true })} />
                     </FormControl>
                   </FormItem>
 
                   <FormItem>
                     <FormLabel>Teléfono</FormLabel>
                     <FormControl>
-                      <Input {...form.register("telefono")} />
+                      <Input className="h-11 text-base" {...form.register("telefono")} />
                     </FormControl>
                   </FormItem>
 
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" {...form.register("email")} />
+                      <Input className="h-11 text-base" type="email" {...form.register("email")} />
                     </FormControl>
                   </FormItem>
 
                   <FormItem>
                     <FormLabel>Dirección</FormLabel>
                     <FormControl>
-                      <Input {...form.register("direccion")} />
+                      <Input className="h-11 text-base" {...form.register("direccion")} />
                     </FormControl>
                   </FormItem>
 
                   <DialogFooter>
-                    <Button variant="outline" type="button" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
-                    <Button type="submit">{editing ? "Actualizar" : "Crear"}</Button>
+                    <Button className="h-11" variant="outline" type="button" onClick={() => { setIsOpen(false); setEditing(null); form.reset(); }}>Cancelar</Button>
+                    <Button className="h-11" type="submit">{editing ? "Actualizar" : "Crear"}</Button>
                   </DialogFooter>
                 </form>
               </Form>
@@ -181,56 +181,85 @@ export default function Proveedores() {
             {loading ? (
               <TableSkeleton columns={6} />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Dirección</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y">
                   {filtered.map((p: any) => (
-                    <TableRow key={p.id} className="hover:bg-muted/50 transition-smooth">
-                      <TableCell className="font-mono text-sm">{p.id}</TableCell>
-                      <TableCell className="font-medium">{p.nombre}</TableCell>
-                      <TableCell>{p.telefono ?? "-"}</TableCell>
-                      <TableCell>{p.email ?? "-"}</TableCell>
-                      <TableCell>{p.direccion ?? "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            setEditing(p);
-                            form.reset({ nombre: p.nombre, telefono: p.telefono, email: p.email, direccion: p.direccion });
-                            setIsOpen(true);
-                          }}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(p); setAlertOpen(true); }}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <div key={p.id} className="p-4 space-y-1">
+                      <div className="font-medium">{p.nombre}</div>
+                      {p.telefono && <div className="text-sm text-muted-foreground">{p.telefono}</div>}
+                      {p.email && <div className="text-sm text-muted-foreground">{p.email}</div>}
+                      {p.direccion && <div className="text-sm text-muted-foreground">{p.direccion}</div>}
+                      <div className="flex gap-2 pt-2">
+                        <Button className="flex-1 min-h-[44px]" variant="ghost" onClick={() => {
+                          setEditing(p);
+                          form.reset({ nombre: p.nombre, telefono: p.telefono, email: p.email, direccion: p.direccion });
+                          setIsOpen(true);
+                        }}>
+                          <Edit className="h-4 w-4 mr-2" />Editar
+                        </Button>
+                        <Button className="flex-1 min-h-[44px]" variant="ghost" onClick={() => { setDeleteTarget(p); setAlertOpen(true); }}>
+                          <Trash2 className="h-4 w-4 mr-2 text-destructive" />Eliminar
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Teléfono</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Dirección</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((p: any) => (
+                        <TableRow key={p.id} className="hover:bg-muted/50 transition-smooth">
+                          <TableCell className="font-mono text-sm">{p.id}</TableCell>
+                          <TableCell className="font-medium">{p.nombre}</TableCell>
+                          <TableCell>{p.telefono ?? "-"}</TableCell>
+                          <TableCell>{p.email ?? "-"}</TableCell>
+                          <TableCell>{p.direccion ?? "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => {
+                                setEditing(p);
+                                form.reset({ nombre: p.nombre, telefono: p.telefono, email: p.email, direccion: p.direccion });
+                                setIsOpen(true);
+                              }}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(p); setAlertOpen(true); }}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
         <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className="w-full h-[100dvh] rounded-none sm:rounded-lg sm:h-auto">
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
               <AlertDialogDescription>¿Eliminar proveedor {deleteTarget?.nombre}? Esta acción no se puede deshacer.</AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex justify-end gap-2">
-              <AlertDialogCancel onClick={() => setAlertOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={async () => {
+              <AlertDialogCancel className="h-11" onClick={() => setAlertOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="h-11" onClick={async () => {
                 if (!deleteTarget) return;
                 try {
                   await deleteProveedor(deleteTarget.id);

@@ -92,7 +92,7 @@ export default function WhatsappAdmin() {
           <CardHeader className="border-b border-border/60 pb-3">
             <CardTitle className="text-base font-medium">Estado de conexión</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 pt-4 text-sm md:grid-cols-5">
+          <CardContent className="grid grid-cols-2 gap-3 pt-4 text-sm sm:grid-cols-3 md:grid-cols-5">
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Estado</p>
               <p className={`font-semibold ${isConnected ? 'text-green-600' : 'text-amber-600'}`}>
@@ -126,30 +126,30 @@ export default function WhatsappAdmin() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid gap-2 md:grid-cols-12">
-              <label className="text-sm self-center col-span-1">Sesión:</label>
+            <div className="flex flex-col gap-2 md:grid md:grid-cols-12">
+              <label className="text-sm self-center md:col-span-1">Sesión:</label>
               <Input
                 value={sessionName}
                 onChange={(e) => setSessionName(e.target.value)}
-                className="md:col-span-2"
+                className="h-11 text-base md:col-span-2 md:h-auto md:text-sm"
                 placeholder="default"
               />
               <Input
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="md:col-span-3"
+                className="h-11 text-base md:col-span-3 md:h-auto md:text-sm"
                 placeholder="Teléfono o chatId"
               />
               <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="min-h-20 md:col-span-4"
+                className="min-h-20 text-base md:col-span-4 md:text-sm"
                 placeholder="Escribe el mensaje"
               />
-              <Button className="md:col-span-1" onClick={handleSend} disabled={sending}>
+              <Button className="h-11 md:col-span-1 md:h-auto" onClick={handleSend} disabled={sending}>
                 {sending ? 'Enviando...' : 'Enviar'}
               </Button>
-              <Button className="md:col-span-1" variant="outline" onClick={loadData} disabled={loading}>
+              <Button className="h-11 md:col-span-1 md:h-auto" variant="outline" onClick={loadData} disabled={loading}>
                 {loading ? 'Actualizando...' : 'Actualizar'}
               </Button>
             </div>

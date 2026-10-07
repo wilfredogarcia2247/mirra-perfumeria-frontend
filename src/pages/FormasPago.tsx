@@ -2,6 +2,19 @@ import React, { useEffect, useState } from "react";
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { getFormasPago, createFormaPago } from "@/integrations/api";
 import { toast } from "sonner";
+import { Layout } from "@/components/Layout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function FormasPago() {
   const [formas, setFormas] = useState<any[]>([]);
@@ -56,7 +69,6 @@ export default function FormasPago() {
     }
     try {
       const nueva = await createFormaPago({ nombre });
-      // only add if not transfer
       if (!/transfer/i.test(nueva?.nombre || '')) setFormas([...formas, nueva]);
       setNombre("");
       toast.success("Forma de pago creada");
@@ -66,41 +78,67 @@ export default function FormasPago() {
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Formas de Pago</h1>
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-2 items-end">
-        <div>
-          <label className="block text-sm font-medium mb-1">Nombre</label>
-          <input
-            type="text"
-            value={nombre}
-            onChange={e => setNombre(e.target.value)}
-            className="border rounded px-2 py-1"
-            required
-            placeholder="Ej: Transferencia, Efectivo, Tarjeta"
-          />
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Formas de Pago</h2>
+            <p className="text-muted-foreground">Gestión de formas de pago</p>
+          </div>
         </div>
-        <button type="submit" className="bg-primary text-white px-4 py-1 rounded">Agregar</button>
-      </form>
-      {error && <div className="text-red-500 mb-2">{error}</div>}
-      {loading ? (
-        <TableSkeleton columns={1} />
-      ) : (
-        <table className="w-full border">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formas.map((f) => (
-              <tr key={f.id}>
-                <td>{f.nombre}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+
+        <Card>
+          <CardContent className="p-0">
+            <form onSubmit={handleSubmit} className="px-4 pt-4 pb-3 flex flex-wrap gap-2 border-b border-border/60">
+              <Input
+                type="text"
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                required
+                placeholder="Ej: Efectivo, Tarjeta"
+                className="h-11 text-base flex-1 min-w-[180px]"
+              />
+              <Button type="submit" className="h-11 px-4 gap-2">
+                <Plus className="h-4 w-4" />
+                Agregar
+              </Button>
+            </form>
+            {error && <div className="px-4 py-2 text-sm text-red-500">{error}</div>}
+
+            {loading ? (
+              <TableSkeleton columns={1} />
+            ) : (
+              <>
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y divide-border">
+                  {formas.map((f) => (
+                    <div key={f.id} className="px-4 py-3">
+                      <span className="font-medium">{f.nombre}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {formas.map((f) => (
+                        <TableRow key={f.id} className="hover:bg-muted/40 transition-colors duration-150">
+                          <TableCell className="font-medium">{f.nombre}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
   );
 }

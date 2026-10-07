@@ -1698,132 +1698,191 @@ export default function Pedidos() {
           </form>
         </div>
 
-        {/* Filtros rápidos por estado */}
-        <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit">
-          <button
-            className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => setSelectedStatus('')}
-          >
-            Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
-          </button>
-          {allStatuses.map((s) => (
+        {/* Filtros rápidos por estado — scroll horizontal en móvil */}
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+          <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit min-w-max">
             <button
-              key={s}
-              className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setSelectedStatus(selectedStatus === s ? '' : s)}
+              className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setSelectedStatus('')}
             >
-              <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
-              {s} <span className="text-xs opacity-60">{countFor(s)}</span>
+              Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
             </button>
-          ))}
+            {allStatuses.map((s) => (
+              <button
+                key={s}
+                className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setSelectedStatus(selectedStatus === s ? '' : s)}
+              >
+                <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
+                {s} <span className="text-xs opacity-60">{countFor(s)}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            {loading ? (
-              <TableSkeleton columns={8} rows={10} />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b border-border">
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 w-16">ID</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-center w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortPedidosByDateDesc(visiblePedidos).map((p: any) => {
-                    const totalParts = fmtTotalParts(p);
-                    const estado = fmtEstado(p);
-                    return (
-                      <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
-                        <TableCell className="text-xs tabular-nums text-muted-foreground pl-6">#{p.id ?? '-'}</TableCell>
-                        <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
-                        <TableCell>
-                          <div className="inline-flex items-center gap-1.5">
-                            <span className={`inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11.5px] font-medium ${statusBadgeClass(estado)}`}>
-                              <span className={`inline-block w-[5px] h-[5px] rounded-full flex-shrink-0 ${statusDotClass(estado)}`} />
-                              {estado}
-                            </span>
-                            {estado.toLowerCase() === 'completado' && (
-                              isPedidoPaid(p) ? (
-                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-green-100 text-green-700 border border-green-200">Pagado</span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
-                              )
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
-                        <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="text-sm font-medium tabular-nums">{totalParts.usd}</div>
-                          {totalParts.bs && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{totalParts.bs}</div>}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openDetalle(p.id); }}>
-                            <Eye className="w-[15px] h-[15px]" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {loading ? (
+          <TableSkeleton columns={8} rows={10} />
+        ) : (
+          <>
+            {/* ── Móvil: tarjetas ── */}
+            <div className="flex flex-col gap-3 sm:hidden">
+              {sortPedidosByDateDesc(visiblePedidos).map((p: any) => {
+                const totalParts = fmtTotalParts(p);
+                const estado = fmtEstado(p);
+                return (
+                  <Card key={p.id || JSON.stringify(p)} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold truncate">{fmtCliente(p)}</p>
+                          <p className="text-xs text-muted-foreground tabular-nums mt-0.5">{fmtFecha(p)}</p>
+                        </div>
+                        <span className="text-xs tabular-nums text-muted-foreground shrink-0">#{p.id ?? '-'}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11.5px] font-medium ${statusBadgeClass(estado)}`}>
+                          <span className={`inline-block w-[5px] h-[5px] rounded-full flex-shrink-0 ${statusDotClass(estado)}`} />
+                          {estado}
+                        </span>
+                        {estado.toLowerCase() === 'completado' && (
+                          isPedidoPaid(p) ? (
+                            <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-green-100 text-green-700 border border-green-200">Pagado</span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
+                          )
+                        )}
+                        <span className="text-xs text-muted-foreground">{fmtProductosCount(p)} prod.</span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold tabular-nums">{totalParts.usd}</p>
+                          {totalParts.bs && <p className="text-[11px] text-muted-foreground tabular-nums">{totalParts.bs}</p>}
+                        </div>
+                        <Button size="sm" variant="outline" className="h-10 px-4 gap-1.5" onClick={() => openDetalle(p.id)}>
+                          <Eye className="w-3.5 h-3.5" /> Ver
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {visiblePedidos.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">No hay pedidos para mostrar.</p>
+              )}
+            </div>
+
+            {/* ── Desktop: tabla ── */}
+            <Card className="hidden sm:block overflow-hidden">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border">
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 w-16">ID</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-center w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortPedidosByDateDesc(visiblePedidos).map((p: any) => {
+                      const totalParts = fmtTotalParts(p);
+                      const estado = fmtEstado(p);
+                      return (
+                        <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
+                          <TableCell className="text-xs tabular-nums text-muted-foreground pl-6">#{p.id ?? '-'}</TableCell>
+                          <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
+                          <TableCell>
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11.5px] font-medium ${statusBadgeClass(estado)}`}>
+                                <span className={`inline-block w-[5px] h-[5px] rounded-full flex-shrink-0 ${statusDotClass(estado)}`} />
+                                {estado}
+                              </span>
+                              {estado.toLowerCase() === 'completado' && (
+                                isPedidoPaid(p) ? (
+                                  <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-green-100 text-green-700 border border-green-200">Pagado</span>
+                                ) : (
+                                  <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
+                                )
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
+                          <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="text-sm font-medium tabular-nums">{totalParts.usd}</div>
+                            {totalParts.bs && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{totalParts.bs}</div>}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-md text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openDetalle(p.id); }}>
+                              <Eye className="w-[15px] h-[15px]" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {/* Pagination Controls */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="text-sm text-muted-foreground">
-            Mostrando página {page} de {totalPages} ({totalOrders} pedidos)
+        <div className="flex items-center justify-between mt-4 gap-2">
+          <div className="text-xs text-muted-foreground hidden sm:block">
+            Página {page} de {totalPages} ({totalOrders} pedidos)
+          </div>
+          <div className="text-xs text-muted-foreground sm:hidden">
+            {page}/{totalPages}
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
+              className="h-9 w-9 p-0"
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1 || loading}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            {/* Page Numbers */}
-            {(() => {
-              const items = [];
-              const maxVisible = 5;
-              let start = Math.max(1, page - 2);
-              let end = Math.min(totalPages, start + maxVisible - 1);
-              if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+            {/* Page Numbers — ocultar en móvil, mostrar en sm+ */}
+            <div className="hidden sm:flex items-center gap-1">
+              {(() => {
+                const items = [];
+                const maxVisible = 5;
+                let start = Math.max(1, page - 2);
+                let end = Math.min(totalPages, start + maxVisible - 1);
+                if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
 
-              if (start > 1) {
-                items.push(<Button key={1} variant="outline" size="sm" className="w-8 h-8 p-0" onClick={() => setPage(1)}>1</Button>);
-                if (start > 2) items.push(<span key="d1" className="px-1 text-muted-foreground">...</span>);
-              }
+                if (start > 1) {
+                  items.push(<Button key={1} variant="outline" size="sm" className="w-8 h-8 p-0" onClick={() => setPage(1)}>1</Button>);
+                  if (start > 2) items.push(<span key="d1" className="px-1 text-muted-foreground">...</span>);
+                }
 
-              for (let i = start; i <= end; i++) {
-                items.push(
-                  <Button key={i} variant={i === page ? 'default' : 'outline'} size="sm" className="w-8 h-8 p-0" onClick={() => setPage(i)}>{i}</Button>
-                );
-              }
+                for (let i = start; i <= end; i++) {
+                  items.push(
+                    <Button key={i} variant={i === page ? 'default' : 'outline'} size="sm" className="w-8 h-8 p-0" onClick={() => setPage(i)}>{i}</Button>
+                  );
+                }
 
-              if (end < totalPages) {
-                if (end < totalPages - 1) items.push(<span key="d2" className="px-1 text-muted-foreground">...</span>);
-                items.push(<Button key={totalPages} variant="outline" size="sm" className="w-8 h-8 p-0" onClick={() => setPage(totalPages)}>{totalPages}</Button>);
-              }
-              return items;
-            })()}
+                if (end < totalPages) {
+                  if (end < totalPages - 1) items.push(<span key="d2" className="px-1 text-muted-foreground">...</span>);
+                  items.push(<Button key={totalPages} variant="outline" size="sm" className="w-8 h-8 p-0" onClick={() => setPage(totalPages)}>{totalPages}</Button>);
+                }
+                return items;
+              })()}
+            </div>
 
             <Button
               variant="outline"
               size="sm"
+              className="h-9 w-9 p-0"
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages || loading}
             >
@@ -1836,7 +1895,7 @@ export default function Pedidos() {
 
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0 gap-0 bg-white shadow-2xl overflow-hidden sm:rounded-xl transition-all duration-200">
+          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto flex flex-col p-0 gap-0 bg-white shadow-2xl overflow-hidden rounded-none sm:rounded-xl transition-all duration-200">
             <DialogHeader className="p-5 border-b shrink-0 bg-white z-10 space-y-2">
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>

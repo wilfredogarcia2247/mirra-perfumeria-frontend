@@ -445,7 +445,7 @@ export default function Productos() {
           </div>
           <div>
             <Button
-              className="gap-2"
+              className="gap-2 h-11 px-4"
               variant="default"
               onClick={() => {
                 // Asegurar que al crear un nuevo producto el formulario esté en blanco
@@ -464,7 +464,7 @@ export default function Productos() {
           </div>
 
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-4xl w-full h-[100dvh] sm:h-auto overflow-y-auto rounded-none sm:rounded-lg sm:max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Editar' : 'Nuevo'} Producto</DialogTitle>
                 <DialogDescription>Completa los datos del producto</DialogDescription>
@@ -711,175 +711,198 @@ export default function Productos() {
           </Dialog>
         </div>
 
-        {/* Products Table */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="px-4 pt-4 pb-3">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            {loading ? (
-              <TableSkeleton columns={10} />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Imagen</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Unidad</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Categoría</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Marca</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Stock</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Costo</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Precio</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product: any) => (
-                    <TableRow key={product.id} className="hover:bg-muted/40 transition-colors duration-150">
-                      <TableCell className="text-xs tabular-nums text-muted-foreground">#{product.id}</TableCell>
-                      <TableCell>
-                        <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+        {/* Buscador */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-11 text-base sm:max-w-sm sm:h-9 sm:text-sm"
+          />
+        </div>
+
+        {loading ? (
+          <TableSkeleton columns={10} />
+        ) : (
+          <>
+            {/* ── Móvil: tarjetas ── */}
+            <div className="flex flex-col gap-3 sm:hidden">
+              {filteredProducts.map((product: any) => {
+                const inv = product?.inventario || [];
+                const totalStock = Array.isArray(inv) && inv.length > 0
+                  ? inv.reduce((s: number, it: any) => s + Number(it.stock_disponible || 0), 0)
+                  : Number(product?.stock || 0);
+                const stockWarn = totalStock < 20;
+
+                const openEdit = () => {
+                  setEditingProduct(product);
+                  form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
+                  setCategoriaId(product.categoria_id ?? null);
+                  setMarcaId(product.marca_id ?? null);
+                  setVisibleEnCatalogo(product.visible_en_catalogo ?? true);
+                  form.setValue('visible_en_catalogo', product.visible_en_catalogo ?? true);
+                  setIsOpen(true);
+                  setLoadingDetalle(true);
+                  setProductDetalle(null);
+                  setProductFormula(null);
+                  getProducto(product.id).then((d) => setProductDetalle(d)).catch((e) => { console.error(e); toast.error('No se pudo cargar inventario'); }).finally(() => setLoadingDetalle(false));
+                  (async () => { try { const all = await getFormulas(); const list = Array.isArray(all) ? all : (all?.data || []); const found = list.find((f: any) => Number(f.producto_terminado_id) === Number(product.id)); if (found) setProductFormula(found); } catch (e) { console.error(e); } })();
+                };
+
+                const openStock = () => {
+                  setViewStockProduct(product);
+                  setViewStockOpen(true);
+                  setViewStockLoading(true);
+                  setViewStockDetalle(null);
+                  getProducto(product.id).then((d) => setViewStockDetalle(d)).catch((e) => { console.error(e); toast.error('No se pudo cargar existencias'); }).finally(() => setViewStockLoading(false));
+                };
+
+                return (
+                  <Card key={product.id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="flex items-center gap-3 p-3">
+                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0">
                           <img
                             src={getImageUrl(product) ?? ''}
-                            alt={product.nombre ?? 'imagen producto'}
+                            alt={product.nombre ?? ''}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const t = e.currentTarget as HTMLImageElement;
-                              t.onerror = null;
-                              // Usar una imagen aleatoria del asset folder como fallback
-                              const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
-                              const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                              t.src = randomFallback;
-                              console.error('[Productos] image load failed, using fallback:', t.src);
-                            }}
+                            onError={(e) => { const t = e.currentTarget as HTMLImageElement; t.onerror = null; const imgs = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg']; t.src = imgs[Math.floor(Math.random() * imgs.length)]; }}
                           />
                         </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <span>{product.nombre}</span>
-                          {product.visible_en_catalogo === false ? (
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Oculto
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold truncate">{product.nombre}</p>
+                            {product.visible_en_catalogo === false && (
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">Oculto</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '—'} · {product.marca_nombre ?? marcasMap[product.marca_id] ?? '—'}
+                          </p>
+                          <div className="flex items-center gap-3 mt-1 text-sm">
+                            <span className={stockWarn ? 'text-destructive font-semibold' : 'text-foreground font-medium'}>
+                              Stock: {Number(totalStock).toLocaleString('es-AR')}
                             </span>
-                          ) : null}
+                            <span className="text-muted-foreground">${product.precio_venta ?? '—'}</span>
+                          </div>
                         </div>
-                      </TableCell>
-                      {/* campo tipo eliminado */}
-                      <TableCell>{product.unidad}</TableCell>
-                      <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
-                      <TableCell>{product.marca_nombre ?? marcasMap[product.marca_id] ?? '-'}</TableCell>
-                      <TableCell>
-                        {(() => {
-                          const inv = (product?.inventario) || [];
-                          const totalDisponible = Array.isArray(inv) && inv.length > 0
-                            ? inv.reduce((s: number, it: any) => s + (Number(it.stock_disponible || 0)), 0)
-                            : Number(product?.stock || 0);
-                          const warn = totalDisponible < 20;
-                          return (
-                            <span className={warn ? "text-destructive font-semibold" : ""}>
-                              {Number(totalDisponible).toLocaleString('es-AR')}
-                            </span>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>{product.costo ?? "-"}</TableCell>
-                      <TableCell>{product.precio_venta ?? "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <span className="text-xs tabular-nums text-muted-foreground self-start shrink-0">#{product.id}</span>
+                      </div>
+                      <div className="flex border-t divide-x">
+                        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={openEdit}>
+                          <Edit className="h-4 w-4" /> Editar
+                        </button>
+                        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={openStock}>
+                          <Warehouse className="h-4 w-4" /> Stock
+                        </button>
+                        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors min-h-[44px]" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}>
+                          <Trash2 className="h-4 w-4" /> Borrar
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {filteredProducts.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">No hay productos para mostrar.</p>
+              )}
+            </div>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              // abrir modal en modo edición
+            {/* ── Desktop: tabla ── */}
+            <Card className="hidden sm:block">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Imagen</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Unidad</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Categoría</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Marca</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Stock</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Costo</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Precio</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((product: any) => (
+                      <TableRow key={product.id} className="hover:bg-muted/40 transition-colors duration-150">
+                        <TableCell className="text-xs tabular-nums text-muted-foreground">#{product.id}</TableCell>
+                        <TableCell>
+                          <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+                            <img
+                              src={getImageUrl(product) ?? ''}
+                              alt={product.nombre ?? 'imagen producto'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const t = e.currentTarget as HTMLImageElement;
+                                t.onerror = null;
+                                const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
+                                t.src = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+                              }}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <span>{product.nombre}</span>
+                            {product.visible_en_catalogo === false ? (
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Oculto</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>{product.unidad}</TableCell>
+                        <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
+                        <TableCell>{product.marca_nombre ?? marcasMap[product.marca_id] ?? '-'}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const inv = (product?.inventario) || [];
+                            const totalDisponible = Array.isArray(inv) && inv.length > 0
+                              ? inv.reduce((s: number, it: any) => s + (Number(it.stock_disponible || 0)), 0)
+                              : Number(product?.stock || 0);
+                            const warn = totalDisponible < 20;
+                            return <span className={warn ? 'text-destructive font-semibold' : ''}>{Number(totalDisponible).toLocaleString('es-AR')}</span>;
+                          })()}
+                        </TableCell>
+                        <TableCell>{product.costo ?? '-'}</TableCell>
+                        <TableCell>{product.precio_venta ?? '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => {
                               setEditingProduct(product);
-                              form.reset({
-                                nombre: product.nombre,
-                                unidad: product.unidad,
-                                // stock no se setea porque no es editable en el formulario
-                                costo: product.costo,
-                                precio_venta: product.precio_venta,
-                                proveedor_id: product.proveedor_id,
-                                categoria_id: product.categoria_id ?? null,
-                                marca_id: product.marca_id ?? null,
-                              });
+                              form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
                               setCategoriaId(product.categoria_id ?? null);
                               setMarcaId(product.marca_id ?? null);
                               setVisibleEnCatalogo(product.visible_en_catalogo ?? true);
                               form.setValue('visible_en_catalogo', product.visible_en_catalogo ?? true);
                               setIsOpen(true);
-                              // cargar detalle completo (incluye inventario por almacén)
                               setLoadingDetalle(true);
                               setProductDetalle(null);
                               setProductFormula(null);
-                              getProducto(product.id)
-                                .then((d) => setProductDetalle(d))
-                                .catch((e) => { console.error('Error cargando detalle producto:', e); toast.error('No se pudo cargar inventario'); })
-                                .finally(() => setLoadingDetalle(false));
-
-                              // Cargar fórmulas y buscar la que corresponde a este producto terminado
-                              (async () => {
-                                try {
-                                  const all = await getFormulas();
-                                  const list = Array.isArray(all) ? all : (all?.data || []);
-                                  const found = list.find((f: any) => Number(f.producto_terminado_id) === Number(product.id));
-                                  if (found) setProductFormula(found);
-                                } catch (e) {
-                                  console.error('Error cargando fórmulas', e);
-                                }
-                              })();
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Ver existencias por almacén"
-                            onClick={() => {
+                              getProducto(product.id).then((d) => setProductDetalle(d)).catch((e) => { console.error('Error cargando detalle producto:', e); toast.error('No se pudo cargar inventario'); }).finally(() => setLoadingDetalle(false));
+                              (async () => { try { const all = await getFormulas(); const list = Array.isArray(all) ? all : (all?.data || []); const found = list.find((f: any) => Number(f.producto_terminado_id) === Number(product.id)); if (found) setProductFormula(found); } catch (e) { console.error('Error cargando fórmulas', e); } })();
+                            }}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" title="Ver existencias por almacén" onClick={() => {
                               setViewStockProduct(product);
                               setViewStockOpen(true);
                               setViewStockLoading(true);
                               setViewStockDetalle(null);
-                              getProducto(product.id)
-                                .then((d) => setViewStockDetalle(d))
-                                .catch((e) => { console.error('Error cargando existencias:', e); toast.error('No se pudo cargar existencias'); })
-                                .finally(() => setViewStockLoading(false));
-                            }}
-                          >
-                            <Warehouse className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setDeleteTarget(product);
-                              setAlertOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                              getProducto(product.id).then((d) => setViewStockDetalle(d)).catch((e) => { console.error('Error cargando existencias:', e); toast.error('No se pudo cargar existencias'); }).finally(() => setViewStockLoading(false));
+                            }}><Warehouse className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
         {/* Confirmación de borrado */}
         <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
           <AlertDialogContent>
@@ -914,7 +937,7 @@ export default function Productos() {
         </AlertDialog>
         {/* Modal de existencias por almacén (solo lectura) */}
         <Dialog open={viewStockOpen} onOpenChange={setViewStockOpen}>
-          <DialogContent className="max-w-4xl w-[95vw] lg:w-3/4 max-h-[80vh] overflow-auto">
+          <DialogContent className="max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[80vh] overflow-auto rounded-none sm:rounded-lg sm:w-[95vw] lg:w-3/4">
             <DialogHeader className="sticky top-0 bg-card/80 backdrop-blur-sm z-10">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div>

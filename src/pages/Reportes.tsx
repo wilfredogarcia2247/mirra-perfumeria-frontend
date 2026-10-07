@@ -3,7 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
+  getCategorias,
   getClientesTopResumen,
+  getFormulas,
+  getPedidos,
   getPedidosResumenReportes,
   getProductos,
   getVentasPorMetodoMoneda,
@@ -21,13 +24,14 @@ type ReportSlug =
   | 'ventas-presentacion'
   | 'productos-favoritos'
   | 'inventario'
+  | 'rotacion-inventario'
   | 'pedidos-estado'
   | 'clientes'
   | 'compras'
   | 'rentabilidad'
   | 'ticket-promedio';
 
-type DataKey = 'pedidos' | 'productos' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
+type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
@@ -36,6 +40,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'ventas-presentacion', title: 'Ventas por presentacion', description: 'Unidades vendidas por ml reportado' },
   { slug: 'productos-favoritos', title: 'Productos favoritos', description: 'Top productos mas vendidos' },
   { slug: 'inventario', title: 'Estado de inventario', description: 'Stock, productos sin stock y reposicion' },
+  { slug: 'rotacion-inventario', title: 'Rotación de inventario', description: 'Tiempo sin venta por producto, identifica stock muerto' },
   { slug: 'pedidos-estado', title: 'Pedidos por estado', description: 'Completados, cancelados y pendientes' },
   { slug: 'clientes', title: 'Clientes frecuentes', description: 'Clientes con mayor recurrencia de compra' },
   { slug: 'compras', title: 'Compras y reposicion', description: 'Indicadores para planificar compras' },
@@ -52,6 +57,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
    'ventas-presentacion': ['presentaciones'],
   'productos-favoritos': ['pedidos'],
   inventario: ['productos'],
+  'rotacion-inventario': ['productos', 'pedidosTodos', 'categorias', 'formulasAll'],
   'pedidos-estado': ['pedidos'],
   clientes: ['clientesResumen'],
   compras: ['pedidos', 'productos'],
@@ -62,6 +68,9 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
 const DATA_LABELS: Record<DataKey, string> = {
   pedidos: 'pedidos',
   productos: 'productos',
+  pedidosTodos: 'historial de ventas',
+  categorias: 'categorías',
+  formulasAll: 'fórmulas',
   ventasMetodo: 'ventas por metodo',
   clientesResumen: 'clientes top',
   presentaciones: 'ventas por presentacion',
@@ -140,6 +149,9 @@ export default function Reportes() {
 
   const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
+  const [pedidosTodos, setPedidosTodos] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [formulasAll, setFormulasAll] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
@@ -153,9 +165,16 @@ export default function Reportes() {
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
   });
+  const [rotacionFilter, setRotacionFilter] = useState<'todos' | 'activo' | 'lento' | 'sin_movimiento' | 'muerto' | 'nunca'>('todos');
+  const [rotacionSearch, setRotacionSearch] = useState('');
+  const [rotacionCategoria, setRotacionCategoria] = useState('');
+  const [rotacionPeriodo, setRotacionPeriodo] = useState<number | null>(null);
   const [loaded, setLoaded] = useState<Record<DataKey, boolean>>({
     pedidos: false,
     productos: false,
+    pedidosTodos: false,
+    categorias: false,
+    formulasAll: false,
     ventasMetodo: false,
     presentaciones: false,
     clientesResumen: false,
@@ -237,6 +256,31 @@ export default function Reportes() {
             if (cancelled) return;
             setProductos(Array.isArray(res) ? res : (res?.data || []));
           }
+          if (key === 'pedidosTodos') {
+            const res = await getPedidos();
+            if (cancelled) return;
+            setPedidosTodos(Array.isArray(res) ? res : (res?.data || []));
+          }
+          if (key === 'categorias') {
+            const res = await getCategorias();
+            if (cancelled) return;
+            setCategorias(Array.isArray(res) ? res : (res?.data || []));
+          }
+          if (key === 'formulasAll') {
+            // Load all formula pages
+            const all: any[] = [];
+            let page = 1;
+            while (true) {
+              const res = await getFormulas(page);
+              if (cancelled) return;
+              const items = Array.isArray(res) ? res : (res?.data || []);
+              all.push(...items);
+              const meta = res?.meta;
+              if (!meta || items.length === 0 || all.length >= (meta.total ?? all.length)) break;
+              page++;
+            }
+            setFormulasAll(all);
+          }
           if (key === 'clientesResumen') {
             const res = await getClientesTopResumen(10, 6, fechaInicio || undefined, fechaFin || undefined);
             if (cancelled) return;
@@ -246,6 +290,9 @@ export default function Reportes() {
           if (cancelled) return;
           if (key === 'pedidos') setPedidos([]);
           if (key === 'productos') setProductos([]);
+          if (key === 'pedidosTodos') setPedidosTodos([]);
+          if (key === 'categorias') setCategorias([]);
+          if (key === 'formulasAll') setFormulasAll([]);
           if (key === 'ventasMetodo') setVentasMetodo([]);
           if (key === 'presentaciones') setPresentaciones([]);
           if (key === 'clientesResumen') setClientesResumen([]);
@@ -554,6 +601,90 @@ export default function Reportes() {
     };
   }, [clientesResumen, pedidos, presentaciones, productos, ventasMetodo]);
 
+  const rotacionMetrics = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const categoriasMap: Record<string, string> = {};
+    for (const c of categorias) {
+      if (c?.id != null) categoriasMap[String(c.id)] = String(c.nombre ?? c.name ?? c.id);
+    }
+
+    // Build map: producto_terminado_id → { totalGramos, unidad }
+    // Each formula can have multiple componentes (essences). Sum all with 'g'/'gr'/'kg'.
+    // If a product has multiple formulas, use the first one found.
+    const GRAM_UNITS = new Set(['g', 'gr', 'gramo', 'gramos', 'gram']);
+    const KG_UNITS = new Set(['kg', 'kilo', 'kilogramo', 'kilogramos']);
+    const formulaEssenceMap: Record<string, { gramos: number; unidad: string }> = {};
+    for (const formula of formulasAll) {
+      const pid = String(formula?.producto_terminado_id ?? '');
+      if (!pid || formulaEssenceMap[pid]) continue; // use first formula per product
+      const componentes: any[] = Array.isArray(formula.componentes) ? formula.componentes : [];
+      let totalGramos = 0;
+      let hasEssence = false;
+      for (const c of componentes) {
+        const u = String(c?.unidad ?? '').toLowerCase().trim();
+        const qty = parseNumber(c?.cantidad ?? 0);
+        if (GRAM_UNITS.has(u)) { totalGramos += qty; hasEssence = true; }
+        else if (KG_UNITS.has(u)) { totalGramos += qty * 1000; hasEssence = true; }
+      }
+      if (hasEssence) formulaEssenceMap[pid] = { gramos: totalGramos, unidad: 'g' };
+    }
+
+    // Build map: product_id -> last completed-sale date
+    const lastSaleByProductId: Record<string, Date> = {};
+    for (const pedido of pedidosTodos) {
+      if (!COMPLETED_STATES.has(normalizeText(pedido?.estado ?? ''))) continue;
+      const rawDate = pedido.fecha || pedido.created_at || pedido.fecha_pedido;
+      if (!rawDate) continue;
+      const saleDate = new Date(rawDate);
+      if (isNaN(saleDate.getTime())) continue;
+      const items: any[] = Array.isArray(pedido.productos) ? pedido.productos : [];
+      for (const item of items) {
+        const pid = String(item?.producto_id ?? item?.id ?? '');
+        if (!pid) continue;
+        if (!lastSaleByProductId[pid] || saleDate > lastSaleByProductId[pid]) {
+          lastSaleByProductId[pid] = saleDate;
+        }
+      }
+    }
+
+    type RotStatus = 'activo' | 'lento' | 'sin_movimiento' | 'muerto' | 'nunca';
+    const STATUS_ORDER: Record<RotStatus, number> = { nunca: 0, muerto: 1, sin_movimiento: 2, lento: 3, activo: 4 };
+
+    const rows = productos.map((p: any) => {
+      const lastSale = lastSaleByProductId[String(p.id)] ?? null;
+      const daysSince = lastSale ? Math.floor((today.getTime() - lastSale.getTime()) / 86_400_000) : null;
+      let status: RotStatus;
+      if (daysSince === null) status = 'nunca';
+      else if (daysSince <= 30) status = 'activo';
+      else if (daysSince <= 90) status = 'lento';
+      else if (daysSince <= 180) status = 'sin_movimiento';
+      else status = 'muerto';
+      const categoriaId = String(p.categoria_id ?? '');
+      const categoriaNombre = p.categoria_nombre ?? categoriasMap[categoriaId] ?? null;
+      const unidad = String(p.unidad ?? '').trim();
+      const essence = formulaEssenceMap[String(p.id)] ?? null;
+      const esenciaGramosTotal = essence ? Math.round(parseNumber(p.stock) * essence.gramos) : null;
+      return { id: String(p.id), nombre: String(p.nombre ?? ''), stock: parseNumber(p.stock), unidad, esenciaGramosTotal, lastSale, daysSince, status, categoriaId, categoriaNombre };
+    }).sort((a, b) => {
+      const diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      if (diff !== 0) return diff;
+      if (b.daysSince !== null && a.daysSince !== null) return b.daysSince - a.daysSince;
+      return 0;
+    });
+
+    const counts = { activo: 0, lento: 0, sin_movimiento: 0, muerto: 0, nunca: 0 };
+    for (const r of rows) counts[r.status]++;
+
+    // Unique categories present in the product list
+    const categoriasEnProductos = Array.from(
+      new Map(rows.filter((r) => r.categoriaId).map((r) => [r.categoriaId, r.categoriaNombre ?? r.categoriaId])).entries()
+    ).map(([id, nombre]) => ({ id, nombre: String(nombre) })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    return { rows, counts, categoriasEnProductos };
+  }, [pedidosTodos, productos, categorias, formulasAll]);
+
   const renderReport = () => {
     if (loadingInfo.active) {
       return (
@@ -665,25 +796,48 @@ export default function Reportes() {
               {chartData.length === 0 || chartKeys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay suficiente información mensual para graficar todavía.</p>
               ) : (
-                <div className="w-full">
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis allowDecimals={false} />
-                      <RechartsTooltip cursor={{ fill: 'rgba(202, 158, 103, 0.12)' }} />
-                      <Legend />
-                      {chartKeys.map((key: string, index: number) => (
-                        <Bar
-                          key={key}
-                          dataKey={key}
-                          fill={PRESENTATION_CHART_COLORS[index % PRESENTATION_CHART_COLORS.length]}
-                          radius={[4, 4, 0, 0]}
-                        />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <>
+                  {/* Mobile chart */}
+                  <div className="sm:hidden w-full">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" />
+                        <YAxis allowDecimals={false} />
+                        <RechartsTooltip cursor={{ fill: 'rgba(202, 158, 103, 0.12)' }} />
+                        <Legend />
+                        {chartKeys.map((key: string, index: number) => (
+                          <Bar
+                            key={key}
+                            dataKey={key}
+                            fill={PRESENTATION_CHART_COLORS[index % PRESENTATION_CHART_COLORS.length]}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Desktop chart */}
+                  <div className="hidden sm:block w-full">
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" />
+                        <YAxis allowDecimals={false} />
+                        <RechartsTooltip cursor={{ fill: 'rgba(202, 158, 103, 0.12)' }} />
+                        <Legend />
+                        {chartKeys.map((key: string, index: number) => (
+                          <Bar
+                            key={key}
+                            dataKey={key}
+                            fill={PRESENTATION_CHART_COLORS[index % PRESENTATION_CHART_COLORS.length]}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
               )}
               <p className="text-xs text-muted-foreground">Incluye únicamente pedidos completados con presentacion detectada en el nombre del producto.</p>
             </CardContent>
@@ -768,6 +922,208 @@ export default function Reportes() {
 
               {metrics.withoutStockProducts.length === 0 && metrics.lowStockProducts.length === 0 && (
                 <p className="text-sm text-muted-foreground">No hay productos con condiciones criticas de inventario.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (selectedReport === 'rotacion-inventario') {
+      const { rows, counts, categoriasEnProductos } = rotacionMetrics;
+
+      const PERIODO_OPTIONS: { label: string; days: number | null }[] = [
+        { label: 'Todo el historial', days: null },
+        { label: 'Sin venta en +1 mes', days: 30 },
+        { label: 'Sin venta en +3 meses', days: 90 },
+        { label: 'Sin venta en +6 meses', days: 180 },
+        { label: 'Sin venta en +12 meses', days: 365 },
+      ];
+
+      const filtered = rows.filter((r) => {
+        const matchStatus = rotacionFilter === 'todos' || r.status === rotacionFilter;
+        const matchSearch = !rotacionSearch || normalizeText(r.nombre).includes(normalizeText(rotacionSearch));
+        const matchCategoria = !rotacionCategoria || r.categoriaId === rotacionCategoria;
+        const matchPeriodo = rotacionPeriodo === null || (r.daysSince === null || r.daysSince >= rotacionPeriodo);
+        return matchStatus && matchSearch && matchCategoria && matchPeriodo;
+      });
+
+      const STATUS_LABEL: Record<string, string> = {
+        activo: 'Activo',
+        lento: 'Lento',
+        sin_movimiento: 'Sin movimiento',
+        muerto: 'Muerto',
+        nunca: 'Nunca vendido',
+      };
+      const STATUS_COLORS: Record<string, string> = {
+        activo: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+        lento: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+        sin_movimiento: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+        muerto: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+        nunca: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+      };
+      const FILTER_TABS: { key: typeof rotacionFilter; label: string; count: number }[] = [
+        { key: 'todos', label: 'Todos', count: rows.length },
+        { key: 'activo', label: '🟢 Activos', count: counts.activo },
+        { key: 'lento', label: '🟡 Lentos', count: counts.lento },
+        { key: 'sin_movimiento', label: '🟠 Sin movimiento', count: counts.sin_movimiento },
+        { key: 'muerto', label: '🔴 Muertos', count: counts.muerto },
+        { key: 'nunca', label: '⚫ Nunca vendidos', count: counts.nunca },
+      ];
+
+      return (
+        <div className="space-y-4">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <Card className="border-green-200 dark:border-green-900">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Activos</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-green-700 dark:text-green-400">{counts.activo}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Vendido en ≤30 días</p>
+              </CardContent>
+            </Card>
+            <Card className="border-amber-200 dark:border-amber-900">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Lentos</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{counts.lento}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">31–90 días sin venta</p>
+              </CardContent>
+            </Card>
+            <Card className="border-orange-200 dark:border-orange-900">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Sin movimiento</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-orange-700 dark:text-orange-400">{counts.sin_movimiento}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">91–180 días sin venta</p>
+              </CardContent>
+            </Card>
+            <Card className="border-red-200 dark:border-red-900">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Muertos</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-red-700 dark:text-red-400">{counts.muerto}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">+180 días sin venta</p>
+              </CardContent>
+            </Card>
+            <Card className="border-gray-200 dark:border-gray-700 col-span-2 sm:col-span-1">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Nunca vendidos</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-600 dark:text-gray-400">{counts.nunca}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Sin historial de venta</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="border-b border-border/60 pb-4 space-y-3">
+              <CardTitle className="text-base font-medium">Análisis de movimiento por producto</CardTitle>
+
+              {/* Período */}
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Período</p>
+                <div className="overflow-x-auto -mx-1 px-1">
+                  <div className="flex gap-1.5 min-w-max">
+                    {PERIODO_OPTIONS.map((opt) => (
+                      <button
+                        key={String(opt.days)}
+                        onClick={() => setRotacionPeriodo(opt.days)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                          rotacionPeriodo === opt.days
+                            ? 'bg-foreground text-background'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Categoría + Búsqueda */}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={rotacionSearch}
+                  onChange={(e) => setRotacionSearch(e.target.value)}
+                  className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <select
+                  value={rotacionCategoria}
+                  onChange={(e) => setRotacionCategoria(e.target.value)}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:w-48"
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasEnProductos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Estado */}
+              <div className="overflow-x-auto -mx-1 px-1">
+                <div className="flex gap-1.5 min-w-max">
+                  {FILTER_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setRotacionFilter(tab.key)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        rotacionFilter === tab.key
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-2">
+              {filtered.length === 0 && (
+                <p className="text-sm text-muted-foreground py-4 text-center">No hay productos para mostrar.</p>
+              )}
+              {filtered.map((row) => {
+                const lastSaleStr = row.lastSale
+                  ? row.lastSale.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : null;
+                const daysLabel = row.daysSince === null
+                  ? 'Sin historial de venta'
+                  : row.daysSince === 0
+                  ? 'Vendido hoy'
+                  : `Hace ${row.daysSince} día${row.daysSince !== 1 ? 's' : ''}`;
+                return (
+                  <div
+                    key={row.id}
+                    className="flex flex-col gap-1.5 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm leading-tight truncate">{row.nombre}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {row.categoriaNombre && <span className="mr-1.5">{row.categoriaNombre} ·</span>}
+                        {lastSaleStr ? `Última venta: ${lastSaleStr} · ` : ''}{daysLabel}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-xs text-muted-foreground text-right">
+                        <div>Stock: <strong>{row.stock.toLocaleString('es-VE')}{row.unidad ? ` ${row.unidad}` : ''}</strong></div>
+                        {row.esenciaGramosTotal !== null && (
+                          <div className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                            {row.esenciaGramosTotal >= 1000
+                              ? `${(row.esenciaGramosTotal / 1000).toFixed(2)} kg esencia`
+                              : `${row.esenciaGramosTotal} g esencia`}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_COLORS[row.status]}`}>
+                        {STATUS_LABEL[row.status]}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length > 0 && (
+                <p className="text-xs text-muted-foreground pt-2">
+                  Mostrando {filtered.length} de {rows.length} productos. Basado en pedidos completados de todo el historial.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -893,6 +1249,7 @@ export default function Reportes() {
                   value={fechaInicio}
                   max={fechaFin || undefined}
                   onChange={(e) => setFechaInicio(e.target.value)}
+                  className="h-11 text-base"
                 />
               </div>
               <div className="space-y-1">
@@ -903,11 +1260,13 @@ export default function Reportes() {
                   value={fechaFin}
                   min={fechaInicio || undefined}
                   onChange={(e) => setFechaFin(e.target.value)}
+                  className="h-11 text-base"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
+                className="h-11"
                 onClick={() => {
                   const now = new Date();
                   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);

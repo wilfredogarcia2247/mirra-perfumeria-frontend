@@ -391,18 +391,18 @@ export default function Bancos() {
         <Card>
           <CardContent className="p-0">
             <div className="px-4 pt-4 pb-3 flex flex-wrap gap-2 border-b border-border/60">
-              <Input placeholder="Nombre del banco" value={name} onChange={(e: any) => setName(e.target.value)} className="max-w-[200px]" />
+              <Input placeholder="Nombre del banco" value={name} onChange={(e: any) => setName(e.target.value)} className="h-11 text-base max-w-[200px]" />
               {tasas && tasas.length > 0 ? (
-                <select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={moneda} onChange={(e:any) => setMoneda(e.target.value)}>
+                <select className="h-11 rounded-md border border-input bg-background px-3 text-base" value={moneda} onChange={(e:any) => setMoneda(e.target.value)}>
                   <option value="">-- Moneda --</option>
                   {tasas.map((t:any) => (
                     <option key={t.id ?? t.simbolo} value={t.simbolo}>{`${t.simbolo}${t.monto ? ` — ${t.monto}` : ''}`}</option>
                   ))}
                 </select>
               ) : (
-                <Input placeholder="Moneda (ej. USD)" value={moneda} onChange={(e: any) => setMoneda(e.target.value)} className="max-w-[140px]" />
+                <Input placeholder="Moneda (ej. USD)" value={moneda} onChange={(e: any) => setMoneda(e.target.value)} className="h-11 text-base max-w-[140px]" />
               )}
-              <Button onClick={handleCreate} disabled={submitting} className="gap-2">
+              <Button onClick={handleCreate} disabled={submitting} className="h-11 px-4 gap-2">
                 <Plus className="h-4 w-4" />
                 {submitting ? 'Creando...' : 'Crear banco'}
               </Button>
@@ -411,62 +411,113 @@ export default function Bancos() {
             {loading ? (
               <TableSkeleton columns={3} />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Moneda</TableHead>
-                    <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y divide-border">
                   {bancos.map((b) => (
-                    <TableRow key={b.id} className="hover:bg-muted/40 transition-colors duration-150">
-                      <TableCell className="font-medium">
-                        {editingId === b.id ? (
-                          <Input className="h-7 text-sm" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
-                        ) : b.nombre}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {editingId === b.id ? (
-                          tasas && tasas.length > 0 ? (
-                            <select className="h-7 rounded-md border border-input bg-background px-2 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
+                    <div key={b.id} className="px-4 py-3 space-y-2">
+                      {editingId === b.id ? (
+                        <div className="space-y-2">
+                          <Input className="h-11 text-base" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
+                          {tasas && tasas.length > 0 ? (
+                            <select className="h-11 w-full rounded-md border border-input bg-background px-3 text-base" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
                               <option value="">--</option>
                               {tasas.map((t:any) => <option key={t.id ?? t.simbolo} value={t.simbolo}>{t.simbolo}</option>)}
                             </select>
                           ) : (
-                            <Input className="h-7 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
-                          )
-                        ) : (b.moneda ?? '—')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {editingId === b.id ? (
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleUpdate} disabled={submitting}>
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            <Input className="h-11 text-base" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
+                          )}
+                          <div className="flex gap-2">
+                            <Button className="flex-1 min-h-[44px]" variant="outline" onClick={handleUpdate} disabled={submitting}>
+                              <Check className="h-4 w-4 mr-1 text-green-600" />Guardar
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEdit}>
-                              <X className="h-3.5 w-3.5" />
+                            <Button className="flex-1 min-h-[44px]" variant="outline" onClick={cancelEdit}>
+                              <X className="h-4 w-4 mr-1" />Cancelar
                             </Button>
                           </div>
-                        ) : (
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(b)}>
-                              <Edit className="h-3.5 w-3.5" />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{b.nombre}</span>
+                            <span className="text-sm text-muted-foreground">{b.moneda ?? '—'}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button className="flex-1 min-h-[44px]" variant="outline" size="sm" onClick={() => startEdit(b)}>
+                              <Edit className="h-4 w-4 mr-1" />Editar
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openModal(b.id)}>
-                              <Eye className="h-3.5 w-3.5" />
+                            <Button className="flex-1 min-h-[44px]" variant="outline" size="sm" onClick={() => openModal(b.id)}>
+                              <Eye className="h-4 w-4 mr-1" />Ver
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(b.id)}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            <Button className="flex-1 min-h-[44px]" variant="outline" size="sm" onClick={() => handleDelete(b.id)}>
+                              <Trash2 className="h-4 w-4 mr-1 text-destructive" />Eliminar
                             </Button>
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                        </>
+                      )}
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Moneda</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bancos.map((b) => (
+                        <TableRow key={b.id} className="hover:bg-muted/40 transition-colors duration-150">
+                          <TableCell className="font-medium">
+                            {editingId === b.id ? (
+                              <Input className="h-7 text-sm" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
+                            ) : b.nombre}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {editingId === b.id ? (
+                              tasas && tasas.length > 0 ? (
+                                <select className="h-7 rounded-md border border-input bg-background px-2 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)}>
+                                  <option value="">--</option>
+                                  {tasas.map((t:any) => <option key={t.id ?? t.simbolo} value={t.simbolo}>{t.simbolo}</option>)}
+                                </select>
+                              ) : (
+                                <Input className="h-7 text-sm" value={editingMoneda} onChange={(e) => setEditingMoneda(e.target.value)} />
+                              )
+                            ) : (b.moneda ?? '—')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {editingId === b.id ? (
+                              <div className="flex justify-end gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleUpdate} disabled={submitting}>
+                                  <Check className="h-3.5 w-3.5 text-green-600" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEdit}>
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(b)}>
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openModal(b.id)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(b.id)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -474,9 +525,9 @@ export default function Bancos() {
 
       {/* Modal detalle banco */}
       {modalOpen && modalBanco && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-2xl p-6 z-10">
+          <div className="relative bg-card border border-border rounded-none sm:rounded-xl shadow-xl w-full sm:max-w-2xl p-6 z-10 h-[100dvh] sm:h-auto overflow-y-auto">
             <div className="flex justify-between items-start mb-5 gap-4">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">{modalBanco.nombre}</h3>
