@@ -6,6 +6,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbar inside sidebar */
+[data-sidebar="content"]::-webkit-scrollbar { display: none; }
+[data-sidebar="content"] { scrollbar-width: none; -ms-overflow-style: none; }
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 */
 
