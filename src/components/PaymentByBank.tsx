@@ -1166,8 +1166,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           const fresh = await getPedidoVenta(pedidoId);
           const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
           if (!pagosList || pagosList.length === 0) {
-            setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa la respuesta del servidor.');
-            toast.error('Pago registrado pero no se detectó asociación al pedido');
             if (onSuccess) onSuccess(fresh);
             if (onClose) onClose();
             setLoading(false);
@@ -1424,8 +1422,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
             // Si el backend reportó éxito y devolvió un pago, lo consideramos válido aun si el "fresh" falla
             if (pagosList.length === 0 && !data?.pago) {
-              setErrors('Pago registrado pero no se detectó asociación al pedido. Revisa la respuesta del servidor.');
-              toast.error('Pago registrado pero no se detectó asociación al pedido');
               if (onSuccess) onSuccess(fresh || data);
               if (onClose) onClose();
               setLoading(false);

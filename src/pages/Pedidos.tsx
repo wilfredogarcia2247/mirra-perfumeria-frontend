@@ -1300,13 +1300,7 @@ export default function Pedidos() {
             setOrdenesDetailed([]);
           }
         })();
-        // Si el pedido trae pagos, abrir la vista de pagos automáticamente
-        try {
-          const hasPagos = Array.isArray(detalle?.pagos) && detalle.pagos.length > 0;
-          setShowPaymentsView(Boolean(hasPagos));
-        } catch (e) {
-          setShowPaymentsView(false);
-        }
+        setShowPaymentsView(false);
       } catch (errInner) {
         // si algo falla en diagnóstico, continuar mostrando detalle
         setSelectedPedido(detalle);
@@ -1922,7 +1916,7 @@ export default function Pedidos() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/50 space-y-6 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
+            <div id="modal-scroll-container" className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/50 space-y-6 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
               {detailLoading ? (
                 <div className="flex items-center justify-center py-20 text-gray-400">
                   <Loader2 className="w-8 h-8 animate-spin mr-2" />
@@ -2182,7 +2176,7 @@ export default function Pedidos() {
                   </div>
                   {/* Vista de pagos en solo lectura (se puede abrir para pedidos completados) */}
                   {selectedPedido && showPaymentsView && (
-                    <div className="mt-4 p-4 bg-white border rounded">
+                    <div id="payments-view-panel" className="mt-4 p-4 bg-white border rounded">
                       <div className="flex items-center justify-between mb-2">
                         <div className="font-medium">Pagos ({((selectedPedido.pagos || selectedPedido.pagos_venta || selectedPedido.payments) || []).length})</div>
                         <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowPaymentsView(false)}>Cerrar</button>
@@ -2659,8 +2653,21 @@ export default function Pedidos() {
                     Registrar pago y completar
                   </Button>
                   {selectedPedido?.estado === 'Completado' && (
-                    <Button size="lg" variant="outline" onClick={() => setShowPaymentsView(true)}>
-                      Ver pagos
+                    <Button size="lg" variant={showPaymentsView ? 'default' : 'outline'} onClick={() => {
+                      if (showPaymentsView) {
+                        setShowPaymentsView(false);
+                      } else {
+                        setShowPaymentsView(true);
+                        setTimeout(() => {
+                          const panel = document.getElementById('payments-view-panel');
+                          const container = document.getElementById('modal-scroll-container');
+                          if (panel && container) {
+                            container.scrollTo({ top: panel.offsetTop - container.offsetTop - 16, behavior: 'smooth' });
+                          }
+                        }, 50);
+                      }
+                    }}>
+                      {showPaymentsView ? 'Ocultar pagos' : 'Ver pagos'}
                     </Button>
                   )}
                   <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
