@@ -690,6 +690,18 @@ export async function getColaboradores() {
   return apiFetch('/cupones/colaboradores');
 }
 
+export async function getUsuariosInfluencer() {
+  return apiFetch('/cupones/usuarios-influencer');
+}
+
+export async function getInfluencerDashboard(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const query = params.toString();
+  return apiFetch(`/cupones/influencer/dashboard${query ? `?${query}` : ''}`);
+}
+
 export async function createColaborador(data: any) {
   return apiFetch('/cupones/colaboradores', { method: 'POST', body: JSON.stringify(data) });
 }
@@ -700,6 +712,15 @@ export async function updateColaborador(id: number, data: any) {
 
 export async function setColaboradorActivo(id: number, activo: boolean) {
   return apiFetch(`/cupones/colaboradores/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) });
+}
+
+export async function getInfluencerCommissionPayments(colaboradorId: number, fechaCorte?: string) {
+  const query = fechaCorte ? `?fecha_corte=${encodeURIComponent(fechaCorte)}` : '';
+  return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos${query}`);
+}
+
+export async function createInfluencerCommissionPayment(colaboradorId: number, data: { fecha_corte: string; referencia: string; comprobante_key: string; observaciones?: string }) {
+  return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 // Validación pública de cupón (carrito del sitio público, sin autenticación)

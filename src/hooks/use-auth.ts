@@ -10,6 +10,21 @@ export function useAuth() {
 
   const isAuthenticated = !!token;
 
+  function getRole(): string | null {
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const role = payload?.rol ?? payload?.role ?? null;
+        return typeof role === 'string' ? role.toLowerCase() : null;
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+
   // Extract userId from JWT token
   function getUserId(): number | null {
     if (!token) return null;
@@ -36,7 +51,8 @@ export function useAuth() {
   }
 
   const userId = getUserId();
+  const role = getRole();
 
-  return { token, isAuthenticated, logout, userId };
+  return { token, isAuthenticated, logout, userId, role, isInfluencer: role === 'influencer' };
 }
 

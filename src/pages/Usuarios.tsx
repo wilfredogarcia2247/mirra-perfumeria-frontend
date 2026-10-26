@@ -421,6 +421,7 @@ export default function Usuarios() {
                 <label className="text-sm font-medium">Rol</label>
                 <select className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-base" value={userForm.rol || 'user'} onChange={(e) => setUserForm((s) => ({ ...s, rol: e.target.value }))}>
                   <option value="user">user</option>
+                  <option value="influencer">influencer</option>
                   <option value="admin">admin</option>
                 </select>
               </div>

@@ -25,6 +25,9 @@ import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
+import InfluencerDashboard from "./pages/InfluencerDashboard";
+import InfluencerAdminPreview from "./pages/InfluencerAdminPreview";
+import MarketingInfluencersPreview from "./pages/MarketingInfluencersPreview";
 import Reportes from "./pages/Reportes";
 import Rastreo from "./pages/Rastreo";
 import NotFound from "./pages/NotFound";
@@ -50,8 +53,14 @@ const App = () => (
           </Route>
           <Route path="/login" element={<Login />} />
 
+          {import.meta.env.DEV && <Route path="/influencer-preview" element={<InfluencerDashboard preview />} />}
+          {import.meta.env.DEV && <Route path="/influencer-admin-preview" element={<InfluencerAdminPreview />} />}
+          {import.meta.env.DEV && <Route path="/marketing-influencers-preview" element={<MarketingInfluencersPreview />} />}
+
           {/* Rutas protegidas */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/influencer" element={<InfluencerDashboard />} />
+
             <Route element={<ModuleProtectedRoute moduleKey="dashboard" />}>
               <Route path="/dashboard" element={<Dashboard />} />
             </Route>

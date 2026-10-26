@@ -22,25 +22,26 @@
 
 ### 3. Variables de Entorno Requeridas
 
-En la sección de **Environment Variables**, agrega las siguientes variables (ajusta según tu `.env`):
+> [!IMPORTANT]
+> En Dokploy, estas variables deben configurarse como **Build Arguments** (argumentos de construcción), NO solo como variables de entorno de runtime. Vite embebe estas variables durante el build.
+
+En la sección de **Environment Variables** o **Build Arguments**, agrega las siguientes variables (ajusta según tu configuración):
 
 ```env
-# API Backend
+# API Backend (REQUERIDO)
 VITE_API_URL=https://tu-backend.dokploy.app
+
+# MinIO (si aplica)
+VITE_MINIO_ENDPOINT=https://minio-ao08g4sg0o8ss84ko8cc8cok.38.10.248.179.sslip.io
+VITE_MINIO_BUCKET=mirra-img
 
 # Cloudinary (si aplica)
 VITE_CLOUDINARY_CLOUD_NAME=tu_cloud_name
 VITE_CLOUDINARY_UPLOAD_PRESET=tu_preset
-
-# MinIO (si aplica)
-VITE_MINIO_ENDPOINT=https://tu-minio.dokploy.app
-VITE_MINIO_BUCKET=mirra-img
-
-# Otras variables que tengas en tu .env
 ```
 
-> [!IMPORTANT]
-> **NO** incluyas el archivo `.env` en tu repositorio. Todas las variables deben configurarse en Dokploy.
+> [!WARNING]
+> **NO** incluyas el archivo `.env` en tu repositorio. Todas las variables deben configurarse en Dokploy como Build Arguments.
 
 ### 4. Configuración de Puerto
 
@@ -94,6 +95,25 @@ Si tu frontend no puede conectarse al backend:
 
 1. Verifica que `VITE_API_URL` apunte al backend correcto
 2. Configura CORS en tu backend para permitir el dominio de Dokploy
+
+### Variables de Entorno no se Aplican
+
+Si después de desplegar ves que la app sigue intentando conectarse a `localhost:3000`:
+
+1. **Verifica los logs de build** en Dokploy - deberías ver una sección que dice:
+   ```
+   === Verificando Variables de Entorno ===
+   VITE_API_URL: https://tu-backend.dokploy.app
+   ```
+
+2. **Si ves `NO DEFINIDA`**, significa que Dokploy no está pasando las variables. Asegúrate de:
+   - Configurar las variables en la sección **"Environment"** de Dokploy
+   - Marcar las variables como **"Build Arguments"** (no solo runtime)
+   - Hacer **"Redeploy"** completo (no solo restart)
+
+3. **Limpia el caché de build** en Dokploy si es necesario
+
+4. **Verifica que la URL del backend sea correcta** (debe incluir `https://` y NO debe terminar en `/api`)
 
 ## 📊 Monitoreo
 

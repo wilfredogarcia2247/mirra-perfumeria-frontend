@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BadgePercent, Check, Loader2, Pencil, Plus, Power, RefreshCw, TicketPercent, Users } from 'lucide-react';
+import { BadgePercent, Check, Loader2, Pencil, Plus, Power, RefreshCw, TicketPercent, Users, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Layout } from '@/components/Layout';
+import ImageUpload from '@/components/ImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   createColaborador,
+  createInfluencerCommissionPayment,
   createCupon,
   getColaboradores,
   getCupones,
   getUsosCupon,
+  getInfluencerCommissionPayments,
+  getUsuariosInfluencer,
   setColaboradorActivo,
   setCuponActivo,
   updateColaborador,
@@ -19,6 +23,9 @@ import {
 type Tab = 'cupones' | 'colaboradores';
 type Coupon = Record<string, any> & { id: number; codigo: string; descuento_porcentaje: number; activo: boolean };
 type Collaborator = Record<string, any> & { id: number; nombre: string; tipo: string; activo: boolean };
+type InfluencerUser = { id: number; nombre: string; email: string };
+type CommissionPayment = { id: number; monto: number | string; fecha_corte: string; fecha_pago: string; referencia: string; comprobante_url?: string | null; observaciones?: string | null };
+type CommissionPaymentSummary = { fecha_corte: string; generado: number | string; pagado: number | string; disponible: number | string };
 
 const emptyCoupon = {
   codigo: '',
@@ -40,6 +47,7 @@ const emptyCollaborator = {
   tiktok: '',
   youtube: '',
   tipo: 'influencer',
+  porcentaje_comision: '10',
   usuario_id: '',
   observaciones: '',
   activo: true,
@@ -53,10 +61,22 @@ function unwrap<T>(response: any): T[] {
 
 function dateInputValue(value?: string | null) {
   if (!value) return '';
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const [year, month, day] = value.slice(0, 10).split('-');
+    return `${day}/${month}/${year}`;
+  }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function parseDateDmy(value: string) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const iso = `${year}-${month}-${day}`;
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
 }
 
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
@@ -70,10 +90,22 @@ function Field({ label, children, className = '' }: { label: string; children: R
 
 const inputClass = 'w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+function currentSundayDate() {
+  const date = new Date();
+  date.setDate(date.getDate() - date.getDay());
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateDmy(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '';
+}
+
 export default function Cupones() {
   const [tab, setTab] = useState<Tab>('cupones');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [influencerUsers, setInfluencerUsers] = useState<InfluencerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [couponForm, setCouponForm] = useState<any>(emptyCoupon);
@@ -83,13 +115,23 @@ export default function Cupones() {
   const [expandedCouponId, setExpandedCouponId] = useState<number | null>(null);
   const [couponUses, setCouponUses] = useState<Record<number, any[]>>({});
   const [loadingUsesId, setLoadingUsesId] = useState<number | null>(null);
+  const [commissionPaymentCollaboratorId, setCommissionPaymentCollaboratorId] = useState<number | null>(null);
+  const [commissionPaymentForm, setCommissionPaymentForm] = useState({ fecha_corte: '', referencia: '', observaciones: '' });
+  const [commissionReceiptUrl, setCommissionReceiptUrl] = useState('');
+  const [commissionReceiptKey, setCommissionReceiptKey] = useState('');
+  const [commissionCutoffInput, setCommissionCutoffInput] = useState('');
+  const [commissionPayments, setCommissionPayments] = useState<Record<number, CommissionPayment[]>>({});
+  const [commissionPaymentSummaries, setCommissionPaymentSummaries] = useState<Record<number, CommissionPaymentSummary>>({});
+  const [loadingCommissionPaymentsId, setLoadingCommissionPaymentsId] = useState<number | null>(null);
+  const [savingCommissionPaymentId, setSavingCommissionPaymentId] = useState<number | null>(null);
 
   const loadData = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      const [couponsResponse, collaboratorsResponse] = await Promise.all([getCupones(), getColaboradores()]);
+      const [couponsResponse, collaboratorsResponse, usersResponse] = await Promise.all([getCupones(), getColaboradores(), getUsuariosInfluencer()]);
       setCoupons(unwrap<Coupon>(couponsResponse));
       setCollaborators(unwrap<Collaborator>(collaboratorsResponse));
+      setInfluencerUsers(unwrap<InfluencerUser>(usersResponse));
     } catch (error: any) {
       toast.error(error?.message || 'No se pudieron cargar los cupones');
     } finally {
@@ -113,6 +155,12 @@ export default function Cupones() {
 
   const saveCoupon = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const fechaInicio = couponForm.fecha_inicio ? parseDateDmy(couponForm.fecha_inicio) : null;
+    const fechaFin = couponForm.fecha_fin ? parseDateDmy(couponForm.fecha_fin) : null;
+    if ((couponForm.fecha_inicio && !fechaInicio) || (couponForm.fecha_fin && !fechaFin)) {
+      toast.error('Escribe las fechas con el formato DD/MM/AAAA');
+      return;
+    }
     setSaving(true);
     const payload = {
       ...couponForm,
@@ -120,8 +168,8 @@ export default function Cupones() {
       descuento_porcentaje: Number(couponForm.descuento_porcentaje),
       colaborador_id: couponForm.colaborador_id || null,
       uso_maximo: couponForm.uso_maximo || null,
-      fecha_inicio: couponForm.fecha_inicio || null,
-      fecha_fin: couponForm.fecha_fin || null,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
     };
     try {
       if (editingCouponId) {
@@ -146,6 +194,7 @@ export default function Cupones() {
     const payload = {
       ...collaboratorForm,
       nombre: String(collaboratorForm.nombre).trim(),
+      porcentaje_comision: Number(collaboratorForm.porcentaje_comision || 0),
       usuario_id: collaboratorForm.usuario_id || null,
     };
     try {
@@ -182,6 +231,81 @@ export default function Cupones() {
       toast.success(collaborator.activo ? 'Colaborador desactivado' : 'Colaborador activado');
     } catch (error: any) {
       toast.error(error?.message || 'No se pudo cambiar el estado del colaborador');
+    }
+  };
+
+  const toggleCommissionPayments = async (collaboratorId: number) => {
+    if (commissionPaymentCollaboratorId === collaboratorId) {
+      setCommissionPaymentCollaboratorId(null);
+      return;
+    }
+    setCommissionPaymentCollaboratorId(collaboratorId);
+    const fechaCorte = currentSundayDate();
+    setCommissionPaymentForm({ fecha_corte: fechaCorte, referencia: '', observaciones: '' });
+    setCommissionReceiptUrl('');
+    setCommissionReceiptKey('');
+    setCommissionCutoffInput(dateInputValue(fechaCorte));
+    setLoadingCommissionPaymentsId(collaboratorId);
+    try {
+      const response = await getInfluencerCommissionPayments(collaboratorId, fechaCorte);
+      setCommissionPayments((current) => ({ ...current, [collaboratorId]: unwrap<CommissionPayment>(response?.pagos) }));
+      if (response?.resumen) setCommissionPaymentSummaries((current) => ({ ...current, [collaboratorId]: response.resumen }));
+    } catch (error: any) {
+      toast.error(error?.message || 'No se pudo cargar el historial de pagos');
+    } finally {
+      setLoadingCommissionPaymentsId(null);
+    }
+  };
+
+  const updateCommissionCutoff = async (collaboratorId: number, fechaCorte: string) => {
+    setCommissionPaymentForm((current) => ({ ...current, fecha_corte: fechaCorte }));
+    if (!fechaCorte) {
+      setCommissionPaymentSummaries((current) => {
+        const next = { ...current };
+        delete next[collaboratorId];
+        return next;
+      });
+      return;
+    }
+    setLoadingCommissionPaymentsId(collaboratorId);
+    try {
+      const response = await getInfluencerCommissionPayments(collaboratorId, fechaCorte);
+      setCommissionPayments((current) => ({ ...current, [collaboratorId]: unwrap<CommissionPayment>(response?.pagos) }));
+      if (response?.resumen) setCommissionPaymentSummaries((current) => ({ ...current, [collaboratorId]: response.resumen }));
+    } catch (error: any) {
+      toast.error(error?.message || 'No se pudo calcular el cierre');
+    } finally {
+      setLoadingCommissionPaymentsId(null);
+    }
+  };
+
+  const saveCommissionPayment = async (event: React.FormEvent<HTMLFormElement>, collaborator: Collaborator) => {
+    event.preventDefault();
+    const available = Number(commissionPaymentSummaries[collaborator.id]?.disponible || 0);
+    if (!commissionPaymentForm.fecha_corte || parseDateDmy(commissionCutoffInput) !== commissionPaymentForm.fecha_corte || available <= 0 || !commissionPaymentForm.referencia.trim() || !commissionReceiptKey) {
+      toast.error('Selecciona una fecha de corte con saldo, agrega la referencia y carga el comprobante');
+      return;
+    }
+    setSavingCommissionPaymentId(collaborator.id);
+    try {
+      await createInfluencerCommissionPayment(collaborator.id, {
+        fecha_corte: commissionPaymentForm.fecha_corte,
+        referencia: commissionPaymentForm.referencia.trim(),
+        comprobante_key: commissionReceiptKey,
+        observaciones: commissionPaymentForm.observaciones.trim() || undefined,
+      });
+      toast.success('Pago al influencer registrado');
+      setCommissionPaymentForm((current) => ({ ...current, referencia: '', observaciones: '' }));
+      setCommissionReceiptUrl('');
+      setCommissionReceiptKey('');
+      await loadData(false);
+      const response = await getInfluencerCommissionPayments(collaborator.id, commissionPaymentForm.fecha_corte);
+      setCommissionPayments((current) => ({ ...current, [collaborator.id]: unwrap<CommissionPayment>(response?.pagos) }));
+      if (response?.resumen) setCommissionPaymentSummaries((current) => ({ ...current, [collaborator.id]: response.resumen }));
+    } catch (error: any) {
+      toast.error(error?.message || 'No se pudo registrar el pago');
+    } finally {
+      setSavingCommissionPaymentId(null);
     }
   };
 
@@ -230,6 +354,7 @@ export default function Cupones() {
       tiktok: collaborator.tiktok || '',
       youtube: collaborator.youtube || '',
       tipo: collaborator.tipo,
+      porcentaje_comision: String(collaborator.porcentaje_comision ?? (collaborator.tipo === 'influencer' ? 10 : 0)),
       usuario_id: collaborator.usuario_id == null ? '' : String(collaborator.usuario_id),
       observaciones: collaborator.observaciones || '',
       activo: Boolean(collaborator.activo),
@@ -285,11 +410,11 @@ export default function Cupones() {
                     <textarea rows={2} className={inputClass} value={couponForm.descripcion} onChange={(e) => setCouponForm({ ...couponForm, descripcion: e.target.value })} placeholder="Motivo o campaña del cupón" />
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Fecha de inicio">
-                      <input type="date" className={inputClass} value={couponForm.fecha_inicio} onChange={(e) => setCouponForm({ ...couponForm, fecha_inicio: e.target.value })} />
+                    <Field label="Fecha de inicio (DD/MM/AAAA)">
+                      <input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" className={inputClass} value={couponForm.fecha_inicio} onChange={(e) => setCouponForm({ ...couponForm, fecha_inicio: e.target.value })} />
                     </Field>
-                    <Field label="Fecha de fin">
-                      <input type="date" min={couponForm.fecha_inicio || undefined} className={inputClass} value={couponForm.fecha_fin} onChange={(e) => setCouponForm({ ...couponForm, fecha_fin: e.target.value })} />
+                    <Field label="Fecha de fin (DD/MM/AAAA)">
+                      <input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" className={inputClass} value={couponForm.fecha_fin} onChange={(e) => setCouponForm({ ...couponForm, fecha_fin: e.target.value })} />
                     </Field>
                   </div>
                   <Field label="Máximo de usos">
@@ -353,7 +478,7 @@ export default function Cupones() {
                         {loadingUsesId === coupon.id ? <p className="text-xs text-muted-foreground">Cargando...</p> : (couponUses[coupon.id] || []).length === 0 ? <p className="text-xs text-muted-foreground">Aún no hay usos registrados.</p> : couponUses[coupon.id].map((usage: any) => (
                           <div key={usage.id} className="flex flex-wrap justify-between gap-2 rounded border px-3 py-2 text-xs">
                             <span>Pedido #{usage.pedido_venta_id}{usage.nombre_cliente ? ` · ${usage.nombre_cliente}` : ''}</span>
-                            <span>{Number(usage.descuento_aplicado).toFixed(2)} · {new Date(usage.usado_en).toLocaleString()}</span>
+                            <span className="text-right">Descuento ${Number(usage.descuento_aplicado).toFixed(2)} · Comisión ${Number(usage.comision_monto || 0).toFixed(2)} ({Number(usage.porcentaje_comision || 0)}%) · {new Date(usage.usado_en).toLocaleString()}</span>
                           </div>
                         ))}
                       </div>
@@ -401,10 +526,23 @@ export default function Cupones() {
                     <Field label="YouTube">
                       <input className={inputClass} value={collaboratorForm.youtube} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, youtube: e.target.value })} placeholder="Canal o URL" />
                     </Field>
-                    <Field label="ID de usuario (opcional)">
-                      <input type="number" min="1" className={inputClass} value={collaboratorForm.usuario_id} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, usuario_id: e.target.value })} />
+                    <Field label={collaboratorForm.tipo === 'influencer' ? 'Cuenta influencer' : 'ID de usuario (opcional)'}>
+                      {collaboratorForm.tipo === 'influencer' ? (
+                        <select className={inputClass} value={collaboratorForm.usuario_id} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, usuario_id: e.target.value })}>
+                          <option value="">Selecciona una cuenta influencer</option>
+                          {influencerUsers.map((user) => <option key={user.id} value={user.id}>{user.nombre} · {user.email}</option>)}
+                        </select>
+                      ) : (
+                        <input type="number" min="1" className={inputClass} value={collaboratorForm.usuario_id} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, usuario_id: e.target.value })} />
+                      )}
+                      {collaboratorForm.tipo === 'influencer' && influencerUsers.length === 0 && <span className="block text-xs text-muted-foreground">Primero crea un usuario con rol influencer.</span>}
                     </Field>
                   </div>
+                  {collaboratorForm.tipo === 'influencer' && (
+                    <Field label="Comisión por pedido (%)">
+                      <input required type="number" min="0" max="100" step="0.01" className={inputClass} value={collaboratorForm.porcentaje_comision} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, porcentaje_comision: e.target.value })} />
+                    </Field>
+                  )}
                   <Field label="Observaciones">
                     <textarea rows={3} className={inputClass} value={collaboratorForm.observaciones} onChange={(e) => setCollaboratorForm({ ...collaboratorForm, observaciones: e.target.value })} />
                   </Field>
@@ -436,6 +574,13 @@ export default function Cupones() {
                         <span className={`rounded-full px-2 py-1 text-xs ${collaborator.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-muted text-muted-foreground'}`}>{collaborator.activo ? 'Activo' : 'Inactivo'}</span>
                       </div>
                       <p className="break-words text-sm text-muted-foreground">{[collaborator.telefono, collaborator.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}</p>
+                      {collaborator.tipo === 'influencer' && (
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium">Comisión: {Number(collaborator.porcentaje_comision ?? 10).toLocaleString('es-VE')}% · {collaborator.usuario_nombre || (collaborator.usuario_id ? `Usuario #${collaborator.usuario_id}` : 'Sin usuario vinculado')}</p>
+                          <p className="text-xs text-muted-foreground">{Number(collaborator.pedidos_comisionables || 0)} pedidos pagados · Base {Number(collaborator.base_comisionable || 0).toFixed(2)} USD</p>
+                          <p className="text-xs text-muted-foreground">Generada {Number(collaborator.comision_generada || 0).toFixed(2)} · Pagada {Number(collaborator.comision_pagada || 0).toFixed(2)} · Pendiente {Number(collaborator.saldo_pendiente || 0).toFixed(2)} USD</p>
+                        </div>
+                      )}
                       <p className="break-words text-xs text-muted-foreground">{[
                         collaborator.instagram && `Instagram: ${collaborator.instagram}`,
                         collaborator.tiktok && `TikTok: ${collaborator.tiktok}`,
@@ -445,9 +590,66 @@ export default function Cupones() {
                     </div>
                     <div className="flex shrink-0 gap-2 border-t pt-3 sm:border-0 sm:pt-0">
                       <Button size="sm" variant="outline" onClick={() => beginEditCollaborator(collaborator)}><Pencil className="mr-2 h-3.5 w-3.5" /> Editar</Button>
+                      {collaborator.tipo === 'influencer' && <Button size="sm" variant="outline" onClick={() => void toggleCommissionPayments(collaborator.id)}><Wallet className="mr-2 h-3.5 w-3.5" /> {commissionPaymentCollaboratorId === collaborator.id ? 'Cerrar pagos' : 'Pagos'}</Button>}
                       <Button size="sm" variant="outline" onClick={() => void toggleCollaborator(collaborator)}><Power className="mr-2 h-3.5 w-3.5" />{collaborator.activo ? 'Desactivar' : 'Activar'}</Button>
                     </div>
                   </CardContent>
+                  {commissionPaymentCollaboratorId === collaborator.id && (
+                    <CardContent className="space-y-4 border-t bg-muted/20 p-4 sm:p-5">
+                      <div>
+                        <h4 className="text-sm font-semibold">Liquidaciones</h4>
+                        <p className="mt-1 text-xs text-muted-foreground">Saldo disponible: {Number(collaborator.saldo_pendiente || 0).toFixed(2)} USD</p>
+                      </div>
+                      {(() => {
+                        const cutoffSummary = commissionPaymentSummaries[collaborator.id];
+                        const cutoffBalance = Number(cutoffSummary?.disponible || 0);
+                        return (
+                          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => void saveCommissionPayment(event, collaborator)}>
+                            <Field label="Fecha de corte (DD/MM/AAAA)">
+                              <input required type="text" inputMode="numeric" placeholder="DD/MM/AAAA" className={inputClass} value={commissionCutoffInput} onChange={(event) => {
+                                const value = event.target.value;
+                                setCommissionCutoffInput(value);
+                                const isoDate = parseDateDmy(value);
+                                if (isoDate) void updateCommissionCutoff(collaborator.id, isoDate);
+                                else setCommissionPaymentForm((current) => ({ ...current, fecha_corte: '' }));
+                              }} />
+                            </Field>
+                            <div className="grid grid-cols-3 gap-2 rounded-md bg-background p-3 text-xs sm:col-span-2">
+                              <div><p className="text-muted-foreground">Generado al corte</p><p className="mt-1 font-semibold tabular-nums">{Number(cutoffSummary?.generado || 0).toFixed(2)} USD</p></div>
+                              <div><p className="text-muted-foreground">Liquidado</p><p className="mt-1 font-semibold tabular-nums">{Number(cutoffSummary?.pagado || 0).toFixed(2)} USD</p></div>
+                              <div><p className="text-muted-foreground">A pagar en este cierre</p><p className="mt-1 font-semibold tabular-nums text-emerald-800">{cutoffBalance.toFixed(2)} USD</p></div>
+                            </div>
+                            <Field label="Referencia del pago">
+                              <input required className={inputClass} value={commissionPaymentForm.referencia} onChange={(event) => setCommissionPaymentForm({ ...commissionPaymentForm, referencia: event.target.value })} placeholder="Transferencia, pago móvil..." disabled={cutoffBalance <= 0} />
+                            </Field>
+                            <Field label="Observaciones">
+                              <input className={inputClass} value={commissionPaymentForm.observaciones} onChange={(event) => setCommissionPaymentForm({ ...commissionPaymentForm, observaciones: event.target.value })} disabled={cutoffBalance <= 0} />
+                            </Field>
+                            <div className="sm:col-span-2">
+                              <Field label="Comprobante de pago (imagen)">
+                                <ImageUpload onImageUpload={setCommissionReceiptUrl} onKeyUpload={setCommissionReceiptKey} existingImageUrl={commissionReceiptUrl} originalImageUrl={commissionReceiptUrl} />
+                              </Field>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <Button type="submit" disabled={savingCommissionPaymentId === collaborator.id || cutoffBalance <= 0 || loadingCommissionPaymentsId === collaborator.id || !commissionReceiptKey}>
+                                {savingCommissionPaymentId === collaborator.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Cerrar y registrar saldo del corte
+                              </Button>
+                            </div>
+                          </form>
+                        );
+                      })()}
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Historial de pagos</p>
+                        {loadingCommissionPaymentsId === collaborator.id ? <p className="text-sm text-muted-foreground">Cargando pagos...</p> : (commissionPayments[collaborator.id] || []).length === 0 ? <p className="text-sm text-muted-foreground">Aún no hay pagos registrados.</p> : (commissionPayments[collaborator.id] || []).map((payment) => (
+                          <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 border-t py-2 text-sm">
+                            <span>Corte {formatDateDmy(String(payment.fecha_corte))} · Pago {new Date(payment.fecha_pago).toLocaleDateString('es-VE')} · {payment.referencia}{payment.comprobante_url && <> · <a className="text-primary underline" href={payment.comprobante_url} target="_blank" rel="noreferrer">Ver comprobante</a></>}</span>
+                            <span className="font-medium tabular-nums">{Number(payment.monto).toFixed(2)} USD</span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  )}
                 </Card>
               ))}
             </section>
