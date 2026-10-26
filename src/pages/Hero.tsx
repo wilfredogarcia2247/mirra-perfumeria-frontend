@@ -8,11 +8,12 @@ import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { trackCatalogPageView } from '@/lib/google-ads';
 import { toast } from 'sonner';
-import { Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle, TicketPercent, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle, TicketPercent, Check } from 'lucide-react';
 
 import Footer from '@/components/Footer';
 import ProductCarousel from '@/components/SocialMediaCarousel';
 import { useIsMobile } from '@/hooks/use-mobile';
+import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
 interface CuponPublico {
   id: number;
@@ -37,6 +38,10 @@ export default function Hero() {
   const [search, setSearch] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [deliveryReview, setDeliveryReview] = useState<CheckoutDeliveryReview | null>(null);
+  const [confirmOrderRequest, setConfirmOrderRequest] = useState(0);
+  const [editDeliveryRequest, setEditDeliveryRequest] = useState(0);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [tipoDocumento, setTipoDocumento] = useState('V');
@@ -507,31 +512,86 @@ export default function Hero() {
           {/* Backdrop with fade effect */}
           <div
             className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsCartOpen(false)}
+            onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}
           />
 
           {/* Slide-over panel */}
-          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-out animate-in slide-in-from-right">
+          <div className={`relative w-full bg-white shadow-2xl flex flex-col h-full transform transition-all duration-300 ease-out animate-in slide-in-from-right ${isCheckoutOpen ? 'max-w-lg bg-site' : 'max-w-md'}`}>
 
             {/* Header fixed */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 z-10 sticky top-0">
-              <h2 className="text-xl font-bold font-bell-mt text-gray-800 flex items-center gap-2">
-                Tu Carrito
-                <span className="text-sm font-sans font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {cartItems.reduce((acc, item) => acc + item.qty, 0)} items
-                </span>
+            <div className={`flex items-center justify-between px-6 py-4 border-b z-10 sticky top-0 ${isCheckoutOpen ? 'border-primary-900 bg-primary-800 text-white' : 'border-gray-100 bg-gradient-to-r from-white to-gray-50'}`}>
+              <h2 className={`text-xl font-bold font-bell-mt flex items-center gap-2 ${isCheckoutOpen ? 'text-white' : 'text-gray-800'}`}>
+                {isCheckoutOpen ? (
+                  <span>
+                    Finalizar Compra
+                    <span className="mt-1 block font-sans text-xs font-normal text-primary-100">
+                      {isCheckoutOpen ? 'Indica cómo deseas recibir tu pedido.' : deliveryReview ? 'Revisa los productos y confirma tu método de entrega.' : ''}
+                    </span>
+                  </span>
+                ) : 'Tu Carrito'}
+                {!isCheckoutOpen && (
+                  <span className="text-sm font-sans font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {cartItems.reduce((acc, item) => acc + item.qty, 0)} items
+                  </span>
+                )}
               </h2>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                aria-label="Cerrar carrito"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-1">
+                {isCheckoutOpen && (
+                  <button
+                    onClick={() => setIsCheckoutOpen(false)}
+                    className="rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label="Volver al carrito"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}
+                  className={`rounded-full p-2 transition-colors ${isCheckoutOpen ? 'text-gray-300 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                  aria-label="Cerrar carrito"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* Content Area - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-thumb-gray-300">
+            <div             className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-5 py-5' : 'px-6 py-6'}`}>
+              <CheckoutModal
+                open
+                visible={isCheckoutOpen}
+                inline
+                items={cartItems}
+                couponCode={cuponAplicado?.codigo}
+                cartTotal={totalCarrito}
+                formatPrice={formatMonto}
+                onUpdateQty={updateQty}
+                onRemoveItem={removeItem}
+                confirmRequest={confirmOrderRequest}
+                editDeliveryRequest={editDeliveryRequest}
+                initialDelivery={deliveryReview}
+                onReview={(review) => {
+                  setDeliveryReview(review);
+                  setIsCheckoutOpen(false);
+                }}
+                onSubmittingChange={setCheckoutSubmitting}
+                onClose={() => setIsCheckoutOpen(false)}
+                onSuccess={() => {
+                  clear();
+                  quitarCupon();
+                  setDeliveryReview(null);
+                  setIsCartOpen(false);
+                  setIsCheckoutOpen(false);
+                  setNombreCliente('');
+                  setTelefonoCliente('');
+                  setCedulaCliente('');
+                  setTipoDocumento('V');
+                  setClienteId(null);
+                  setClienteExistente(false);
+                  setDocumentoConsultado(false);
+                }}
+              />
+              <div className={isCheckoutOpen ? 'hidden' : ''}>
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
                   <div className="bg-gray-100 p-6 rounded-full">
@@ -549,7 +609,38 @@ export default function Hero() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6 pb-20"> {/* pb-20 for extra scroll space */}
+                <div className="space-y-4 pb-20"> {/* pb-20 for extra scroll space */}
+                  {deliveryReview && (
+                    <>
+                    <section className="rounded-xl border border-[#eadfce] bg-white px-3 py-2" aria-label="Paso 2 de 2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#806747]">Paso 2 de 2 · Revisión</p>
+                      <p className="mt-0.5 text-xs text-gray-600">Verifica productos y entrega antes de confirmar.</p>
+                    </section>
+                    <section className="rounded-xl border border-[#eadfce] bg-[#fbf7f2] px-3 py-2.5" aria-label="Método de entrega seleccionado">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#806747]">Entrega elegida</p>
+                          <p className="mt-0.5 text-sm font-semibold leading-tight text-gray-900">{deliveryReview.method}</p>
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                            {deliveryReview.details.map((detail, index) => (
+                              <p key={`${index}-${detail}`} className="break-words text-xs leading-snug text-gray-600">{detail}</p>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditDeliveryRequest((request) => request + 1);
+                            setIsCheckoutOpen(true);
+                          }}
+                          className="shrink-0 rounded-lg px-1.5 py-0.5 text-xs font-medium text-[#806747] underline underline-offset-2"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </section>
+                    </>
+                  )}
                   {/* Cart Items List */}
                   <div className="space-y-4">
                     {cartItems.map((it) => {
@@ -628,7 +719,7 @@ export default function Hero() {
                   </div>
 
                   {/* Checkout Form */}
-                  {isCheckoutOpen && (
+                  {false && isCheckoutOpen && (
                     <div className="mt-8 pt-6 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <User className="w-4 h-4" /> Datos de Envío
@@ -858,10 +949,11 @@ export default function Hero() {
                   )}
                 </div>
               )}
+              </div>
             </div>
 
             {/* Footer with Total and Actions (Fixed at bottom) */}
-            {cartItems.length > 0 && (
+            {cartItems.length > 0 && !isCheckoutOpen && (
               <div className="border-t border-gray-100 bg-white p-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 sticky bottom-0">
                 {/* Campo de cupón de descuento */}
                 <div className="mb-4">
@@ -928,7 +1020,11 @@ export default function Hero() {
                       {formatMonto(totalCarrito)}
                     </p>
                   </div>
-                  {!isCheckoutOpen && <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">Envío por coordinar</p>}
+                  {!isCheckoutOpen && (
+                    <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">
+                      {deliveryReview?.method || 'Envío por coordinar'}
+                    </p>
+                  )}
                 </div>
 
                 {descuentoCupon > 0 && (
@@ -954,11 +1050,18 @@ export default function Hero() {
                       <Trash2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setIsCheckoutOpen(true)}
-                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
+                      onClick={() => {
+                        if (deliveryReview) {
+                          setConfirmOrderRequest((request) => request + 1);
+                        } else {
+                          setIsCheckoutOpen(true);
+                        }
+                      }}
+                      disabled={checkoutSubmitting}
+                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60"
                     >
-                      <span>Finalizar Compra</span>
-                      <Send className="w-4 h-4" />
+                      <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
+                      {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
                 ) : null}

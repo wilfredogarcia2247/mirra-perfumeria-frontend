@@ -131,6 +131,11 @@ export async function getVentasPorPresentacion(fechaInicio?: string, fechaFin?: 
   return apiFetch(`/pedidos-venta/reportes-presentaciones${qs}`);
 }
 
+export async function getCierreDiario(fecha: string) {
+  const params = new URLSearchParams({ fecha });
+  return apiFetch(`/pedidos-venta/cierre-diario?${params.toString()}`);
+}
+
 export async function getPedidosPaginated(page = 1, limit = 12, estado?: string, conCupon?: boolean) {
   let url = `/pedidos-venta/paginated?page=${page}&limit=${limit}`;
   if (estado) url += `&estado=${encodeURIComponent(estado)}`;
@@ -937,11 +942,18 @@ export async function getCachedTasaActiva(ttl = 60000) {
   }
 }
 
-export async function createTasaCambio(data: { monto: number | string; simbolo: string; descripcion?: string }) {
+type TasaCambioSaveResponse = { pedidos_actualizados_tasa?: number };
+
+export async function createTasaCambio(
+  data: { monto: number | string; simbolo: string; descripcion?: string; activo?: boolean }
+): Promise<TasaCambioSaveResponse> {
   return apiFetch(`/tasas-cambio`, { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function updateTasaCambio(id: number, data: { monto?: number | string; simbolo?: string; descripcion?: string }) {
+export async function updateTasaCambio(
+  id: number,
+  data: { monto?: number | string; simbolo?: string; descripcion?: string; activo?: boolean }
+): Promise<TasaCambioSaveResponse> {
   return apiFetch(`/tasas-cambio/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
@@ -1148,6 +1160,7 @@ export async function createPedidoVentaPublic(data: any) {
     if (!Number.isFinite(n) || n <= 0) {
       throw new Error('tasa_cambio_monto inválida');
     }
+
     payload.tasa_cambio_monto = n;
   }
 
@@ -1226,8 +1239,13 @@ export async function createPedidoVentaPublic(data: any) {
   }
 
   // Validación previa: campos básicos requeridos por el frontend
-  if (!payload.nombre_cliente || String(payload.nombre_cliente).trim() === '') throw new Error('nombre_cliente requerido');
-  if (!payload.telefono || String(payload.telefono).trim() === '') throw new Error('telefono requerido');
+  if (!payload.nombre_cliente || String(payload.nombre_cliente).trim() === '') {
+    throw new Error('nombre_cliente requerido');
+  }
+  if (!payload.telefono || String(payload.telefono).trim() === '') {
+    throw new Error('telefono requerido');
+  }
+  if (!payload.cedula || String(payload.cedula).trim() === '') throw new Error('cedula requerida');
   const lines = Array.isArray(payload.lineas) ? payload.lineas : [];
   if (lines.length === 0) throw new Error('lineas requeridas');
 
@@ -1237,9 +1255,10 @@ export async function createPedidoVentaPublic(data: any) {
   if (payload.cliente_id !== undefined && payload.cliente_id !== null && payload.cliente_id !== '') {
     finalPayload.cliente_id = Number(payload.cliente_id);
   }
-  finalPayload.nombre_cliente = payload.nombre_cliente;
-  finalPayload.telefono = normalizePhoneForWhatsapp(payload.telefono);
+  if (payload.nombre_cliente) finalPayload.nombre_cliente = String(payload.nombre_cliente).trim();
+  if (payload.telefono) finalPayload.telefono = normalizePhoneForWhatsapp(payload.telefono);
   if (payload.cedula !== undefined) finalPayload.cedula = payload.cedula;
+  if (payload.entrega !== undefined) finalPayload.entrega = payload.entrega;
   finalPayload.lineas = lines.map((l: any) => {
     const base: any = { producto_id: l.producto_id ?? l.productId ?? l.id, cantidad: Number(l.cantidad ?? 0) };
     if (l.precio_unitario !== undefined && l.precio_unitario !== null) base.precio_unitario = Number(l.precio_unitario);
@@ -1334,6 +1353,40 @@ export async function createPedidoVentaPublic(data: any) {
     // ignore normalization errors
   }
   return body;
+}
+
+export interface Sucursal {
+  id: number;
+  nombre: string;
+  direccion: string;
+  activa?: boolean;
+}
+
+export async function getSucursalesActivas(): Promise<Sucursal[]> {
+  const response = await fetch(`${API_URL}/sucursales/activas`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const rows = await response.json();
+  if (!Array.isArray(rows)) throw new Error('La respuesta de sucursales no es válida');
+  return rows;
+}
+
+export async function getSucursales(): Promise<Sucursal[]> {
+  return apiFetch('/sucursales');
+}
+
+export async function createSucursal(data: Pick<Sucursal, 'nombre' | 'direccion'>): Promise<Sucursal> {
+  return apiFetch('/sucursales', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateSucursal(id: number, data: Pick<Sucursal, 'nombre' | 'direccion'> & { activa: boolean }): Promise<Sucursal> {
+  return apiFetch(`/sucursales/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteSucursal(id: number): Promise<{ success: boolean }> {
+  return apiFetch(`/sucursales/${id}`, { method: 'DELETE' });
 }
 // src/integrations/api.ts
 

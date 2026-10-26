@@ -51,6 +51,7 @@ export default function TasasCambio() {
     setSimbolo('');
     setMonto('');
     setDescripcion('');
+    setActivo(false);
   }
 
   async function openEdit(id?: number) {
@@ -82,14 +83,12 @@ export default function TasasCambio() {
 
     setSubmitting(true);
     try {
-      const payload = { simbolo: sym, monto: num, descripcion: descripcion || undefined, activo: activo ? true : undefined };
-      if (editingId) {
-        await updateTasaCambio(editingId, payload);
-        toast.success('Tasa actualizada');
-      } else {
-        await createTasaCambio(payload as any);
-        toast.success('Tasa creada');
-      }
+      const payload = { simbolo: sym, monto: num, descripcion: descripcion || undefined, activo };
+      const result = editingId
+        ? await updateTasaCambio(editingId, payload)
+        : await createTasaCambio(payload);
+      const successMessage = editingId ? 'Tasa actualizada' : 'Tasa creada';
+      showSaveResult(successMessage, result);
       setIsOpen(false);
       await load();
     } catch (err) {
@@ -99,6 +98,16 @@ export default function TasasCambio() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function showSaveResult(message: string, result: { pedidos_actualizados_tasa?: number }) {
+    const ordersUpdated = Number(result.pedidos_actualizados_tasa || 0);
+    const synchronizedPendingOrders = result.pedidos_actualizados_tasa != null;
+    toast.success(!synchronizedPendingOrders
+      ? message
+      : ordersUpdated > 0
+        ? `${message}. ${ordersUpdated} pedido(s) pendiente(s) sin pago actualizado(s).`
+        : `${message}. Ningún pedido pendiente sin pago necesitaba cambiar de tasa.`);
   }
 
   async function handleDelete(id: number) {
@@ -124,8 +133,8 @@ export default function TasasCambio() {
     if (!confirmTargetId) return;
     setConfirmLoading(true);
     try {
-      await updateTasaCambio(confirmTargetId, { activo: true });
-      toast.success('Tasa activada');
+      const result = await updateTasaCambio(confirmTargetId, { activo: true });
+      showSaveResult('Tasa activada', result);
       setConfirmOpen(false);
       setConfirmTargetId(null);
       await load();

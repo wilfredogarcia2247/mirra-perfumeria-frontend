@@ -37,6 +37,7 @@ export function loadGoogleAdsTag(): Promise<void> {
 }
 
 export function trackCatalogPageView() {
+  if (import.meta.env.DEV) return;
   if (pageViewSent) return;
   pageViewSent = true;
   void loadGoogleAdsTag().then(() => {

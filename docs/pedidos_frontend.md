@@ -2,6 +2,8 @@
 
 Resumen rápido
 
+El checkout público permite retirar en una sucursal, enviar a una agencia MRW o solicitar delivery. La administración de sucursales está disponible para usuarios autorizados en `/admin/sucursales`; los pedidos muestran su información de entrega en el detalle.
+
 Esta guía recoge los endpoints principales que el frontend debe usar para trabajar con pedidos de venta y la creación de órdenes de producción asociadas.
 
 Endpoints principales

@@ -4,7 +4,7 @@ import { loadGoogleAdsTag } from '@/lib/google-ads';
 
 export default function PublicSite() {
   useEffect(() => {
-    void loadGoogleAdsTag();
+    if (!import.meta.env.DEV) void loadGoogleAdsTag();
   }, []);
 
   return <Outlet />;

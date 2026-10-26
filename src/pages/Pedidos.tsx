@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy } from 'lucide-react';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -755,6 +755,95 @@ export default function Pedidos() {
     const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
     return { base, descuentos, recargos, final };
   }, [selectedPedido]);
+
+  const copiarPedidoParaWhatsApp = async () => {
+    if (!selectedPedido) return;
+    if (ajustesDirty) {
+      toast.error('Guarda los descuentos o recargos antes de copiar el pedido');
+      return;
+    }
+
+    const customerName = String(selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'cliente')
+      .trim()
+      .split(/\s+/)[0];
+    const products = Array.isArray(selectedPedido.productos) ? selectedPedido.productos : [];
+    if (products.length === 0) {
+      toast.error('Este pedido no tiene productos para copiar');
+      return;
+    }
+
+    const productLines = products.map((product: any) => {
+      const name = String(
+        product.producto_nombre
+        || product.nombre_producto
+        || product.producto?.nombre
+        || product.producto?.name
+        || product.nombre
+        || product.name
+        || 'Producto',
+      ).trim();
+      const quantity = Number(product.cantidad);
+      return `- ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
+    });
+    const exchangeRate = fmtTasa(selectedPedido);
+    const formatMoney = (amount: number) => roundMoney(exchangeRate ? amount * exchangeRate : amount)
+      .toLocaleString('es-VE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const currencyLabel = exchangeRate ? 'BS' : '$';
+    const breakdown: string[] = [];
+    const savedAdjustments = Array.isArray(selectedPedido.ajustes)
+      ? selectedPedido.ajustes.map(adaptAjusteFromApi)
+      : [];
+    const appliedAdjustments = computeAjustesSummary(persistedTotals.base, savedAdjustments).ajustes;
+
+    if (persistedTotals.base > 0) {
+      breakdown.push(`Subtotal: ${currencyLabel} ${formatMoney(persistedTotals.base)}`);
+    }
+    for (const adjustment of appliedAdjustments) {
+      const amount = adjustment.modo === 'porcentaje'
+        ? roundMoney(persistedTotals.base * (adjustment.valor / 100))
+        : roundMoney(adjustment.valor);
+      const sign = adjustment.tipo === 'descuento' ? '-' : '+';
+      const valueLabel = adjustment.modo === 'porcentaje'
+        ? `${adjustment.valor}%`
+        : `${currencyLabel} ${formatMoney(adjustment.valor)}`;
+      const reason = adjustment.motivo ? ` · ${adjustment.motivo}` : '';
+      breakdown.push(
+        `${adjustment.tipo === 'descuento' ? 'Descuento' : 'Recargo'} ${valueLabel}${reason}: ${sign} ${currencyLabel} ${formatMoney(amount)}`,
+      );
+    }
+
+    const couponDiscount = roundMoney(selectedPedido.descuento_cupon ?? 0);
+    if (couponDiscount > 0) {
+      const couponCode = String(selectedPedido.cupon_codigo || '').trim();
+      const couponPercent = fmtCuponPct(selectedPedido);
+      const couponLabel = couponCode
+        ? `Descuento cupón ${couponCode}${couponPercent ? ` (${couponPercent})` : ''}`
+        : `Descuento cupón${couponPercent ? ` (${couponPercent})` : ''}`;
+      breakdown.push(`${couponLabel}: - ${currencyLabel} ${formatMoney(couponDiscount)}`);
+    }
+
+    const formattedTotal = formatMoney(persistedTotals.final);
+    const totalLabel = `${currencyLabel} ${formattedTotal}`;
+    const message = [
+      `Hola ${customerName}, hemos recibido tu pedido y queremos confirmarlo.`,
+      '',
+      ...productLines,
+      ...(breakdown.length > 0 ? ['', ...breakdown] : []),
+      '',
+      `Total a pagar: ${totalLabel}`,
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success('Pedido copiado para enviar por WhatsApp');
+    } catch (error) {
+      console.error('No se pudo copiar el pedido al portapapeles:', error);
+      toast.error('No se pudo copiar el pedido. Revisa los permisos del navegador.');
+    }
+  };
 
   // Datos del cupón aplicado al pedido abierto
   const cuponDetalle = React.useMemo(() => {
@@ -2018,6 +2107,45 @@ export default function Pedidos() {
                   <span>Cargando...</span>
                 )}
               </DialogDescription>
+              {selectedPedido?.tipo_entrega && (
+                <div className="rounded-lg border border-copper-200 bg-copper-50 px-3 py-2 text-sm text-copper-900">
+                  {(() => {
+                    const details = selectedPedido.datos_entrega || {};
+                    const type = String(selectedPedido.tipo_entrega);
+                    const locationLink = details.ubicacion_link
+                      || (details.ubicacion_latitud != null && details.ubicacion_longitud != null
+                        ? `https://www.google.com/maps/search/?api=1&query=${details.ubicacion_latitud},${details.ubicacion_longitud}`
+                        : null);
+                    return (
+                      <>
+                        <p className="font-semibold">
+                          {type === 'tienda' ? 'Retiro en tienda' : type === 'envio_nacional' ? `Envío nacional · ${details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}` : 'Delivery'}
+                        </p>
+                        {type === 'tienda' && (
+                          <>
+                            <p>{details.sucursal_nombre || 'Sucursal'}</p>
+                            {details.sucursal_direccion && <p>{details.sucursal_direccion}</p>}
+                          </>
+                        )}
+                        {type === 'envio_nacional' && (
+                          <>
+                            <p>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</p>
+                            {(details.agencia_codigo || details.agencia_mrw_codigo) && (
+                              <p>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</p>
+                            )}
+                            <p>Dirección: {details.agencia_direccion || details.agencia_mrw_direccion || '-'}</p>
+                          </>
+                        )}
+                        {type === 'delivery' && locationLink && (
+                          <a className="mt-1 inline-block underline" href={locationLink} target="_blank" rel="noreferrer">
+                            Ver ubicación de delivery en Google Maps
+                          </a>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
               {cuponDetalle && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   <TicketPercent className="w-4 h-4 shrink-0" />
@@ -2039,7 +2167,17 @@ export default function Pedidos() {
                 <div className={`space-y-6 ${showPaymentInline ? 'hidden' : ''}`}>
                   <div className="flex justify-between items-center">
                     <div />
-                    <div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copiarPedidoParaWhatsApp()}
+                        disabled={ajustesDirty || detailLoading}
+                        title={ajustesDirty ? 'Guarda los descuentos o recargos antes de copiar' : 'Copiar mensaje de confirmación para WhatsApp'}
+                      >
+                        <ClipboardCopy className="mr-2 h-4 w-4" />
+                        Copiar pedido
+                      </Button>
                       <Button size="sm" variant="outline" onClick={async () => { await loadProductosOptions(); setAddProductId(null); setAddPresentacionId(null); setAddPrecio(null); setAddCantidad(1); setProductSearchTerm(''); setShowProductDropdown(false); setAddModalOpen(true); }}>Agregar producto</Button>
                     </div>
                   </div>
@@ -2154,7 +2292,7 @@ export default function Pedidos() {
                             </td>
                             <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
                             <td className="py-2">{typeof it.costo === 'number' ? `$${it.costo.toFixed(2)}` : it.costo}</td>
-                            <td className="py-2">{it.cantidad}</td>
+                            <td className="py-2" style={{ textAlign: 'center' }}>{it.cantidad}</td>
                             <td className="py-2">{typeof it.subtotal === 'number' ? `$${it.subtotal.toFixed(2)}` : it.subtotal}</td>
                             <td className="py-2">
                               {it.produccion_creada ? (
