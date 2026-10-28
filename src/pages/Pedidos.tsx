@@ -621,9 +621,17 @@ export default function Pedidos() {
     setAjustesError(null);
   }, []);
 
+  // Vista previa de los ajustes sin guardar. El descuento del cupón también se resta,
+  // igual que hace el backend al calcular el total del pedido.
   const ajustesPreview = React.useMemo(() => {
     const base = Number(selectedPedido?.total_base ?? 0);
-    return computeAjustesSummary(base, ajustesDraft);
+    const summary = computeAjustesSummary(base, ajustesDraft);
+    const descuentoCupon = roundMoney(selectedPedido?.descuento_cupon ?? 0);
+    return {
+      ...summary,
+      descuento_cupon: descuentoCupon,
+      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon)),
+    };
   }, [selectedPedido, ajustesDraft]);
 
   const handleAddAjuste = () => {
@@ -748,12 +756,14 @@ export default function Pedidos() {
   };
 
   const persistedTotals = React.useMemo(() => {
-    if (!selectedPedido) return { base: 0, descuentos: 0, recargos: 0, final: 0 };
+    if (!selectedPedido) return { base: 0, descuentos: 0, descuentosAjustes: 0, recargos: 0, final: 0 };
     const base = roundMoney(selectedPedido?.total_base ?? selectedPedido?.total ?? 0);
     const descuentos = roundMoney(selectedPedido?.total_descuentos ?? 0);
+    // total_descuentos del backend incluye el cupón; el cupón ya se muestra en su propia línea
+    const descuentosAjustes = Math.max(0, roundMoney(descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0)));
     const recargos = roundMoney(selectedPedido?.total_recargos ?? 0);
     const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
-    return { base, descuentos, recargos, final };
+    return { base, descuentos, descuentosAjustes, recargos, final };
   }, [selectedPedido]);
 
   const copiarPedidoParaWhatsApp = async () => {
@@ -2393,6 +2403,7 @@ export default function Pedidos() {
                       </div>
                       <div className="mt-3 text-xs text-muted-foreground">
                         Vista previa: Subtotal ${ajustesPreview.total_base.toFixed(2)}
+                        {ajustesPreview.descuento_cupon > 0 && ` - cupón $${ajustesPreview.descuento_cupon.toFixed(2)}`}
                         {ajustesPreview.total_descuentos > 0 && ` - $${ajustesPreview.total_descuentos.toFixed(2)}`}
                         {ajustesPreview.total_recargos > 0 && ` + $${ajustesPreview.total_recargos.toFixed(2)}`}
                         {' = '}
@@ -2409,8 +2420,8 @@ export default function Pedidos() {
                             - Cupón {cuponDetalle.codigo}{cuponDetalle.pct ? ` (${cuponDetalle.pct})` : ''}: ${cuponDetalle.descuento.toFixed(2)}
                           </div>
                         )}
-                        {persistedTotals.descuentos > 0 && (
-                          <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentos.toFixed(2)}</div>
+                        {persistedTotals.descuentosAjustes > 0 && (
+                          <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentosAjustes.toFixed(2)}</div>
                         )}
                         {persistedTotals.recargos > 0 && (
                           <div className="text-sm text-rose-600">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
