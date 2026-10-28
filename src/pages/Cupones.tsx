@@ -90,9 +90,8 @@ function Field({ label, children, className = '' }: { label: string; children: R
 
 const inputClass = 'w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-function currentSundayDate() {
+function currentLocalDate() {
   const date = new Date();
-  date.setDate(date.getDate() - date.getDay());
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
@@ -240,7 +239,7 @@ export default function Cupones() {
       return;
     }
     setCommissionPaymentCollaboratorId(collaboratorId);
-    const fechaCorte = currentSundayDate();
+    const fechaCorte = currentLocalDate();
     setCommissionPaymentForm({ fecha_corte: fechaCorte, referencia: '', observaciones: '' });
     setCommissionReceiptUrl('');
     setCommissionReceiptKey('');
@@ -288,13 +287,17 @@ export default function Cupones() {
     }
     setSavingCommissionPaymentId(collaborator.id);
     try {
-      await createInfluencerCommissionPayment(collaborator.id, {
+      const result = await createInfluencerCommissionPayment(collaborator.id, {
         fecha_corte: commissionPaymentForm.fecha_corte,
         referencia: commissionPaymentForm.referencia.trim(),
         comprobante_key: commissionReceiptKey,
         observaciones: commissionPaymentForm.observaciones.trim() || undefined,
       });
       toast.success('Pago al influencer registrado');
+      const cuponesDesactivados: string[] = Array.isArray(result?.cupones_desactivados) ? result.cupones_desactivados : [];
+      if (cuponesDesactivados.length) {
+        toast.info(`Cupón(es) desactivado(s) tras el corte: ${cuponesDesactivados.join(', ')}. Crea un código nuevo si el influencer sigue vendiendo.`);
+      }
       setCommissionPaymentForm((current) => ({ ...current, referencia: '', observaciones: '' }));
       setCommissionReceiptUrl('');
       setCommissionReceiptKey('');
