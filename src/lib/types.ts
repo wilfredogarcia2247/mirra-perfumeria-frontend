@@ -11,6 +11,10 @@ export interface Product {
   price_venta?: number;
   stock?: number;
   tamanos?: Array<any>;
+  formulas?: Array<any>;
+  inventario?: Array<any>;
+  categoria_obj?: any;
+  marca_obj?: any;
 }
 
 export type ProductListResponse =

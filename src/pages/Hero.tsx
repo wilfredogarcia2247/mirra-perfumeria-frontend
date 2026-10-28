@@ -113,7 +113,7 @@ export default function Hero() {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    (async () => {
+    const load = async () => {
       try {
         const res = await getCatalogoPaginated({});
         // getCatalogoPaginated normaliza a { items, meta }
@@ -154,7 +154,8 @@ export default function Hero() {
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
+    };
+    load();
     return () => { mounted = false; };
   }, []);
 
@@ -344,7 +345,9 @@ export default function Hero() {
             {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${selectedCategory.split('-').join(' ')}`}
           </h2>
           <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
-          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.</p>
+          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">
+            {categorySlug ? `Explora nuestra selección de ${categorySlug.replace(/-/g, ' ')}` : 'Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.'}
+          </p>
         </div>
         <div className="mb-8 sm:mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
           <div className="w-full md:w-2/3">
@@ -388,7 +391,7 @@ export default function Hero() {
               disabled={page === 1}
               title="Ir a la primera página"
             >
-              ⏮ Primera
+              ⏮ Inicio
             </button>
 
             {/* Previous page */}

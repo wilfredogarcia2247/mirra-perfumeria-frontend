@@ -90,9 +90,8 @@ function Field({ label, children, className = '' }: { label: string; children: R
 
 const inputClass = 'w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-function currentSundayDate() {
+function currentLocalDate() {
   const date = new Date();
-  date.setDate(date.getDate() - date.getDay());
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
@@ -118,6 +117,7 @@ export default function Cupones() {
   const [commissionPaymentCollaboratorId, setCommissionPaymentCollaboratorId] = useState<number | null>(null);
   const [commissionPaymentForm, setCommissionPaymentForm] = useState({ fecha_corte: '', referencia: '', observaciones: '' });
   const [commissionReceiptUrl, setCommissionReceiptUrl] = useState('');
+  const [commissionReceiptKey, setCommissionReceiptKey] = useState('');
   const [commissionCutoffInput, setCommissionCutoffInput] = useState('');
   const [commissionPayments, setCommissionPayments] = useState<Record<number, CommissionPayment[]>>({});
   const [commissionPaymentSummaries, setCommissionPaymentSummaries] = useState<Record<number, CommissionPaymentSummary>>({});
@@ -239,9 +239,10 @@ export default function Cupones() {
       return;
     }
     setCommissionPaymentCollaboratorId(collaboratorId);
-    const fechaCorte = currentSundayDate();
+    const fechaCorte = currentLocalDate();
     setCommissionPaymentForm({ fecha_corte: fechaCorte, referencia: '', observaciones: '' });
     setCommissionReceiptUrl('');
+    setCommissionReceiptKey('');
     setCommissionCutoffInput(dateInputValue(fechaCorte));
     setLoadingCommissionPaymentsId(collaboratorId);
     try {
@@ -280,21 +281,26 @@ export default function Cupones() {
   const saveCommissionPayment = async (event: React.FormEvent<HTMLFormElement>, collaborator: Collaborator) => {
     event.preventDefault();
     const available = Number(commissionPaymentSummaries[collaborator.id]?.disponible || 0);
-    if (!commissionPaymentForm.fecha_corte || parseDateDmy(commissionCutoffInput) !== commissionPaymentForm.fecha_corte || available <= 0 || !commissionPaymentForm.referencia.trim() || !commissionReceiptUrl) {
+    if (!commissionPaymentForm.fecha_corte || parseDateDmy(commissionCutoffInput) !== commissionPaymentForm.fecha_corte || available <= 0 || !commissionPaymentForm.referencia.trim() || !commissionReceiptKey) {
       toast.error('Selecciona una fecha de corte con saldo, agrega la referencia y carga el comprobante');
       return;
     }
     setSavingCommissionPaymentId(collaborator.id);
     try {
-      await createInfluencerCommissionPayment(collaborator.id, {
+      const result = await createInfluencerCommissionPayment(collaborator.id, {
         fecha_corte: commissionPaymentForm.fecha_corte,
         referencia: commissionPaymentForm.referencia.trim(),
-        comprobante_url: commissionReceiptUrl,
+        comprobante_key: commissionReceiptKey,
         observaciones: commissionPaymentForm.observaciones.trim() || undefined,
       });
       toast.success('Pago al influencer registrado');
+      const cuponesDesactivados: string[] = Array.isArray(result?.cupones_desactivados) ? result.cupones_desactivados : [];
+      if (cuponesDesactivados.length) {
+        toast.info(`Cupón(es) desactivado(s) tras el corte: ${cuponesDesactivados.join(', ')}. Crea un código nuevo si el influencer sigue vendiendo.`);
+      }
       setCommissionPaymentForm((current) => ({ ...current, referencia: '', observaciones: '' }));
       setCommissionReceiptUrl('');
+      setCommissionReceiptKey('');
       await loadData(false);
       const response = await getInfluencerCommissionPayments(collaborator.id, commissionPaymentForm.fecha_corte);
       setCommissionPayments((current) => ({ ...current, [collaborator.id]: unwrap<CommissionPayment>(response?.pagos) }));
@@ -624,11 +630,11 @@ export default function Cupones() {
                             </Field>
                             <div className="sm:col-span-2">
                               <Field label="Comprobante de pago (imagen)">
-                                <ImageUpload onImageUpload={setCommissionReceiptUrl} existingImageUrl={commissionReceiptUrl} originalImageUrl={commissionReceiptUrl} />
+                                <ImageUpload onImageUpload={setCommissionReceiptUrl} onKeyUpload={setCommissionReceiptKey} existingImageUrl={commissionReceiptUrl} originalImageUrl={commissionReceiptUrl} />
                               </Field>
                             </div>
                             <div className="sm:col-span-2">
-                              <Button type="submit" disabled={savingCommissionPaymentId === collaborator.id || cutoffBalance <= 0 || loadingCommissionPaymentsId === collaborator.id || !commissionReceiptUrl}>
+                              <Button type="submit" disabled={savingCommissionPaymentId === collaborator.id || cutoffBalance <= 0 || loadingCommissionPaymentsId === collaborator.id || !commissionReceiptKey}>
                                 {savingCommissionPaymentId === collaborator.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Cerrar y registrar saldo del corte
                               </Button>

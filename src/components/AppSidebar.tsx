@@ -159,7 +159,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border p-4">
+      <SidebarHeader className="border-b border-sidebar-border p-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 ring-1 ring-primary/30">
             <img src="/logo.png" alt="Mirra" className="h-5 w-5 object-contain" />
@@ -173,23 +173,26 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="py-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <SidebarContent
+        className="py-1.5 gap-0.5"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.25) transparent' }}
+      >
         {menuGroups.map((group, groupIndex) => {
           const visibleItems = group.items.filter(isItemVisible);
           if (visibleItems.length === 0) return null;
           return (
             <React.Fragment key={group.label}>
               {groupIndex > 0 && (
-                <div className="mx-3 my-1 h-px bg-sidebar-border/60" aria-hidden="true" />
+                <div className="mx-3 my-0.5 h-px bg-sidebar-border/60" aria-hidden="true" />
               )}
               <SidebarGroup className="py-0">
                 {open && (
-                  <SidebarGroupLabel className="px-3 py-1 text-[9.5px] font-medium tracking-widest text-sidebar-foreground/30 uppercase">
+                  <SidebarGroupLabel className="px-3 py-0.5 text-[9.5px] font-medium tracking-widest text-sidebar-foreground/30 uppercase">
                     {group.label}
                   </SidebarGroupLabel>
                 )}
                 <SidebarGroupContent>
-                  <SidebarMenu>
+                  <SidebarMenu className="gap-0.5">
                     {visibleItems.map((item) => {
                       const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
                       return (
@@ -198,13 +201,13 @@ export function AppSidebar() {
                             <SidebarMenuButton
                               onClick={() => navigate(item.url)}
                               isActive={isActive}
-                              className={`flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-md transition-colors duration-150 ${isActive ? item.module === 'influencer' ? 'relative bg-amber-100 pl-[calc(0.75rem+3px)] font-medium text-amber-950 data-[active=true]:bg-amber-100 data-[active=true]:text-amber-950 before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-amber-700' : activeItemClass : inactiveItemClass}`}
+                              className={`flex items-center gap-3 px-3 py-1.5 min-h-[34px] rounded-md transition-colors duration-150 ${isActive ? item.module === 'influencer' ? 'relative bg-amber-100 pl-[calc(0.75rem+3px)] font-medium text-amber-950 data-[active=true]:bg-amber-100 data-[active=true]:text-amber-950 before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-amber-700' : activeItemClass : inactiveItemClass}`}
                               title={!open ? item.title : undefined}
                             >
                               <span className="flex items-center justify-center w-5 h-5 shrink-0">
-                                <item.icon className="h-[18px] w-[18px]" />
+                                <item.icon className="h-[17px] w-[17px]" />
                               </span>
-                              {open && <span className="flex-1 text-[13px]">{item.title}</span>}
+                              {open && <span className="flex-1 text-[12.5px]">{item.title}</span>}
                             </SidebarMenuButton>
                           </SidebarMenuItem>
 

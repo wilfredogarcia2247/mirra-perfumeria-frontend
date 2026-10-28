@@ -724,7 +724,7 @@ export async function getInfluencerCommissionPayments(colaboradorId: number, fec
   return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos${query}`);
 }
 
-export async function createInfluencerCommissionPayment(colaboradorId: number, data: { fecha_corte: string; referencia: string; comprobante_url: string; observaciones?: string }) {
+export async function createInfluencerCommissionPayment(colaboradorId: number, data: { fecha_corte: string; referencia: string; comprobante_key: string; observaciones?: string }) {
   return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos`, { method: 'POST', body: JSON.stringify(data) });
 }
 

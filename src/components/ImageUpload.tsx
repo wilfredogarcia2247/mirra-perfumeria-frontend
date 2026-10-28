@@ -6,11 +6,12 @@ import { uploadImage as uploadImageToAPI } from '@/integrations/api';
 
 interface ImageUploadProps {
   onImageUpload: (url: string) => void;
+  onKeyUpload?: (key: string) => void;
   existingImageUrl?: string;
   originalImageUrl?: string;
 }
 
-export default function ImageUpload({ onImageUpload, existingImageUrl, originalImageUrl }: ImageUploadProps) {
+export default function ImageUpload({ onImageUpload, onKeyUpload, existingImageUrl, originalImageUrl }: ImageUploadProps) {
   const normalizePreviewUrl = (url: string) => {
     if (!url) return '';
     if (/^data:|^blob:/i.test(url)) return url;
@@ -83,6 +84,7 @@ export default function ImageUpload({ onImageUpload, existingImageUrl, originalI
         const httpUrl = normalizePreviewUrl(response.url);
         setPreviewUrl(httpUrl);
         onImageUpload(httpUrl);
+        if (response.key) onKeyUpload?.(response.key);
         setUploadSuccess(true);
         toast.success('Imagen subida correctamente');
       } else {
