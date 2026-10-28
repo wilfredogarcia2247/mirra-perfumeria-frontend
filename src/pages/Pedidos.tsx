@@ -70,6 +70,36 @@ const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummar
   };
 };
 
+// Líneas del método de entrega para el mensaje de WhatsApp (mismos datos que el detalle del pedido)
+const buildDeliveryLines = (pedido: any): string[] => {
+  const type = String(pedido?.tipo_entrega || '');
+  if (!type) return [];
+  const details = pedido?.datos_entrega || {};
+  const lines = ['🚚 *Método de entrega*'];
+  if (type === 'tienda') {
+    lines.push('🏬 Retiro en tienda');
+    if (details.sucursal_nombre) lines.push(details.sucursal_nombre);
+    if (details.sucursal_direccion) lines.push(`📍 ${details.sucursal_direccion}`);
+  } else if (type === 'envio_nacional') {
+    const carrier = details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW';
+    const agencyCode = details.agencia_codigo || details.agencia_mrw_codigo;
+    const agencyAddress = details.agencia_direccion || details.agencia_mrw_direccion;
+    lines.push(`📦 Envío nacional por ${carrier}`);
+    if (agencyCode) lines.push(`Agencia: ${agencyCode}`);
+    if (agencyAddress) lines.push(`📍 ${agencyAddress}`);
+  } else if (type === 'delivery') {
+    const locationLink = details.ubicacion_link
+      || (details.ubicacion_latitud != null && details.ubicacion_longitud != null
+        ? `https://www.google.com/maps/search/?api=1&query=${details.ubicacion_latitud},${details.ubicacion_longitud}`
+        : null);
+    lines.push('🛵 Delivery');
+    if (locationLink) lines.push(`📍 Ubicación: ${locationLink}`);
+  } else {
+    lines.push(type);
+  }
+  return lines;
+};
+
 const adaptAjusteFromApi = (aj: any): AjusteDraft => {
   const tipo = String(aj?.tipo || '').toLowerCase() === 'recargo' ? 'recargo' : 'descuento';
   const modo = String(aj?.modo || '').toLowerCase() === 'monto' ? 'monto' : 'porcentaje';
@@ -793,7 +823,7 @@ export default function Pedidos() {
         || 'Producto',
       ).trim();
       const quantity = Number(product.cantidad);
-      return `- ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
+      return `• ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
     });
     const exchangeRate = fmtTasa(selectedPedido);
     const formatMoney = (amount: number) => roundMoney(exchangeRate ? amount * exchangeRate : amount)
@@ -801,7 +831,8 @@ export default function Pedidos() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    const currencyLabel = exchangeRate ? 'BS' : '$';
+    const currencyLabel = exchangeRate ? 'Bs' : '$';
+    const money = (amount: number) => `${currencyLabel} ${formatMoney(amount)}`;
     const breakdown: string[] = [];
     const savedAdjustments = Array.isArray(selectedPedido.ajustes)
       ? selectedPedido.ajustes.map(adaptAjusteFromApi)
@@ -809,41 +840,44 @@ export default function Pedidos() {
     const appliedAdjustments = computeAjustesSummary(persistedTotals.base, savedAdjustments).ajustes;
 
     if (persistedTotals.base > 0) {
-      breakdown.push(`Subtotal: ${currencyLabel} ${formatMoney(persistedTotals.base)}`);
-    }
-    for (const adjustment of appliedAdjustments) {
-      const amount = adjustment.modo === 'porcentaje'
-        ? roundMoney(persistedTotals.base * (adjustment.valor / 100))
-        : roundMoney(adjustment.valor);
-      const sign = adjustment.tipo === 'descuento' ? '-' : '+';
-      const valueLabel = adjustment.modo === 'porcentaje'
-        ? `${adjustment.valor}%`
-        : `${currencyLabel} ${formatMoney(adjustment.valor)}`;
-      const reason = adjustment.motivo ? ` · ${adjustment.motivo}` : '';
-      breakdown.push(
-        `${adjustment.tipo === 'descuento' ? 'Descuento' : 'Recargo'} ${valueLabel}${reason}: ${sign} ${currencyLabel} ${formatMoney(amount)}`,
-      );
+      breakdown.push(`Subtotal: ${money(persistedTotals.base)}`);
     }
 
     const couponDiscount = roundMoney(selectedPedido.descuento_cupon ?? 0);
     if (couponDiscount > 0) {
       const couponCode = String(selectedPedido.cupon_codigo || '').trim();
       const couponPercent = fmtCuponPct(selectedPedido);
-      const couponLabel = couponCode
-        ? `Descuento cupón ${couponCode}${couponPercent ? ` (${couponPercent})` : ''}`
-        : `Descuento cupón${couponPercent ? ` (${couponPercent})` : ''}`;
-      breakdown.push(`${couponLabel}: - ${currencyLabel} ${formatMoney(couponDiscount)}`);
+      breakdown.push(`🎟️ Cupón${couponCode ? ` ${couponCode}` : ''}${couponPercent ? ` (${couponPercent})` : ''}: - ${money(couponDiscount)}`);
     }
 
-    const formattedTotal = formatMoney(persistedTotals.final);
-    const totalLabel = `${currencyLabel} ${formattedTotal}`;
+    for (const adjustment of appliedAdjustments) {
+      const amount = adjustment.modo === 'porcentaje'
+        ? roundMoney(persistedTotals.base * (adjustment.valor / 100))
+        : roundMoney(adjustment.valor);
+      const isDiscount = adjustment.tipo === 'descuento';
+      const valueLabel = adjustment.modo === 'porcentaje' ? ` ${adjustment.valor}%` : '';
+      const reason = adjustment.motivo ? ` (${adjustment.motivo})` : '';
+      breakdown.push(
+        `${isDiscount ? '➖ Descuento' : '➕ Recargo'}${valueLabel}${reason}: ${isDiscount ? '-' : '+'} ${money(amount)}`,
+      );
+    }
+
+    const deliveryLines = buildDeliveryLines(selectedPedido);
     const message = [
-      `Hola ${customerName}, hemos recibido tu pedido y queremos confirmarlo.`,
+      `¡Hola, ${customerName}! 👋✨`,
+      'Recibimos tu pedido y queremos confirmarlo contigo.',
       '',
+      `🧾 *Pedido #${selectedPedido.id}*`,
+      '',
+      '🛍️ *Productos*',
       ...productLines,
-      ...(breakdown.length > 0 ? ['', ...breakdown] : []),
       '',
-      `Total a pagar: ${totalLabel}`,
+      '💰 *Resumen*',
+      ...breakdown,
+      `*Total a pagar: ${money(persistedTotals.final)}*`,
+      ...(deliveryLines.length > 0 ? ['', ...deliveryLines] : []),
+      '',
+      'Por favor, confírmanos si todo está correcto ✅',
     ].join('\n');
 
     try {
@@ -891,6 +925,8 @@ export default function Pedidos() {
   // Estados para eliminar línea de pedido
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteLine, setDeleteLine] = useState<any | null>(null);
+  // Unidades a quitar de la línea (solo se pregunta si la línea tiene más de 1 unidad)
+  const [deleteUnits, setDeleteUnits] = useState('1');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   // Estados para agregar producto al pedido
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1757,8 +1793,16 @@ export default function Pedidos() {
     }
   }
 
-  async function handleDeleteLineConfirmed() {
+  // units: cuántas unidades quitar; 'all' (o todas las de la línea) elimina la línea completa
+  async function handleDeleteLineConfirmed(units: number | 'all' = 'all') {
     if (!selectedPedido?.id || !deleteLine?.id) return;
+    const lineQuantity = Number(deleteLine?.cantidad) || 1;
+    const unitsToRemove = units === 'all' ? lineQuantity : units;
+    if (!Number.isInteger(unitsToRemove) || unitsToRemove < 1 || unitsToRemove > lineQuantity) {
+      toast.error(`Indica cuántas unidades quitar (entre 1 y ${lineQuantity})`);
+      return;
+    }
+    const removesWholeLine = unitsToRemove >= lineQuantity;
     // Guard client-side: should not happen if button was disabled
     const hasOrder = Boolean(deleteLine?.orden_produccion_id ?? deleteLine?.orden_id ?? deleteLine?.ordenes_produccion_id ?? deleteLine?.produccion_id ?? deleteLine?.produccionId);
     const createdFlag = (deleteLine?.produccion_creada === true);
@@ -1767,11 +1811,9 @@ export default function Pedidos() {
       setDeleteModalOpen(false);
       return;
     }
-    const ok = window.confirm('¿Eliminar línea? Esta acción no se puede deshacer.');
-    if (!ok) return;
     setDeleteSubmitting(true);
     try {
-      const endpoint = `/pedidos-venta/${selectedPedido.id}/lineas/${deleteLine.id}`;
+      const endpoint = `/pedidos-venta/${selectedPedido.id}/lineas/${deleteLine.id}${removesWholeLine ? '' : `?cantidad=${unitsToRemove}`}`;
       const resp = await apiFetch(endpoint, { method: 'DELETE' });
       // El backend devuelve el pedido actualizado en caso de éxito
       if (resp) {
@@ -1788,7 +1830,7 @@ export default function Pedidos() {
       } else {
         await openDetalle(selectedPedido.id);
       }
-      toast.success('Línea eliminada');
+      toast.success(removesWholeLine ? 'Línea eliminada' : `${unitsToRemove} ${unitsToRemove === 1 ? 'unidad quitada' : 'unidades quitadas'}`);
       setDeleteModalOpen(false);
       setDeleteLine(null);
     } catch (err: any) {
@@ -2289,7 +2331,7 @@ export default function Pedidos() {
                                           <Button
                                             size="sm"
                                             variant="destructive"
-                                            onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteModalOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteUnits('1'); setDeleteModalOpen(true); }}
                                             disabled={!canDelete}
                                             title={canDelete ? 'Eliminar línea' : 'No se puede eliminar: orden de producción asociada'}
                                           >Eliminar</Button>
@@ -2959,13 +3001,45 @@ export default function Pedidos() {
               <DialogTitle>Eliminar línea</DialogTitle>
               <DialogDescription>Confirme la eliminación de la línea del pedido. Esta acción no se puede deshacer.</DialogDescription>
             </DialogHeader>
-            <div className="p-2">
-              <div className="text-sm">{deleteLine ? `${deleteLine.producto_nombre || deleteLine.nombre || 'Línea #' + deleteLine.id}` : '¿Eliminar esta línea?'} </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setDeleteModalOpen(false); setDeleteLine(null); }} disabled={deleteSubmitting}>Cancelar</Button>
-              <Button variant="destructive" onClick={handleDeleteLineConfirmed} disabled={deleteSubmitting}>{deleteSubmitting ? 'Eliminando...' : 'Eliminar'}</Button>
-            </DialogFooter>
+            {(() => {
+              const lineQuantity = Number(deleteLine?.cantidad) || 1;
+              const lineName = deleteLine ? `${deleteLine.producto_nombre || deleteLine.nombre || 'Línea #' + deleteLine.id}` : '¿Eliminar esta línea?';
+              const units = Number(deleteUnits);
+              const validUnits = Number.isInteger(units) && units >= 1 && units <= lineQuantity;
+              return (
+                <>
+                  <div className="space-y-3 p-2">
+                    <div className="text-sm">{lineName}{lineQuantity > 1 ? ` (${lineQuantity} unidades)` : ''}</div>
+                    {lineQuantity > 1 && (
+                      <label className="block space-y-1 text-sm">
+                        <span className="font-medium">Unidades a quitar</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={lineQuantity}
+                          step={1}
+                          value={deleteUnits}
+                          onChange={(e) => setDeleteUnits(e.target.value)}
+                          className="w-28 rounded border px-2 py-1"
+                        />
+                        <span className="block text-xs text-muted-foreground">Máximo {lineQuantity}</span>
+                      </label>
+                    )}
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => { setDeleteModalOpen(false); setDeleteLine(null); }} disabled={deleteSubmitting}>Cancelar</Button>
+                    {lineQuantity > 1 && units < lineQuantity && (
+                      <Button variant="destructive" onClick={() => void handleDeleteLineConfirmed(units)} disabled={deleteSubmitting || !validUnits}>
+                        {deleteSubmitting ? 'Quitando...' : `Quitar ${validUnits ? units : ''} ${units === 1 ? 'unidad' : 'unidades'}`}
+                      </Button>
+                    )}
+                    <Button variant="destructive" onClick={() => void handleDeleteLineConfirmed('all')} disabled={deleteSubmitting}>
+                      {deleteSubmitting ? 'Eliminando...' : lineQuantity > 1 ? 'Quitar todas' : 'Eliminar'}
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
           </DialogContent>
         </Dialog>
         {/* Modal para producir desde una línea del pedido */}
