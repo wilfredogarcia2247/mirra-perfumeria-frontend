@@ -7,6 +7,8 @@ export interface Product {
   agotado?: boolean;
   brand?: string;
   category?: string;
+  // Todas las categorías del perfume (Hombre y Mujer a la vez = unisex)
+  categories?: string[];
   description?: string;
   price?: number;
   precio_venta?: number;

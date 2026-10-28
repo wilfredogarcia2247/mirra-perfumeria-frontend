@@ -798,10 +798,14 @@ export default function Reportes() {
       else status = 'muerto';
       const categoriaId = String(p.categoria_id ?? '');
       const categoriaNombre = p.categoria_nombre ?? categoriasMap[categoriaId] ?? null;
+      // Un perfume puede tener varias categorías (Hombre y Mujer = unisex)
+      const categoriasProducto: { id: string; nombre: string }[] = Array.isArray(p.categorias) && p.categorias.length > 0
+        ? p.categorias.map((c: any) => ({ id: String(c.id), nombre: String(c.nombre ?? categoriasMap[String(c.id)] ?? c.id) }))
+        : (categoriaId ? [{ id: categoriaId, nombre: String(categoriaNombre ?? categoriaId) }] : []);
       const unidad = String(p.unidad ?? '').trim();
       const essence = formulaEssenceMap[String(p.id)] ?? null;
       const esenciaGramosTotal = essence ? Math.round(parseNumber(p.stock) * essence.gramos) : null;
-      return { id: String(p.id), nombre: String(p.nombre ?? ''), stock: parseNumber(p.stock), unidad, esenciaGramosTotal, lastSale, daysSince, status, categoriaId, categoriaNombre };
+      return { id: String(p.id), nombre: String(p.nombre ?? ''), stock: parseNumber(p.stock), unidad, esenciaGramosTotal, lastSale, daysSince, status, categoriaId, categoriaNombre, categoriasProducto };
     }).sort((a, b) => {
       const diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
       if (diff !== 0) return diff;
@@ -814,7 +818,7 @@ export default function Reportes() {
 
     // Unique categories present in the product list
     const categoriasEnProductos = Array.from(
-      new Map(rows.filter((r) => r.categoriaId).map((r) => [r.categoriaId, r.categoriaNombre ?? r.categoriaId])).entries()
+      new Map(rows.flatMap((r) => r.categoriasProducto).map((c) => [c.id, c.nombre])).entries()
     ).map(([id, nombre]) => ({ id, nombre: String(nombre) })).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     return { rows, counts, categoriasEnProductos };
@@ -1249,7 +1253,7 @@ export default function Reportes() {
       const filtered = rows.filter((r) => {
         const matchStatus = rotacionFilter === 'todos' || r.status === rotacionFilter;
         const matchSearch = !rotacionSearch || normalizeText(r.nombre).includes(normalizeText(rotacionSearch));
-        const matchCategoria = !rotacionCategoria || r.categoriaId === rotacionCategoria;
+        const matchCategoria = !rotacionCategoria || r.categoriasProducto.some((c) => c.id === rotacionCategoria);
         const matchPeriodo = rotacionPeriodo === null || (r.daysSince === null || r.daysSince >= rotacionPeriodo);
         return matchStatus && matchSearch && matchCategoria && matchPeriodo;
       });

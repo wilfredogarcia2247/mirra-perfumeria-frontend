@@ -24,6 +24,26 @@ interface CuponPublico {
   colaborador_nombre?: string | null;
 }
 
+function slugifyCategory(name: string) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Nombres de todas las categorías del producto (la API envía `categorias`; `categoria` es la antigua única)
+function categoryNames(item: any): string[] {
+  const list = Array.isArray(item?.categorias) ? item.categorias : [];
+  const names = list.map((c: any) => String(c?.nombre ?? c?.name ?? '')).filter(Boolean);
+  if (names.length > 0) return names;
+  const single = (item?.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item?.categoria_nombre ?? item?.category ?? '';
+  return single ? [String(single)] : [];
+}
+
+// Texto que ve el cliente: si es de Hombre y de Mujer se muestra "Unisex"
+function categoryLabel(names: string[]) {
+  const slugs = names.map(slugifyCategory);
+  if (slugs.includes('hombre') && slugs.includes('mujer')) return 'Unisex';
+  return names.join(', ');
+}
+
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
@@ -126,7 +146,8 @@ export default function Hero() {
           featured: Boolean(item.destacado ?? item.featured ?? false),
           agotado: Boolean(item.agotado),
           brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
-          category: (item.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item.categoria_nombre ?? item.categoria ?? item.category ?? '',
+          categories: categoryNames(item),
+          category: categoryLabel(categoryNames(item)),
           description: item.descripcion ?? item.description ?? '',
           price: Number(item.precio_venta ?? item.price ?? 0) || 0,
           precio_venta: item.precio_venta ?? null,
@@ -167,16 +188,17 @@ export default function Hero() {
         (product.name || '').toLowerCase().includes(q) ||
         (product.brand || '').toLowerCase().includes(q) ||
         (product.description || '').toLowerCase().includes(q) ||
-        (product.category || '').toLowerCase().includes(q)
+        (product.category || '').toLowerCase().includes(q) ||
+        (product.categories || []).join(' ').toLowerCase().includes(q)
       ))
       : catalogProducts;
 
     const categoryFiltered = selectedCategory === 'all'
       ? filtered
       : filtered.filter((product) => {
-        const catName = product.category || '';
-        const catSlug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        return catSlug === selectedCategory.toLowerCase();
+        // Un perfume unisex (Hombre y Mujer) aparece en las dos categorías
+        const names = product.categories && product.categories.length > 0 ? product.categories : [product.category || ''];
+        return names.some((name) => slugifyCategory(name) === selectedCategory.toLowerCase());
       });
 
     setFullProducts(categoryFiltered);

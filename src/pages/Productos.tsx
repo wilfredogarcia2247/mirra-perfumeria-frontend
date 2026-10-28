@@ -45,6 +45,17 @@ import {
 
 // Los productos se obtienen desde la API en `useEffect` usando getProductos()
 
+// Ids de las categorías del producto (varias) con respaldo a la categoría única antigua
+function categoriaIdsDe(product: any): number[] {
+  if (Array.isArray(product?.categoria_ids)) return product.categoria_ids.map(Number);
+  return product?.categoria_id != null ? [Number(product.categoria_id)] : [];
+}
+
+function nombresCategorias(product: any, mapa: Record<number, string>): string {
+  if (product?.categorias_nombres) return product.categorias_nombres;
+  return categoriaIdsDe(product).map((id) => mapa[id]).filter(Boolean).join(', ') || product?.categoria_nombre || '';
+}
+
 export default function Productos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [productos, setProductos] = useState<any[]>([]);
@@ -90,7 +101,8 @@ export default function Productos() {
     },
   });
 
-  const [categoriaId, setCategoriaId] = useState<number | null>(null);
+  // Varias categorías por perfume: Hombre y Mujer a la vez = unisex
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([]);
   const [visibleEnCatalogo, setVisibleEnCatalogo] = useState(true);
   const [destacado, setDestacado] = useState(false);
   const [marcaId, setMarcaId] = useState<number | null>(null);
@@ -139,7 +151,7 @@ export default function Productos() {
       // Soportar ambas propiedades por si la API usa `image_url` o `imagen_url`.
       setImageUrl(editingProduct?.imagen_url ?? editingProduct?.image_url ?? null);
       // inicializar categoria/marca/visibilidad
-      setCategoriaId(editingProduct?.categoria_id ?? null);
+      setCategoriaIds(categoriaIdsDe(editingProduct));
       setMarcaId(editingProduct?.marca_id ?? null);
       setVisibleEnCatalogo(editingProduct?.visible_en_catalogo ?? true);
       setDestacado(editingProduct?.destacado ?? false);
@@ -217,7 +229,7 @@ export default function Productos() {
         precio_venta: Number.isNaN(precio_venta) ? null : precio_venta,
         proveedor_id: Number.isNaN(proveedor_id) ? null : proveedor_id,
         image_url: imageUrl || null,
-        categoria_id: categoriaId ?? null,
+        categoria_ids: categoriaIds,
         marca_id: marcaId ?? null,
         visible_en_catalogo: Boolean(visibleEnCatalogo),
         destacado,
@@ -248,7 +260,7 @@ export default function Productos() {
     if (isOpen && !editingProduct) {
       form.reset({ nombre: '', unidad: 'unidad', stock: 0, costo: 0, precio_venta: 0, proveedor_id: null, categoria_id: null, marca_id: null, visible_en_catalogo: true });
       setImageUrl(null);
-      setCategoriaId(null);
+      setCategoriaIds([]);
       setMarcaId(null);
       setVisibleEnCatalogo(true);
       setDestacado(false);
@@ -294,7 +306,7 @@ export default function Productos() {
           precio_venta: Number.isNaN(precio_venta as number) ? null : precio_venta,
           proveedor_id: Number.isNaN(proveedor_id as number) ? null : proveedor_id,
           image_url: url,
-          categoria_id: categoriaId ?? (editingProduct?.categoria_id ?? null),
+          categoria_ids: categoriaIds,
           marca_id: marcaId ?? (editingProduct?.marca_id ?? null),
           visible_en_catalogo: Boolean(visibleEnCatalogo ?? true),
           destacado,
@@ -457,7 +469,7 @@ export default function Productos() {
                 setEditingProduct(null);
                 form.reset();
                 setImageUrl(null);
-                setCategoriaId(null);
+                setCategoriaIds([]);
                 setMarcaId(null);
                 setProductDetalle(null);
                 setIsOpen(true);
@@ -558,21 +570,31 @@ export default function Productos() {
 
                         {/* Proveedor se mantiene en payload pero no es visible en el formulario */}
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div>
                             <FormLabel>Categoría</FormLabel>
-                            <FormControl>
-                              <select
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                value={categoriaId ?? ''}
-                                onChange={(e) => setCategoriaId(e.target.value ? Number(e.target.value) : null)}
-                              >
-                                <option value="">-- Sin categoría --</option>
-                                {categorias.map((c) => (
-                                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                                ))}
-                              </select>
-                            </FormControl>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {categorias.length === 0 && <p className="text-sm text-muted-foreground">No hay categorías creadas.</p>}
+                              {categorias.map((c) => {
+                                const id = Number(c.id);
+                                const marcada = categoriaIds.includes(id);
+                                return (
+                                  <label
+                                    key={c.id}
+                                    className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition ${marcada ? 'border-primary bg-primary/10 font-medium' : 'border-input bg-background'}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4"
+                                      checked={marcada}
+                                      onChange={() => setCategoriaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+                                    />
+                                    {c.nombre}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <p className="mt-1.5 text-xs text-muted-foreground">Si es unisex, marca Hombre y Mujer.</p>
                           </div>
                           <div>
                             <FormLabel>Marca</FormLabel>
@@ -757,7 +779,7 @@ export default function Productos() {
                 const openEdit = () => {
                   setEditingProduct(product);
                   form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
-                  setCategoriaId(product.categoria_id ?? null);
+                  setCategoriaIds(categoriaIdsDe(product));
                   setMarcaId(product.marca_id ?? null);
                   setVisibleEnCatalogo(product.visible_en_catalogo ?? true);
                   setDestacado(product.destacado ?? false);
@@ -803,7 +825,7 @@ export default function Productos() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '—'} · {product.marca_nombre ?? marcasMap[product.marca_id] ?? '—'}
+                            {nombresCategorias(product, categoriasMap) || '—'} · {product.marca_nombre ?? marcasMap[product.marca_id] ?? '—'}
                           </p>
                           <div className="flex items-center gap-3 mt-1 text-sm">
                             <span className={stockWarn ? 'text-destructive font-semibold' : 'text-foreground font-medium'}>
@@ -885,7 +907,7 @@ export default function Productos() {
                           </div>
                         </TableCell>
                         <TableCell>{product.unidad}</TableCell>
-                        <TableCell>{product.categoria_nombre ?? categoriasMap[product.categoria_id] ?? '-'}</TableCell>
+                        <TableCell>{nombresCategorias(product, categoriasMap) || '-'}</TableCell>
                         <TableCell>{product.marca_nombre ?? marcasMap[product.marca_id] ?? '-'}</TableCell>
                         <TableCell>
                           {(() => {
@@ -904,7 +926,7 @@ export default function Productos() {
                             <Button variant="ghost" size="icon" onClick={() => {
                               setEditingProduct(product);
                               form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
-                              setCategoriaId(product.categoria_id ?? null);
+                              setCategoriaIds(categoriaIdsDe(product));
                               setMarcaId(product.marca_id ?? null);
                               setVisibleEnCatalogo(product.visible_en_catalogo ?? true);
                               setDestacado(product.destacado ?? false);
