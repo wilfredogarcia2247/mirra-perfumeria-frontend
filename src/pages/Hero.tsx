@@ -124,6 +124,7 @@ export default function Hero() {
           name: item.nombre ?? item.name ?? '',
           image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
           featured: Boolean(item.destacado ?? item.featured ?? false),
+          agotado: Boolean(item.agotado),
           brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
           category: (item.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item.categoria_nombre ?? item.categoria ?? item.category ?? '',
           description: item.descripcion ?? item.description ?? '',

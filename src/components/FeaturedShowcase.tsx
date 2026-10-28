@@ -6,6 +6,7 @@ import { getImageUrl, getPrecioMostrar } from '@/lib/utils';
 import { getCachedTasaActiva } from '@/integrations/api';
 import { useCart } from '@/hooks/use-cart';
 import ProductModal from '@/components/ProductModal';
+import SoldOutOverlay from '@/components/SoldOutOverlay';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 
@@ -109,6 +110,7 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
     <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#e8d9c5] bg-white shadow-lg">
       <button type="button" onClick={() => onOpen(product)} className="relative block aspect-[4/5] overflow-hidden">
         <ProductImage product={product} className="transition-transform duration-700 group-hover:scale-105" />
+        {product.agotado && <SoldOutOverlay />}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white to-transparent" />
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#CA9E67] px-2.5 py-1 text-[11px] font-semibold text-white">
           <Star className="h-3 w-3 fill-current" /> Favorito
@@ -125,8 +127,8 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
               <p className="whitespace-nowrap text-xl font-semibold text-[#8b6439]">{price}</p>
             </>
           ) : <p className="text-sm text-gray-500">Consultar precio</p>}
-          <button type="button" onClick={() => onOpen(product)} className="mt-4 w-full rounded-lg bg-[#CA9E67] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#b58a53]">
-            Ver presentaciones
+          <button type="button" onClick={() => onOpen(product)} className={`mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition ${product.agotado ? 'bg-gray-200 text-gray-500' : 'bg-[#CA9E67] text-white hover:bg-[#b58a53]'}`}>
+            {product.agotado ? 'Agotado por el momento' : 'Ver presentaciones'}
           </button>
         </div>
       </div>

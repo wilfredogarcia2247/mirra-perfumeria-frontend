@@ -3,6 +3,8 @@ export interface Product {
   name: string;
   image_url?: string;
   featured?: boolean;
+  // Sin esencia suficiente: se muestra con el cartel AGOTADO y no se puede pedir
+  agotado?: boolean;
   brand?: string;
   category?: string;
   description?: string;
