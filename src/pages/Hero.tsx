@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle, TicketPercent, Check } from 'lucide-react';
 
 import Footer from '@/components/Footer';
-import ProductCarousel from '@/components/SocialMediaCarousel';
+import FeaturedShowcase from '@/components/FeaturedShowcase';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
@@ -334,8 +334,8 @@ export default function Hero() {
       </section>
 
       {!loading && catalogProducts.length > 0 && (
-        <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
-          <ProductCarousel products={catalogProducts} />
+        <div className="relative z-10">
+          <FeaturedShowcase products={catalogProducts} />
         </div>
       )}
 

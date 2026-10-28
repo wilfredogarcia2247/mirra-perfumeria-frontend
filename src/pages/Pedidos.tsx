@@ -2237,19 +2237,19 @@ export default function Pedidos() {
                     <table className="w-full table-auto text-sm">
                       <thead>
                         <tr className="text-left text-xs text-muted-foreground">
-                          <th className="pb-2">Imagen</th>
+                          <th className="hidden pb-2 md:table-cell">Imagen</th>
                           <th className="pb-2">Nombre</th>
                           <th className="pb-2">Precio</th>
-                          <th className="pb-2">Costo</th>
-                          <th className="pb-2">Cantidad</th>
+                          <th className="hidden pb-2 md:table-cell">Costo</th>
+                          <th className="pb-2 text-center"><span className="md:hidden">Cant.</span><span className="hidden md:inline">Cantidad</span></th>
                           <th className="pb-2">Subtotal</th>
-                          <th className="pb-2">Producción</th>
+                          <th className="hidden pb-2 md:table-cell">Producción</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Array.isArray(selectedPedido.productos) && selectedPedido.productos.map((it: any) => (
                           <tr key={it.id} className="border-t">
-                            <td className="py-2 w-16">
+                            <td className="hidden py-2 w-16 md:table-cell">
                               <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
                                 <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => {
                                   const t = e.currentTarget as HTMLImageElement;
@@ -2262,7 +2262,7 @@ export default function Pedidos() {
                                 }} />
                               </div>
                             </td>
-                            <td className="py-2 align-top">
+                            <td className="py-2 pr-2 align-top">
                               <div className="font-medium">{it.producto_nombre || it.nombre || '-'}</div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {(() => {
@@ -2343,10 +2343,10 @@ export default function Pedidos() {
                               </div>
                             </td>
                             <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
-                            <td className="py-2">{typeof it.costo === 'number' ? `$${it.costo.toFixed(2)}` : it.costo}</td>
+                            <td className="hidden py-2 md:table-cell">{typeof it.costo === 'number' ? `${it.costo.toFixed(2)}` : it.costo}</td>
                             <td className="py-2" style={{ textAlign: 'center' }}>{it.cantidad}</td>
                             <td className="py-2">{typeof it.subtotal === 'number' ? `$${it.subtotal.toFixed(2)}` : it.subtotal}</td>
-                            <td className="py-2">
+                            <td className="hidden py-2 md:table-cell">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (
@@ -2374,8 +2374,8 @@ export default function Pedidos() {
                           {ajustesDraft.map((ajuste, index) => {
                             const previewRow = ajustesPreview.ajustes[index];
                             return (
-                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-12 gap-2 items-end">
-                                <div className="col-span-2">
+                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-2 gap-2 items-end rounded-md border p-2 md:grid-cols-12 md:border-0 md:p-0">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">Tipo</label>
                                   <select
                                     value={ajuste.tipo}
@@ -2386,7 +2386,7 @@ export default function Pedidos() {
                                     <option value="recargo">Recargo</option>
                                   </select>
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">Modo</label>
                                   <select
                                     value={ajuste.modo}
@@ -2397,7 +2397,7 @@ export default function Pedidos() {
                                     <option value="monto">Monto</option>
                                   </select>
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">{ajuste.modo === 'porcentaje' ? 'Porcentaje' : 'Monto ($)'}</label>
                                   <input
                                     type="number"
@@ -2408,7 +2408,7 @@ export default function Pedidos() {
                                     className="w-full border rounded px-2 py-1 text-sm"
                                   />
                                 </div>
-                                <div className="col-span-4">
+                                <div className="col-span-2 md:col-span-4">
                                   <label className="text-xs text-muted-foreground">Motivo</label>
                                   <input
                                     type="text"
@@ -2418,7 +2418,7 @@ export default function Pedidos() {
                                     placeholder="Ej. Descuento promocional"
                                   />
                                 </div>
-                                <div className="col-span-1 text-right text-sm font-medium">
+                                <div className="col-span-1 self-center text-left text-sm font-medium md:text-right">
                                   {previewRow ? `$${previewRow.monto_aplicado.toFixed(2)}` : '$0.00'}
                                 </div>
                                 <div className="col-span-1 flex justify-end">
@@ -2950,8 +2950,8 @@ export default function Pedidos() {
             )}
 
             <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full">
-              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
-                <div className="flex gap-2">
+              <div className="w-full flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
+                <div className="grid grid-cols-1 gap-2 md:flex">
                   <Button size="lg" variant="default" onClick={() => {
                     if (ajustesDirty) {
                       toast.error('Guarda los ajustes antes de registrar el pago');
@@ -2983,7 +2983,7 @@ export default function Pedidos() {
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2 md:flex">
                   <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="hover:bg-slate-50">
                     {canceling ? 'Procesando...' : 'Cancelar pedido'}
                   </Button>

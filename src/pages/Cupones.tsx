@@ -430,7 +430,7 @@ export default function Cupones() {
         </div>
 
         {tab === 'cupones' ? (
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.4fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.4fr)]">
             <Card>
               <CardHeader><CardTitle>{editingCouponId ? 'Editar cupón' : 'Crear cupón'}</CardTitle></CardHeader>
               <CardContent>
@@ -532,7 +532,7 @@ export default function Cupones() {
             </section>
           </div>
         ) : (
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.4fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.4fr)]">
             <Card>
               <CardHeader><CardTitle>{editingCollaboratorId ? 'Editar colaborador' : 'Agregar colaborador'}</CardTitle></CardHeader>
               <CardContent>
@@ -631,7 +631,7 @@ export default function Cupones() {
                       ].filter(Boolean).join(' · ')}</p>
                       {collaborator.observaciones && <p className="text-xs text-muted-foreground">{collaborator.observaciones}</p>}
                     </div>
-                    <div className="flex shrink-0 gap-2 border-t pt-3 sm:border-0 sm:pt-0">
+                    <div className="flex shrink-0 flex-wrap gap-2 border-t pt-3 sm:border-0 sm:pt-0">
                       <Button size="sm" variant="outline" onClick={() => beginEditCollaborator(collaborator)}><Pencil className="mr-2 h-3.5 w-3.5" /> Editar</Button>
                       {collaborator.tipo === 'influencer' && <Button size="sm" variant="outline" onClick={() => void toggleCommissionPayments(collaborator.id)}><Wallet className="mr-2 h-3.5 w-3.5" /> {commissionPaymentCollaboratorId === collaborator.id ? 'Cerrar pagos' : 'Pagos'}</Button>}
                       <Button size="sm" variant="outline" onClick={() => void toggleCollaborator(collaborator)}><Power className="mr-2 h-3.5 w-3.5" />{collaborator.activo ? 'Desactivar' : 'Activar'}</Button>
@@ -704,7 +704,7 @@ export default function Cupones() {
                               </Field>
                             </div>
                             <div className="sm:col-span-2">
-                              <Button type="submit" disabled={savingCommissionPaymentId === collaborator.id || periodBalance <= 0 || loadingCommissionPaymentsId === collaborator.id || !commissionReceiptKey}>
+                              <Button type="submit" className="w-full sm:w-auto" disabled={savingCommissionPaymentId === collaborator.id || periodBalance <= 0 || loadingCommissionPaymentsId === collaborator.id || !commissionReceiptKey}>
                                 {savingCommissionPaymentId === collaborator.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Registrar pago del período
                               </Button>
