@@ -16,10 +16,11 @@ type DashboardData = {
     base_comisionable: number;
     comision_estimada: number;
     comision_generada: number;
+    comision_generada_total?: number;
     comision_pagada: number;
     saldo_pendiente: number;
   };
-  pagos: Array<{ id: number; monto: number | string; fecha_corte: string; fecha_pago: string; referencia: string; comprobante_url?: string | null }>;
+  pagos: Array<{ id: number; monto: number | string; fecha_corte: string; fecha_desde?: string | null; fecha_hasta?: string | null; fecha_pago: string; referencia: string; comprobante_url?: string | null }>;
   cupones: Array<{
     id: number;
     codigo: string;
@@ -63,7 +64,7 @@ type DashboardData = {
 
 const previewData: DashboardData = {
   colaborador: { nombre: 'Valeria V.', porcentaje_comision: 10 },
-  resumen: { pedidos: 3, pedidos_cancelados: 0, base_comisionable: 284.48, comision_estimada: 28.45, comision_generada: 28.45, comision_pagada: 10, saldo_pendiente: 18.45 },
+  resumen: { pedidos: 3, pedidos_cancelados: 0, base_comisionable: 284.48, comision_estimada: 28.45, comision_generada: 28.45, comision_generada_total: 28.45, comision_pagada: 10, saldo_pendiente: 18.45 },
   pagos: [{ id: 1, monto: 10, fecha_corte: '2026-10-18', fecha_pago: '2026-10-23T12:00:00.000Z', referencia: 'Transferencia demostrativa', comprobante_url: '/logo.png' }],
   cupones: [
     { id: 1, codigo: 'VALERIA10', descuento_porcentaje: 10, porcentaje_comision: 10, estado: 'agotado', codigo_activo: false, uso_actual: 2, uso_maximo: 2, pedidos: 2, pedidos_cancelados: 0, base_comisionable: 200, comision_estimada: 20 },
@@ -153,6 +154,18 @@ const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: '
 function dollars(value: unknown) {
   const amount = Number(value);
   return currency.format(Number.isFinite(amount) ? amount : 0);
+}
+
+function dateOnly(value: string) {
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '';
+}
+
+// Período pagado: "01/10/2026 al 15/10/2026". Los pagos antiguos sin "desde"
+// cubren todo lo anterior a su fecha final.
+function paymentPeriod(payment: { fecha_corte: string; fecha_desde?: string | null; fecha_hasta?: string | null }) {
+  const hasta = payment.fecha_hasta || payment.fecha_corte;
+  return payment.fecha_desde ? `${dateOnly(payment.fecha_desde)} al ${dateOnly(hasta)}` : `Hasta el ${dateOnly(hasta)}`;
 }
 
 function bolivares(value: unknown) {
@@ -333,17 +346,17 @@ export default function InfluencerDashboard({ preview = false }: { preview?: boo
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumen de rendimiento">
               <Card className="border-amber-200/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">Total de pedidos</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums">{Number(summaryForView?.pedidos || 0).toLocaleString('es-VE')}</p></div><ShoppingBag className="h-5 w-5 text-amber-700" /></CardContent></Card>
               <Card className="border-amber-200/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">Ventas base generadas</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums">{dollars(summaryForView?.base_comisionable || 0)}</p><p className="mt-1 text-xs text-muted-foreground">Sin IVA ni recargos</p></div><BadgePercent className="h-5 w-5 text-amber-700" /></CardContent></Card>
-              <Card className="border-amber-200/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">Comisión total generada</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums">{dollars(data.resumen.comision_generada)}</p><p className="mt-1 text-xs text-muted-foreground">En pedidos completamente pagados</p></div><BadgePercent className="h-5 w-5 text-amber-700" /></CardContent></Card>
-              <Card className="border-emerald-200 bg-emerald-50/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">Saldo de comisión aún no cobrado</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums text-emerald-800">{dollars(data.resumen.saldo_pendiente)}</p><p className="mt-1 text-xs text-muted-foreground">Pagada: {dollars(data.resumen.comision_pagada)} · A {Number(data.colaborador.porcentaje_comision).toLocaleString('es-VE')}%</p></div><Wallet className="h-5 w-5 text-emerald-700" /></CardContent></Card>
+              <Card className="border-amber-200/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">{fechaInicio || fechaFin ? 'Comisión generada en el periodo' : 'Comisión total generada'}</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums">{dollars(data.resumen.comision_generada)}</p><p className="mt-1 text-xs text-muted-foreground">En pedidos completamente pagados</p></div><BadgePercent className="h-5 w-5 text-amber-700" /></CardContent></Card>
+              <Card className="border-emerald-200 bg-emerald-50/70"><CardContent className="flex items-start justify-between gap-3 p-5"><div><p className="text-sm text-muted-foreground">Saldo de comisión aún no cobrado</p><p className="mt-2 font-serif text-3xl font-semibold tabular-nums text-emerald-800">{dollars(data.resumen.saldo_pendiente)}</p><p className="mt-1 text-xs text-muted-foreground">Pagada: {dollars(data.resumen.comision_pagada)} · A {Number(data.colaborador.porcentaje_comision).toLocaleString('es-VE')}%</p>{(fechaInicio || fechaFin) && <p className="mt-1 text-xs text-muted-foreground">Total a la fecha, no depende del periodo</p>}</div><Wallet className="h-5 w-5 text-emerald-700" /></CardContent></Card>
             </section>
 
             {data.pagos.length > 0 && (
               <section className="overflow-hidden rounded-lg border border-emerald-200/70 bg-card" aria-label="Pagos recibidos">
                 <header className="border-b border-emerald-200/70 p-5"><h2 className="font-serif text-xl font-semibold">Pagos recibidos</h2><p className="mt-1 text-sm text-muted-foreground">Liquidaciones registradas por la administración.</p></header>
                 <div className="divide-y md:hidden">
-                  {data.pagos.map((payment) => <div key={payment.id} className="flex items-center justify-between gap-3 p-4"><div className="min-w-0"><p className="font-medium">Corte {new Date(`${String(payment.fecha_corte).slice(0, 10)}T12:00:00`).toLocaleDateString('es-VE')}</p><p className="break-words text-sm text-muted-foreground">Pago {new Date(payment.fecha_pago).toLocaleDateString('es-VE')} · {payment.referencia}</p>{payment.comprobante_url && <a className="mt-1 inline-block text-sm text-primary underline" href={payment.comprobante_url} target="_blank" rel="noreferrer">Ver comprobante</a>}</div><p className="shrink-0 font-semibold tabular-nums text-emerald-800">{dollars(payment.monto)}</p></div>)}
+                  {data.pagos.map((payment) => <div key={payment.id} className="flex items-center justify-between gap-3 p-4"><div className="min-w-0"><p className="font-medium">Período {paymentPeriod(payment)}</p><p className="break-words text-sm text-muted-foreground">Pago {new Date(payment.fecha_pago).toLocaleDateString('es-VE')} · {payment.referencia}</p>{payment.comprobante_url && <a className="mt-1 inline-block text-sm text-primary underline" href={payment.comprobante_url} target="_blank" rel="noreferrer">Ver comprobante</a>}</div><p className="shrink-0 font-semibold tabular-nums text-emerald-800">{dollars(payment.monto)}</p></div>)}
                 </div>
-                <div className="hidden overflow-x-auto md:block"><Table><TableHeader><TableRow className="bg-emerald-50/60"><TableHead>Fecha de corte</TableHead><TableHead>Fecha de pago</TableHead><TableHead>Referencia</TableHead><TableHead>Comprobante</TableHead><TableHead className="text-right">Monto pagado</TableHead></TableRow></TableHeader><TableBody>{data.pagos.map((payment) => <TableRow key={payment.id}><TableCell>{new Date(`${String(payment.fecha_corte).slice(0, 10)}T12:00:00`).toLocaleDateString('es-VE')}</TableCell><TableCell>{new Date(payment.fecha_pago).toLocaleDateString('es-VE')}</TableCell><TableCell>{payment.referencia}</TableCell><TableCell>{payment.comprobante_url ? <a className="text-primary underline" href={payment.comprobante_url} target="_blank" rel="noreferrer">Ver imagen</a> : '—'}</TableCell><TableCell className="text-right font-medium tabular-nums">{dollars(payment.monto)}</TableCell></TableRow>)}</TableBody></Table></div>
+                <div className="hidden overflow-x-auto md:block"><Table><TableHeader><TableRow className="bg-emerald-50/60"><TableHead>Período pagado</TableHead><TableHead>Fecha de pago</TableHead><TableHead>Referencia</TableHead><TableHead>Comprobante</TableHead><TableHead className="text-right">Monto pagado</TableHead></TableRow></TableHeader><TableBody>{data.pagos.map((payment) => <TableRow key={payment.id}><TableCell>{paymentPeriod(payment)}</TableCell><TableCell>{new Date(payment.fecha_pago).toLocaleDateString('es-VE')}</TableCell><TableCell>{payment.referencia}</TableCell><TableCell>{payment.comprobante_url ? <a className="text-primary underline" href={payment.comprobante_url} target="_blank" rel="noreferrer">Ver imagen</a> : '—'}</TableCell><TableCell className="text-right font-medium tabular-nums">{dollars(payment.monto)}</TableCell></TableRow>)}</TableBody></Table></div>
               </section>
             )}
 

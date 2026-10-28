@@ -719,12 +719,15 @@ export async function setColaboradorActivo(id: number, activo: boolean) {
   return apiFetch(`/cupones/colaboradores/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) });
 }
 
-export async function getInfluencerCommissionPayments(colaboradorId: number, fechaCorte?: string) {
-  const query = fechaCorte ? `?fecha_corte=${encodeURIComponent(fechaCorte)}` : '';
+// Sin fechas, el backend sugiere el período: desde el día siguiente al último pago hasta hoy.
+export async function getInfluencerCommissionPayments(colaboradorId: number, periodo?: { fecha_desde: string; fecha_hasta: string }) {
+  const query = periodo
+    ? `?fecha_desde=${encodeURIComponent(periodo.fecha_desde)}&fecha_hasta=${encodeURIComponent(periodo.fecha_hasta)}`
+    : '';
   return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos${query}`);
 }
 
-export async function createInfluencerCommissionPayment(colaboradorId: number, data: { fecha_corte: string; referencia: string; comprobante_key: string; observaciones?: string }) {
+export async function createInfluencerCommissionPayment(colaboradorId: number, data: { fecha_desde: string; fecha_hasta: string; referencia: string; comprobante_key: string; observaciones?: string }) {
   return apiFetch(`/cupones/colaboradores/${colaboradorId}/comisiones-pagos`, { method: 'POST', body: JSON.stringify(data) });
 }
 
