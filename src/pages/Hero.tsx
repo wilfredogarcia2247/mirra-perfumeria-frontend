@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
-import ProductCard from '@/components/ProductCard';
+import CatalogProductCard from '@/components/CatalogProductCard';
+import ProductQuickSheet from '@/components/ProductQuickSheet';
+import { volarAlCarrito } from '@/lib/catalog';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic } from '@/integrations/api';
 import useCart, { CartItem } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
@@ -56,6 +58,13 @@ export default function Hero() {
   const { categorySlug } = useParams();
   const selectedCategory = categorySlug || 'all';
   const [search, setSearch] = useState<string>('');
+  const navigate = useNavigate();
+  // Ventana con la foto grande para elegir la presentación
+  const [sheetProduct, setSheetProduct] = useState<{ product: Product; foto: HTMLImageElement | null } | null>(null);
+  // Altura del encabezado fijo: los filtros se pegan justo debajo al bajar
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const filtrosRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [deliveryReview, setDeliveryReview] = useState<CheckoutDeliveryReview | null>(null);
@@ -145,6 +154,7 @@ export default function Hero() {
           image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
           featured: Boolean(item.destacado ?? item.featured ?? false),
           agotado: Boolean(item.agotado),
+          mas_pedido: Boolean(item.mas_pedido),
           brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
           categories: categoryNames(item),
           category: categoryLabel(categoryNames(item)),
@@ -198,7 +208,7 @@ export default function Hero() {
       : filtered.filter((product) => {
         // Un perfume unisex (Hombre y Mujer) aparece en las dos categorías
         const names = product.categories && product.categories.length > 0 ? product.categories : [product.category || ''];
-        return names.some((name) => slugifyCategory(name) === selectedCategory.toLowerCase());
+        return names.map(slugifyCategory).includes(selectedCategory.toLowerCase());
       });
 
     setFullProducts(categoryFiltered);
@@ -236,6 +246,47 @@ export default function Hero() {
   }, []);
 
   // not exposing categories selector on the public Hero
+
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    const medir = () => setHeaderHeight(header.getBoundingClientRect().height);
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
+  // Filtros rápidos: solo los que tienen perfumes
+  const filtrosRapidos = (() => {
+    const slugsDe = (p: Product) => (p.categories && p.categories.length > 0 ? p.categories : [p.category || '']).map(slugifyCategory);
+    const lista: { slug: string; label: string }[] = [{ slug: 'all', label: 'Todos' }];
+    if (catalogProducts.some((p) => slugsDe(p).includes('hombre'))) lista.push({ slug: 'hombre', label: 'Hombre' });
+    if (catalogProducts.some((p) => slugsDe(p).includes('mujer'))) lista.push({ slug: 'mujer', label: 'Mujer' });
+    return lista.length > 1 ? lista : [];
+  })();
+
+  function elegirFiltro(slug: string) {
+    navigate(slug === 'all' ? '/' : `/categoria/${slug}`);
+    setPage(1);
+    // Si el cliente ya bajó por la lista, volver a su inicio (justo debajo de los filtros fijos).
+    // Se calcula después de que la página se actualiza, porque los textos de arriba cambian con el filtro.
+    window.setTimeout(() => {
+      const lista = listaRef.current;
+      const filtros = filtrosRef.current;
+      if (!lista || !filtros) return;
+      const altoFiltros = filtros.getBoundingClientRect().height;
+      const destino = window.scrollY + lista.getBoundingClientRect().top - headerHeight - altoFiltros - 8;
+      if (window.scrollY > destino + 1) window.scrollTo({ top: Math.max(0, destino), behavior: 'smooth' });
+    }, 60);
+  }
+
+  // Agregar desde la ventana: la foto vuela al carrito y luego se suma
+  function handleAddFromSheet(item: Product, foto: HTMLImageElement | null) {
+    const espera = volarAlCarrito(foto?.currentSrc || getImageUrl(item), foto ? foto.getBoundingClientRect() : null);
+    window.setTimeout(() => handleAddToCart(item), espera);
+  }
 
   function handleAddToCart(product: Product) {
     addItem(product, 1);
@@ -314,7 +365,7 @@ export default function Hero() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-x-clip">
       {/* Decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -right-20 -top-20 w-96 h-96 bg-primary-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -358,7 +409,7 @@ export default function Hero() {
 
       {!loading && catalogProducts.length > 0 && (
         <div className="relative z-10">
-          <FeaturedShowcase products={catalogProducts} />
+          <FeaturedShowcase products={catalogProducts} onAddToCart={handleAddFromSheet} />
         </div>
       )}
 
@@ -389,14 +440,56 @@ export default function Hero() {
           {/* Category filter removed from Landing (Hero) */}
         </div>
 
+        {filtrosRapidos.length > 0 && (
+          <div
+            ref={filtrosRef}
+            className="sticky z-30 -mx-4 mb-4 bg-gray-50/95 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6"
+            style={{ top: headerHeight }}
+          >
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar perfumes">
+              {filtrosRapidos.map((f) => {
+                const activo = selectedCategory.toLowerCase() === f.slug;
+                return (
+                  <button
+                    key={f.slug}
+                    type="button"
+                    role="tab"
+                    aria-selected={activo}
+                    onClick={() => elegirFiltro(f.slug)}
+                    className={`shrink-0 rounded-full border-[1.5px] px-4 py-2 text-sm font-semibold transition ${activo ? 'border-gray-900 bg-gray-900 text-white' : 'border-[#e8d9c5] bg-white text-gray-800 hover:border-[#CA9E67]'}`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} openModalOnAdd={true} showStock={false} />
+          <div ref={listaRef} className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+            {products.map((p, i) => (
+              <CatalogProductCard
+                key={p.id}
+                product={p}
+                tasa={tasaPublic}
+                index={i}
+                onOpen={(product, foto) => setSheetProduct({ product, foto })}
+              />
             ))}
           </div>
+        )}
+
+        {sheetProduct && (
+          <ProductQuickSheet
+            product={sheetProduct.product}
+            origen={sheetProduct.foto}
+            tasa={tasaPublic}
+            onClose={() => setSheetProduct(null)}
+            onAdd={handleAddFromSheet}
+          />
         )}
 
         <div className="flex flex-col items-center justify-center mt-6 sm:mt-8 gap-4">

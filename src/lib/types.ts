@@ -5,6 +5,8 @@ export interface Product {
   featured?: boolean;
   // Sin esencia suficiente: se muestra con el cartel AGOTADO y no se puede pedir
   agotado?: boolean;
+  // Entre los más pedidos recientemente: etiqueta "🔥 Más pedido"
+  mas_pedido?: boolean;
   brand?: string;
   category?: string;
   // Todas las categorías del perfume (Hombre y Mujer a la vez = unisex)
