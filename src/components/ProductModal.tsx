@@ -6,6 +6,7 @@ import { X, ShoppingCart, Info, Check } from 'lucide-react';
 import { getCachedTasaActiva } from '@/integrations/api';
 import { getPrecioMostrar } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import SoldOutOverlay from '@/components/SoldOutOverlay';
 
 interface Props {
   product: Product;
@@ -107,6 +108,7 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
                     target.src = randomFallback;
                   }}
                 />
+                {product.agotado && <SoldOutOverlay size="lg" />}
               </div>
             </div>
 
@@ -120,9 +122,13 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
               </div>
 
               <div className="flex items-center gap-2 mb-6">
-                <span className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full ${(product.stock ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>
-                  {(product.stock ?? 0) > 0 ? 'Disponible' : 'Consultar Stock'}
-                </span>
+                {product.agotado ? (
+                  <span className="px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gray-900 text-white">Agotado</span>
+                ) : (
+                  <span className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full ${(product.stock ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {(product.stock ?? 0) > 0 ? 'Disponible' : 'Consultar Stock'}
+                  </span>
+                )}
                 {product.brand && (
                   <span className="px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gray-100 text-gray-600">
                     {product.brand}
@@ -214,6 +220,9 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
 
         {/* Fixed Footer Actions */}
         <div className="border-t border-gray-100 p-4 sm:p-6 bg-white z-20">
+          {product.agotado && (
+            <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
+          )}
           <Button
             size="lg"
             className="w-full text-lg h-12 bg-gradient-to-r from-primary-600 to-amber-600 hover:from-primary-700 hover:to-amber-700 text-white shadow-lg shadow-primary-500/20 rounded-xl transition-all active:scale-[0.98]"
@@ -223,10 +232,14 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
               onAddToCart(item as any);
               onClose();
             }}
-            disabled={!selectedTamano}
+            disabled={!selectedTamano || product.agotado}
           >
-            <ShoppingCart className="mr-2 h-5 w-5" />
-            Agregar al Carrito
+            {product.agotado ? 'Agotado' : (
+              <>
+                <ShoppingCart className="mr-2 h-5 w-5" />
+                Agregar al Carrito
+              </>
+            )}
           </Button>
         </div>
 

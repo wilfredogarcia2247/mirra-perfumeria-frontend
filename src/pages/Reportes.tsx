@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import {
   getCategorias,
   getClientesTopResumen,
+  getCierreDiario,
   getFormulas,
   getOrdenesProduccionResumen,
   getEntradasEsencias,
@@ -32,9 +33,10 @@ type ReportSlug =
   | 'compras'
   | 'rentabilidad'
   | 'ticket-promedio'
+  | 'cierre-diario'
   | 'historial-produccion';
 
-type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'produccionResumen' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones';
+type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'produccionResumen' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones' | 'cierre';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
   { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
@@ -50,6 +52,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'compras', title: 'Compras y reposicion', description: 'Indicadores para planificar compras' },
   { slug: 'rentabilidad', title: 'Rentabilidad', description: 'Margen estimado por ventas y costos' },
   { slug: 'ticket-promedio', title: 'Ticket promedio', description: 'Monto promedio por pedido completado' },
+  { slug: 'cierre-diario', title: 'Cierre diario', description: 'Ventas, ajustes y presentaciones del día' },
 ];
 
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
@@ -68,6 +71,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   compras: ['pedidos', 'productos'],
   rentabilidad: ['pedidos', 'productos'],
   'ticket-promedio': ['pedidos'],
+  'cierre-diario': ['cierre'],
 };
 
 const DATA_LABELS: Record<DataKey, string> = {
@@ -80,6 +84,7 @@ const DATA_LABELS: Record<DataKey, string> = {
   ventasMetodo: 'ventas por metodo',
   clientesResumen: 'clientes top',
   presentaciones: 'ventas por presentacion',
+  cierre: 'cierre diario',
 };
 
 const DATE_FILTER_REPORTS = new Set<ReportSlug>([
@@ -143,6 +148,27 @@ function getBaseProductName(name: string): string {
   return String(name || '').split(/presentaci[oó]n/i)[0].trim() || String(name || 'Producto sin nombre');
 }
 
+function getTodayDateValue() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Caracas',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const partValue = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${partValue('year')}-${partValue('month')}-${partValue('day')}`;
+}
+
+function formatCloseUsd(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return 'No disponible';
+  return `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatCloseBs(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return 'No disponible';
+  return `Bs ${Number(value).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function getReportSlug(pathname: string): ReportSlug {
   if (pathname === '/reportes' || pathname === '/reportes/') return 'resumen-general';
   const value = pathname.split('/')[2] as ReportSlug | undefined;
@@ -163,6 +189,9 @@ export default function Reportes() {
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
   const [produccionResumen, setProduccionResumen] = useState<any[]>([]);
+  const [fechaCierre, setFechaCierre] = useState(getTodayDateValue);
+  const [cierreDiario, setCierreDiario] = useState<any>(null);
+  const [cierreError, setCierreError] = useState('');
   const [fechaInicio, setFechaInicio] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -198,7 +227,31 @@ export default function Reportes() {
     presentaciones: false,
     clientesResumen: false,
     produccionResumen: false,
+    cierre: false,
   });
+
+  useEffect(() => {
+    if (selectedReport !== 'cierre-diario') return;
+    let cancelled = false;
+    const loadDailyClose = async () => {
+      setLoadingInfo({ active: true, progress: 0, message: 'Cargando cierre diario...', etaSeconds: 0 });
+      setCierreError('');
+      try {
+        const result = await getCierreDiario(fechaCierre);
+        if (!cancelled) setCierreDiario(result);
+      } catch (error) {
+        if (!cancelled) {
+          setCierreDiario(null);
+          setCierreError(error instanceof Error ? error.message : 'No se pudo cargar el cierre diario.');
+        }
+      } finally {
+        if (!cancelled) setLoadingInfo({ active: false, progress: 100, message: 'Cierre diario listo', etaSeconds: 0 });
+      }
+    };
+
+    void loadDailyClose();
+    return () => { cancelled = true; };
+  }, [selectedReport, fechaCierre]);
 
   useEffect(() => {
     if (selectedReport !== 'ventas-metodo') return;
@@ -245,7 +298,7 @@ export default function Reportes() {
   }, [selectedReport, prodFechaInicio, prodFechaFin]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario') return;
     setLoaded((prev) => ({
       ...prev,
       pedidos: false,
@@ -255,7 +308,7 @@ export default function Reportes() {
   }, [fechaInicio, fechaFin, selectedReport]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario') return;
 
     let cancelled = false;
 
@@ -745,10 +798,14 @@ export default function Reportes() {
       else status = 'muerto';
       const categoriaId = String(p.categoria_id ?? '');
       const categoriaNombre = p.categoria_nombre ?? categoriasMap[categoriaId] ?? null;
+      // Un perfume puede tener varias categorías (Hombre y Mujer = unisex)
+      const categoriasProducto: { id: string; nombre: string }[] = Array.isArray(p.categorias) && p.categorias.length > 0
+        ? p.categorias.map((c: any) => ({ id: String(c.id), nombre: String(c.nombre ?? categoriasMap[String(c.id)] ?? c.id) }))
+        : (categoriaId ? [{ id: categoriaId, nombre: String(categoriaNombre ?? categoriaId) }] : []);
       const unidad = String(p.unidad ?? '').trim();
       const essence = formulaEssenceMap[String(p.id)] ?? null;
       const esenciaGramosTotal = essence ? Math.round(parseNumber(p.stock) * essence.gramos) : null;
-      return { id: String(p.id), nombre: String(p.nombre ?? ''), stock: parseNumber(p.stock), unidad, esenciaGramosTotal, lastSale, daysSince, status, categoriaId, categoriaNombre };
+      return { id: String(p.id), nombre: String(p.nombre ?? ''), stock: parseNumber(p.stock), unidad, esenciaGramosTotal, lastSale, daysSince, status, categoriaId, categoriaNombre, categoriasProducto };
     }).sort((a, b) => {
       const diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
       if (diff !== 0) return diff;
@@ -761,7 +818,7 @@ export default function Reportes() {
 
     // Unique categories present in the product list
     const categoriasEnProductos = Array.from(
-      new Map(rows.filter((r) => r.categoriaId).map((r) => [r.categoriaId, r.categoriaNombre ?? r.categoriaId])).entries()
+      new Map(rows.flatMap((r) => r.categoriasProducto).map((c) => [c.id, c.nombre])).entries()
     ).map(([id, nombre]) => ({ id, nombre: String(nombre) })).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     return { rows, counts, categoriasEnProductos };
@@ -779,6 +836,136 @@ export default function Reportes() {
             </div>
           </CardContent>
         </Card>
+      );
+    }
+
+    if (selectedReport === 'cierre-diario') {
+      const close = cierreDiario;
+      const summary = close?.resumen || {};
+      const amountRows = [
+        { label: 'Subtotal', usd: summary.subtotal_usd, bs: summary.subtotal_bs },
+        { label: 'Descuentos', usd: summary.descuentos_usd, bs: summary.descuentos_bs },
+        { label: 'Recargos', usd: summary.recargos_usd, bs: summary.recargos_bs },
+        { label: 'Total vendido', usd: summary.total_usd, bs: summary.total_bs, emphasized: true },
+      ];
+
+      return (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="border-b border-border/60 pb-3">
+              <CardTitle className="text-base font-medium">Cierre diario</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="max-w-xs space-y-1">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="fecha-cierre-diario">Fecha del cierre</label>
+                <Input
+                  id="fecha-cierre-diario"
+                  type="date"
+                  value={fechaCierre}
+                  onChange={(event) => setFechaCierre(event.target.value)}
+                  className="h-11 text-base"
+                />
+              </div>
+              {cierreError && <p role="alert" className="text-sm text-destructive">{cierreError}</p>}
+              {!cierreError && close && (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <Card><CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pedidos completados</p><p className="mt-2 text-2xl font-semibold tabular-nums">{close.cantidad_pedidos}</p></CardContent></Card>
+                    {amountRows.map((row) => (
+                      <Card key={row.label} className={row.emphasized ? 'border-primary/40 bg-primary/5' : undefined}>
+                        <CardContent className="p-4">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{row.label}</p>
+                          <p className={`mt-2 text-xl tabular-nums ${row.emphasized ? 'font-bold' : 'font-semibold'}`}>{formatCloseUsd(row.usd)}</p>
+                          <p className="mt-1 text-sm text-muted-foreground tabular-nums">{formatCloseBs(row.bs)}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {close.pedidos_sin_tasa > 0 && (
+                    <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      No se puede completar el total en bolívares: {close.pedidos_sin_tasa} pedido(s) completado(s) no tiene(n) una tasa guardada.
+                    </p>
+                  )}
+                  {close.pedidos_historicos_sin_fecha_completado > 0 && (
+                    <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      {close.pedidos_historicos_sin_fecha_completado} pedido(s) completado(s) antes de este cambio no tienen fecha de finalización registrada y no se pueden asignar a un cierre diario.
+                    </p>
+                  )}
+
+                  <Card>
+                    <CardHeader className="border-b border-border/60 pb-3">
+                      <CardTitle className="text-base font-medium">Unidades vendidas por presentación</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {close.presentaciones?.length ? (
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {close.presentaciones.map((item: any) => (
+                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border px-3 py-2">
+                              <span className="font-medium">{item.presentacion}</span>
+                              <span className="tabular-nums">{item.unidades} uds</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No hay presentaciones vendidas en esta fecha.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="border-b border-border/60 pb-3">
+                      <CardTitle className="text-base font-medium">Descuentos y recargos por pedido</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-4">
+                      {close.pedidos?.length ? close.pedidos.map((pedido: any) => (
+                        <div key={pedido.id} className="rounded-md border p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-medium">Pedido #{pedido.id} · {pedido.cliente}</p>
+                              <p className="text-xs text-muted-foreground">Tasa del pedido: {pedido.tasa_cambio ? Number(pedido.tasa_cambio).toLocaleString('es-VE') : 'No registrada'}</p>
+                            </div>
+                            <div className="text-right text-sm font-semibold tabular-nums">
+                              <p>{formatCloseUsd(pedido.total_usd)}</p>
+                              <p className="font-normal text-muted-foreground">{formatCloseBs(pedido.total_bs)}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-1 border-t pt-2 text-sm">
+                            {pedido.descuento_cupon_usd > 0 && (
+                              <div className="flex flex-wrap justify-between gap-2 text-amber-800">
+                                <span>Descuento de cupón {pedido.cupon_codigo ? `(${pedido.cupon_codigo})` : ''}</span>
+                                <span className="tabular-nums">−{formatCloseUsd(pedido.descuento_cupon_usd)} · −{formatCloseBs(pedido.descuento_cupon_bs)}</span>
+                              </div>
+                            )}
+                            {(pedido.ajustes || []).map((ajuste: any) => (
+                              <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-rose-700'}`}>
+                                <span>
+                                  {ajuste.tipo === 'descuento' ? 'Descuento' : 'Recargo'}
+                                  {' '}{ajuste.modo === 'porcentaje' ? `${ajuste.valor}%` : formatCloseUsd(ajuste.valor)}
+                                  {ajuste.motivo ? ` · ${ajuste.motivo}` : ''}
+                                </span>
+                                <span className="tabular-nums">
+                                  {ajuste.tipo === 'descuento' ? '−' : '+'}{formatCloseUsd(ajuste.monto_usd)}
+                                  {' · '}
+                                  {ajuste.tipo === 'descuento' ? '−' : '+'}{formatCloseBs(ajuste.monto_bs)}
+                                </span>
+                              </div>
+                            ))}
+                            {pedido.descuento_cupon_usd <= 0 && (pedido.ajustes || []).length === 0 && (
+                              <p className="text-xs text-muted-foreground">Sin descuentos ni recargos.</p>
+                            )}
+                          </div>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-muted-foreground">No hay pedidos completados en esta fecha.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       );
     }
 
@@ -1066,7 +1253,7 @@ export default function Reportes() {
       const filtered = rows.filter((r) => {
         const matchStatus = rotacionFilter === 'todos' || r.status === rotacionFilter;
         const matchSearch = !rotacionSearch || normalizeText(r.nombre).includes(normalizeText(rotacionSearch));
-        const matchCategoria = !rotacionCategoria || r.categoriaId === rotacionCategoria;
+        const matchCategoria = !rotacionCategoria || r.categoriasProducto.some((c) => c.id === rotacionCategoria);
         const matchPeriodo = rotacionPeriodo === null || (r.daysSince === null || r.daysSince >= rotacionPeriodo);
         return matchStatus && matchSearch && matchCategoria && matchPeriodo;
       });

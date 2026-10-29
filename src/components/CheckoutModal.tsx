@@ -1,30 +1,167 @@
-import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Building2, Check, MapPin, Minus, Navigation, Pencil, Plus, Trash2, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
-import { createPedidoVentaPublic, getFormulas, getProducto, getTasaActiva, lookupClienteByCedula } from '@/integrations/api';
+import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
+
+type FulfillmentType = 'tienda' | 'envio_nacional' | 'delivery';
+const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '');
+
+export interface CheckoutDeliveryReview {
+  method: string;
+  details: string[];
+  fulfillmentType: FulfillmentType;
+  nombreCliente: string;
+  cedula: string;
+  telefono: string;
+  clienteId: number | null;
+  clienteExistente: boolean;
+  sucursalId: string;
+  empresaEnvio: string;
+  empresaEnvioOtra: string;
+  agenciaCodigo: string;
+  agenciaDireccion: string;
+  ubicacionLink: string;
+  ubicacionActual: { latitude: number; longitude: number } | null;
+}
 
 interface Props {
   open: boolean;
+  visible?: boolean;
   items: CartItem[];
+  inline?: boolean;
+  couponCode?: string;
+  cartTotal?: number;
+  formatPrice?: (value: number) => string;
+  onUpdateQty?: (key: string, qty: number) => void;
+  onRemoveItem?: (key: string) => void;
+  confirmRequest?: number;
+  editDeliveryRequest?: number;
+  initialDelivery?: CheckoutDeliveryReview | null;
+  onReview?: (review: CheckoutDeliveryReview) => void;
+  onSubmittingChange?: (submitting: boolean) => void;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function CheckoutModal({ open, items, onClose, onSuccess }: Props) {
+export default function CheckoutModal({
+  open,
+  visible = true,
+  items,
+  inline = false,
+  couponCode,
+  cartTotal,
+  formatPrice,
+  onUpdateQty,
+  onRemoveItem,
+  confirmRequest = 0,
+  editDeliveryRequest = 0,
+  initialDelivery = null,
+  onReview,
+  onSubmittingChange,
+  onClose,
+  onSuccess,
+}: Props) {
+  const localDemo = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).get('demoCheckout') === '1';
   const [nombreCliente, setNombreCliente] = useState<string>('');
   const [telefono, setTelefono] = useState<string>('');
   const [cedula, setCedula] = useState<string>('');
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [clienteExistente, setClienteExistente] = useState<boolean>(false);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [clienteLookupComplete, setClienteLookupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tasaActiva, setTasaActiva] = useState<any | null>(null);
   const [useTasaActiva, setUseTasaActiva] = useState<boolean>(true);
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType | null>(null);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [sucursalesError, setSucursalesError] = useState('');
+  const [sucursalId, setSucursalId] = useState('');
+  const [sucursalesDropdownOpen, setSucursalesDropdownOpen] = useState(false);
+  const [empresaEnvio, setEmpresaEnvio] = useState('');
+  const [empresaEnvioOtra, setEmpresaEnvioOtra] = useState('');
+  const [agenciaCodigo, setAgenciaCodigo] = useState('');
+  const [agenciaDireccion, setAgenciaDireccion] = useState('');
+  const [ubicacionLink, setUbicacionLink] = useState('');
+  const [ubicacionActual, setUbicacionActual] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [localizando, setLocalizando] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'delivery' | 'review'>('delivery');
+  const formRef = useRef<HTMLFormElement>(null);
+  const cedulaLookupRequest = useRef(0);
+  const currentCedula = useRef('');
+  const nombreClienteRef = useRef('');
+  const telefonoRef = useRef('');
+  const nombreAutocompletado = useRef(false);
+  const telefonoAutocompletado = useRef(false);
+  const skipNextCedulaLookup = useRef<{ cedula: string; fulfillmentType: FulfillmentType } | null>(null);
+  const [clienteLookupError, setClienteLookupError] = useState('');
+
+  useEffect(() => {
+    if (editDeliveryRequest <= 0 || !initialDelivery) return;
+    skipNextCedulaLookup.current = {
+      cedula: initialDelivery.cedula.trim(),
+      fulfillmentType: initialDelivery.fulfillmentType,
+    };
+    setCheckoutStep('delivery');
+    setFulfillmentType(initialDelivery.fulfillmentType);
+    setNombreCliente(initialDelivery.nombreCliente);
+    setCedula(initialDelivery.cedula);
+    currentCedula.current = initialDelivery.cedula.trim();
+    setTelefono(initialDelivery.telefono);
+    setClienteId(initialDelivery.clienteId);
+    setClienteExistente(initialDelivery.clienteExistente);
+    setClienteLookupComplete(true);
+    setClienteLookupError('');
+    setSucursalId(initialDelivery.sucursalId);
+    setEmpresaEnvio(initialDelivery.empresaEnvio);
+    setEmpresaEnvioOtra(initialDelivery.empresaEnvioOtra);
+    setAgenciaCodigo(initialDelivery.agenciaCodigo);
+    setAgenciaDireccion(initialDelivery.agenciaDireccion);
+    setUbicacionLink(initialDelivery.ubicacionLink);
+    setUbicacionActual(initialDelivery.ubicacionActual);
+    nombreClienteRef.current = initialDelivery.nombreCliente;
+    telefonoRef.current = initialDelivery.telefono;
+    nombreAutocompletado.current = false;
+    telefonoAutocompletado.current = false;
+  }, [editDeliveryRequest, initialDelivery]);
+
+  useEffect(() => {
+    if (confirmRequest > 0 && checkoutStep === 'review') {
+      formRef.current?.requestSubmit();
+    }
+  }, [confirmRequest, checkoutStep]);
 
   useEffect(() => {
     let mounted = true;
     if (!open) return;
+    setLoadingSucursales(true);
+    if (localDemo) {
+      const demoBranches = [{ id: 900001, nombre: 'Sucursal de prueba', direccion: 'Av. Demo, Maracaibo', activa: true }];
+      setSucursales(demoBranches);
+      setSucursalId((current) => demoBranches.some((branch) => String(branch.id) === current) ? current : '');
+      setSucursalesError('');
+      setLoadingSucursales(false);
+    } else {
+      getSucursalesActivas()
+        .then((rows) => {
+          if (!mounted) return;
+          setSucursales(rows);
+          setSucursalesError('');
+          setSucursalId((current) => rows.some((branch) => String(branch.id) === current) ? current : '');
+        })
+        .catch((error) => {
+          console.error('Error cargando sucursales del checkout:', error);
+          if (!mounted) return;
+          setSucursales([]);
+          setSucursalesError('No pudimos cargar las sucursales. Intenta de nuevo más tarde.');
+          toast.error('No se pudieron cargar las sucursales');
+        })
+        .finally(() => {
+          if (mounted) setLoadingSucursales(false);
+        });
+    }
     (async () => {
       try {
         const t = await getTasaActiva();
@@ -38,50 +175,266 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
     return () => { mounted = false; };
   }, [open]);
 
-  if (!open) return null;
-
-  const buscarClientePorCedula = async (cedulaIngresada: string) => {
+  const buscarClientePorCedula = useCallback(async (cedulaIngresada: string) => {
     const value = cedulaIngresada.trim();
-    if (!value) {
-      setClienteId(null);
-      setClienteExistente(false);
-      setNombreCliente('');
-      setTelefono('');
-      return;
-    }
+    if (value.length < 4) return;
 
+    const requestId = ++cedulaLookupRequest.current;
     try {
+      setClienteLookupError('');
       setBuscandoCliente(true);
       const data = await lookupClienteByCedula(value);
+      if (requestId !== cedulaLookupRequest.current || currentCedula.current !== value) return;
       if (data?.exists && data?.cliente) {
         setClienteExistente(true);
         setClienteId(Number(data.cliente.id));
-        setNombreCliente(String(data.cliente.nombre || ''));
-        setTelefono(String(data.cliente.telefono || ''));
+        if (!nombreClienteRef.current.trim() || nombreAutocompletado.current) {
+          const name = String(data.cliente.nombre || '');
+          setNombreCliente(name);
+          nombreClienteRef.current = name;
+          nombreAutocompletado.current = Boolean(name);
+        }
+        if (!telefonoRef.current.trim() || telefonoAutocompletado.current) {
+          const phone = normalizePhoneDigits(String(data.cliente.telefono || ''));
+          setTelefono(phone);
+          telefonoRef.current = phone;
+          telefonoAutocompletado.current = Boolean(phone);
+        }
+        setClienteLookupComplete(true);
         return;
       }
 
       setClienteExistente(false);
       setClienteId(null);
-      setNombreCliente('');
-      setTelefono('');
+      setClienteLookupComplete(true);
     } catch (error) {
+      if (requestId !== cedulaLookupRequest.current || currentCedula.current !== value) return;
       setClienteExistente(false);
       setClienteId(null);
-      setNombreCliente('');
-      setTelefono('');
+      setClienteLookupError('No pudimos verificar la cédula. Puedes ingresar tus datos manualmente.');
+      setClienteLookupComplete(true);
     } finally {
-      setBuscandoCliente(false);
+      if (requestId === cedulaLookupRequest.current) setBuscandoCliente(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const value = cedula.trim();
+    const skippedLookup = skipNextCedulaLookup.current;
+    if (skippedLookup) {
+      skipNextCedulaLookup.current = null;
+      if (value === skippedLookup.cedula && fulfillmentType === skippedLookup.fulfillmentType) return;
+    }
+    if (!open || !fulfillmentType || value.length < 4) {
+      cedulaLookupRequest.current += 1;
+      setBuscandoCliente(false);
+      return;
+    }
+
+    setClienteLookupComplete(false);
+    const timeout = window.setTimeout(() => {
+      void buscarClientePorCedula(value);
+    }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [cedula, fulfillmentType, open, buscarClientePorCedula]);
+
+  if (!open) return null;
+
+  const capturarUbicacionActual = () => {
+    if (!navigator.geolocation) {
+      toast.error('Este navegador no permite compartir la ubicación actual');
+      return;
+    }
+    setLocalizando(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const location = { latitude: coords.latitude, longitude: coords.longitude };
+        setUbicacionActual(location);
+        setUbicacionLink(`https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`);
+        setLocalizando(false);
+        toast.success('Ubicación actual agregada');
+      },
+      (error) => {
+        console.error('No se pudo obtener la ubicación actual:', error);
+        setLocalizando(false);
+        toast.error('No se pudo obtener tu ubicación. Revisa los permisos del navegador o pega un enlace de Maps.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
   };
+
+  const renderCustomerFields = ({ wideName = false, widePhone = false } = {}) => (
+    <>
+      <div>
+        <label htmlFor="checkout-cedula" className="mb-2 block text-sm font-medium text-gray-700">Cédula</label>
+        <input
+          id="checkout-cedula"
+          required
+          type="text"
+          value={cedula}
+          onChange={(event) => {
+            const next = event.target.value;
+            setCedula(next);
+            currentCedula.current = next.trim();
+            cedulaLookupRequest.current += 1;
+            setBuscandoCliente(false);
+            setClienteLookupError('');
+            setClienteLookupComplete(false);
+            setClienteExistente(false);
+            setClienteId(null);
+            if (nombreAutocompletado.current) {
+              setNombreCliente('');
+              nombreClienteRef.current = '';
+              nombreAutocompletado.current = false;
+            }
+            if (telefonoAutocompletado.current) {
+              setTelefono('');
+              telefonoRef.current = '';
+              telefonoAutocompletado.current = false;
+            }
+          }}
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          placeholder="Escribe tu cédula"
+        />
+        {buscandoCliente && <p className="mt-1 text-xs text-gray-500">Buscando tus datos...</p>}
+        {clienteLookupError && !(nombreCliente.trim() && telefono.trim()) && (
+          <p className="mt-1 text-xs text-amber-700">{clienteLookupError}</p>
+        )}
+      </div>
+      {clienteLookupComplete && (
+        <>
+      <div className={wideName ? 'col-span-2' : undefined}>
+        <label htmlFor="checkout-nombre" className="mb-2 block text-sm font-medium text-gray-700">
+          Nombre y apellido
+        </label>
+        <input
+          id="checkout-nombre"
+          required
+          type="text"
+          value={nombreCliente}
+          onChange={(event) => {
+            nombreClienteRef.current = event.target.value;
+            nombreAutocompletado.current = false;
+            setNombreCliente(event.target.value);
+          }}
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          placeholder="Ej. María González"
+        />
+      </div>
+      <div className={widePhone ? 'col-span-2' : undefined}>
+        <label htmlFor="checkout-telefono" className="mb-2 block text-sm font-medium text-gray-700">Número de teléfono</label>
+        <input
+          id="checkout-telefono"
+          required
+          type="tel"
+          inputMode="numeric"
+          minLength={11}
+          pattern="[0-9]{11,}"
+          value={telefono}
+          onChange={(event) => {
+            const digits = normalizePhoneDigits(event.target.value);
+            telefonoRef.current = digits;
+            telefonoAutocompletado.current = false;
+            setTelefono(digits);
+          }}
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          placeholder="Ej. 584141234567"
+        />
+        <p className="mt-1 text-xs text-gray-500">Solo números, mínimo 11 dígitos.</p>
+      </div>
+      {clienteExistente && (
+        <p className={wideName || widePhone ? 'col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700' : 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'}>
+          ¡Bienvenido de vuelta! Tu lealtad hace crecer la familia Mirra.
+        </p>
+      )}
+      {!clienteExistente && !clienteLookupError && (
+        <p className={wideName || widePhone ? 'col-span-2 text-xs text-gray-500' : 'text-xs text-gray-500'}>
+          No encontramos datos para esta cédula. Completa tu nombre y teléfono.
+        </p>
+      )}
+        </>
+      )}
+      {!clienteLookupComplete && !buscandoCliente && cedula.trim().length < 4 && (
+        <p className={wideName || widePhone ? 'col-span-2 text-xs text-gray-500' : 'text-xs text-gray-500'}>
+          Ingresa tu cédula para buscar tus datos antes de continuar.
+        </p>
+      )}
+    </>
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fulfillmentType) return toast.error('Selecciona un método de entrega para continuar');
     if (!cedula.trim()) return toast.error('Ingrese la cédula del cliente');
-    if (!clienteExistente && !nombreCliente.trim()) return toast.error('Ingrese el nombre del cliente');
-    if (!clienteExistente && !telefono.trim()) return toast.error('Ingrese el teléfono del cliente');
+    if (!nombreCliente.trim()) return toast.error('Ingrese el nombre completo del cliente');
+    if (!telefono.trim()) return toast.error('Ingrese el teléfono del cliente');
+    if (normalizePhoneDigits(telefono).length < 11) return toast.error('El teléfono debe tener al menos 11 dígitos');
+    if (fulfillmentType === 'tienda' && !sucursales.some((branch) => String(branch.id) === sucursalId)) {
+      return toast.error('Selecciona una sucursal disponible');
+    }
+    if (fulfillmentType === 'envio_nacional' && !empresaEnvio) {
+      return toast.error('Selecciona la empresa de envío');
+    }
+    if (fulfillmentType === 'envio_nacional' && empresaEnvio === 'OTRA' && !empresaEnvioOtra.trim()) {
+      return toast.error('Escribe el nombre de la empresa de envío');
+    }
+    if (fulfillmentType === 'envio_nacional' && empresaEnvio !== 'OTRA' && !agenciaCodigo.trim()) {
+      return toast.error('Indica el código de la agencia');
+    }
+    if (fulfillmentType === 'envio_nacional' && !agenciaDireccion.trim()) {
+      return toast.error('Indica la dirección de la agencia');
+    }
+    if (fulfillmentType === 'delivery' && !ubicacionLink.trim() && !ubicacionActual) {
+      return toast.error('Comparte tu ubicación actual o pega un enlace de Google Maps');
+    }
+    if (checkoutStep === 'delivery') {
+      setCheckoutStep('review');
+      const selectedBranch = sucursales.find((branch) => String(branch.id) === sucursalId);
+      const carrier = empresaEnvio === 'OTRA' ? empresaEnvioOtra.trim() : empresaEnvio;
+      const customerDetails = [
+        `Cliente: ${nombreCliente.trim()} · Cédula: ${cedula.trim()} · Teléfono: ${telefono.trim()}`,
+      ];
+      onReview?.({
+        method: fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local',
+        details: fulfillmentType === 'tienda'
+          ? [selectedBranch?.nombre, selectedBranch?.direccion, ...customerDetails].filter(Boolean)
+          : fulfillmentType === 'envio_nacional'
+            ? [carrier, empresaEnvio !== 'OTRA' && agenciaCodigo.trim() ? `Agencia ${agenciaCodigo.trim()}` : '', agenciaDireccion.trim(), ...customerDetails]
+              .filter(Boolean)
+            : [
+              ...customerDetails,
+              ubicacionLink.trim() || (ubicacionActual ? 'Ubicación actual compartida' : ''),
+            ].filter(Boolean),
+        fulfillmentType,
+        nombreCliente: nombreCliente.trim(),
+        cedula: cedula.trim(),
+        telefono: normalizePhoneDigits(telefono),
+        clienteId,
+        clienteExistente,
+        sucursalId,
+        empresaEnvio,
+        empresaEnvioOtra: empresaEnvioOtra.trim(),
+        agenciaCodigo: agenciaCodigo.trim(),
+        agenciaDireccion: agenciaDireccion.trim(),
+        ubicacionLink: ubicacionLink.trim(),
+        ubicacionActual,
+      });
+      return;
+    }
+    if (localDemo) return toast.info('Esta vista previa local no envía pedidos.');
+    if (items.length === 0) return toast.error('Agrega al menos un producto antes de confirmar');
 
-    const lineas = items.map((it) => ({ producto_id: it.product.id, cantidad: Number(it.qty || 0) }));
+    const lineas = items.map((it) => {
+      const product: any = it.product;
+      const formulaId = product?.formula?.id ?? product?.formula_id ?? product?.tamano?.id ?? product?.tamano_id;
+      const formulaName = product?.formula?.nombre ?? product?.formula_nombre ?? product?.tamano?.nombre ?? product?.tamano_nombre;
+      return {
+        producto_id: it.product.id,
+        cantidad: Number(it.qty || 0),
+        ...(formulaId != null ? { formula_id: Number(formulaId), tamano_id: Number(formulaId) } : {}),
+        ...(formulaName != null ? { formula_nombre: String(formulaName), tamano_nombre: String(formulaName) } : {}),
+      };
+    });
 
     // Obtener datos frescos de productos
     const prodMap = new Map<number, any>();
@@ -187,6 +540,8 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
     // Construir snapshot de productos para enviar si el backend lo necesita
     const productosSnapshot = items.map((it) => {
       const p: any = it.product as any;
+      const formulaId = p?.formula?.id ?? p?.formula_id ?? p?.tamano?.id ?? p?.tamano_id;
+      const formulaName = p?.formula?.nombre ?? p?.formula_nombre ?? p?.tamano?.nombre ?? p?.tamano_nombre;
       return {
         id: undefined,
         producto_id: p.id,
@@ -196,6 +551,8 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
         costo: p.costo ?? undefined,
         image_url: p.image_url ?? p.image ?? undefined,
         subtotal: Number(p.price ?? p.precio_venta ?? 0) * Number(it.qty || 0),
+        ...(formulaId != null ? { formula_id: Number(formulaId), tamano_id: Number(formulaId) } : {}),
+        ...(formulaName != null ? { formula_nombre: String(formulaName), tamano_nombre: String(formulaName) } : {}),
       };
     });
 
@@ -207,6 +564,25 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
       lineas,
       _preserve_productos: true,
       productos: productosSnapshot,
+      ...(couponCode ? { cupon_codigo: couponCode } : {}),
+      entrega: fulfillmentType === 'tienda'
+        ? { tipo: fulfillmentType, sucursal_id: Number(sucursalId) }
+        : fulfillmentType === 'envio_nacional'
+          ? {
+            tipo: fulfillmentType,
+            transportista: empresaEnvio,
+            ...(empresaEnvio === 'OTRA' ? { transportista_otro: empresaEnvioOtra.trim() } : {}),
+            agencia_codigo: agenciaCodigo.trim(),
+            agencia_direccion: agenciaDireccion.trim(),
+          }
+          : {
+            tipo: fulfillmentType,
+            ...(ubicacionLink.trim() ? { ubicacion_link: ubicacionLink.trim() } : {}),
+            ...(ubicacionActual ? {
+              ubicacion_latitud: ubicacionActual.latitude,
+              ubicacion_longitud: ubicacionActual.longitude,
+            } : {}),
+          },
     };
 
     if (useTasaActiva && tasaActiva && (typeof tasaActiva.monto === 'number' && tasaActiva.monto > 0)) {
@@ -215,6 +591,7 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
 
     try {
       setLoading(true);
+      onSubmittingChange?.(true);
       const created = await createPedidoVentaPublic(payload);
       toast.success('Pedido creado correctamente');
       // comprobar cambios de precio
@@ -292,111 +669,459 @@ export default function CheckoutModal({ open, items, onClose, onSuccess }: Props
       toast.error('Error al crear pedido');
     } finally {
       setLoading(false);
-      onClose();
+      onSubmittingChange?.(false);
     }
   };
 
+  const getItemPrice = (item: CartItem) => {
+    const product = item.product as any;
+    return Number(product?.precio_snapshot ?? product?.price ?? product?.precio_venta ?? 0);
+  };
+  const displayPrice = (value: number) => formatPrice?.(value)
+    ?? `$${Number(value).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const selectedBranch = sucursales.find((branch) => String(branch.id) === sucursalId);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-md p-6 z-10">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Finalizar pedido</h3>
-          <button onClick={onClose} className="p-1 rounded-md"><X className="w-5 h-5" /></button>
-        </div>
+    <div className={`${inline ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/60 p-4 backdrop-blur-sm'} ${visible ? '' : 'hidden'}`}>
+      {!inline && <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="absolute inset-0 h-full w-full cursor-default" />}
+      <section className={inline ? 'w-full bg-white' : 'relative z-10 my-auto max-h-[94vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl'}>
+        {!inline &&         <header className="flex items-start justify-between bg-primary-800 px-6 py-5">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Finalizar compra</h2>
+            <p className="mt-1 text-sm text-gray-400">Selecciona tu método de entrega para continuar.</p>
+          </div>
+          <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white">
+            <X className="h-5 w-5" />
+          </button>
+        </header>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <div>
-              <label className="block text-sm font-medium text-copper-800">Cédula / RIF</label>
-              <input
-                type="text"
-                value={cedula}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setCedula(next);
-                  if (next.trim().length >= 4) {
-                    void buscarClientePorCedula(next);
-                  }
-                }}
-                onBlur={() => {
-                  if (cedula.trim()) void buscarClientePorCedula(cedula);
-                }}
-                className="mt-1 block w-full rounded-md border p-2"
-                placeholder="Ej: V55555555"
-              />
-              {buscandoCliente && <p className="mt-1 text-xs text-slate-500">Verificando cliente...</p>}
+        <form ref={formRef} onSubmit={handleSubmit} className={inline ? 'mx-auto w-full max-w-md space-y-5' : 'max-h-[calc(94vh-88px)] space-y-6 overflow-y-auto p-6 md:p-8'}>
+          {checkoutStep === 'delivery' && (
+            <>
+          <div className="rounded-lg border border-[#eadfce] bg-[#fbf7f2] px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#806747]">Paso 1 de 2 · Entrega</p>
+            <p className="mt-1 text-sm text-gray-700">Elige cómo recibirás tu pedido y completa los datos.</p>
+          </div>
+          <fieldset>
+            <legend className="sr-only">Método de entrega</legend>
+            <div className={`grid gap-2 ${inline ? 'grid-cols-3' : 'grid-cols-1 md:grid-cols-3'}`}>
+              {([
+                { value: 'tienda', label: 'Retiro en tienda', icon: Building2 },
+                { value: 'envio_nacional', label: 'Envío nacional', icon: Truck },
+                { value: 'delivery', label: 'Delivery local', icon: MapPin },
+              ] as const).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={fulfillmentType === value}
+                  onClick={() => {
+                    if (fulfillmentType !== value) setClienteLookupComplete(false);
+                    setSucursalesDropdownOpen(false);
+                    setFulfillmentType(value);
+                  }}
+                  className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-gray-700 transition-colors hover:bg-[#fbf7f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cbb496] ${fulfillmentType === value ? 'border-[#b4936a] bg-[#fbf7f2] ring-2 ring-[#d8c5aa]' : 'border-gray-200'}`}
+                >
+                  {fulfillmentType === value && (
+                    <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-[#efe5d8] px-1.5 py-0.5 text-[9px] font-semibold leading-none text-[#735c3f]">
+                      <Check className="h-2.5 w-2.5" />
+                      Elegido
+                    </span>
+                  )}
+                  <Icon className="h-6 w-6" strokeWidth={1.8} />
+                  <span className="text-center text-sm font-medium">{label}</span>
+                </button>
+              ))}
             </div>
+          </fieldset>
 
-            {!clienteExistente && (
-              <div>
-                <label className="block text-sm font-medium text-copper-800">Nombre del cliente</label>
-                <input type="text" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: Cliente Publico Demo" />
-              </div>
-            )}
-            {!clienteExistente && (
-              <div>
-                <label className="block text-sm font-medium text-copper-800">Teléfono</label>
-                <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} className="mt-1 block w-full rounded-md border p-2" placeholder="Ej: 04140000001" />
-              </div>
-            )}
-            {clienteExistente && (
-              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                ¡Bienvenido de vuelta! Tu lealtad hace crecer la familia Mirra. Disfruta tu compra de hoy.
-              </div>
-            )}
-            {tasaActiva ? (
-              <div className="mt-2 flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">Tasa activa: <strong>{tasaActiva.simbolo} {typeof tasaActiva.monto === 'number' ? tasaActiva.monto : tasaActiva.monto}</strong></div>
+          <hr className="border-gray-200" />
+
+          {!fulfillmentType ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center py-10 text-center text-gray-400">
+              <svg className="mb-3 h-12 w-12 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-2.3 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
+              </svg>
+              <p className="font-medium text-gray-600">Elige una opción de entrega para continuar.</p>
+              <p className="mt-1 max-w-xs text-sm">Al seleccionarla, aparecerán los datos necesarios para recibir tu pedido.</p>
+            </div>
+          ) : (
+            <div key={fulfillmentType} className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <p className="text-sm font-medium text-[#735c3f]">
+                Opción elegida: {fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local'}
+              </p>
+              {fulfillmentType === 'tienda' && (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-800">Retiro en tienda</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderCustomerFields({ widePhone: true })}
+                  </div>
+                  <div>
+                    <label htmlFor="checkout-sucursal" className="mb-1.5 block text-sm font-medium text-gray-700">Sucursal</label>
+                    {sucursalesError ? (
+                      <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{sucursalesError}</p>
+                    ) : sucursales.length > 0 ? (
+                      <div className="relative">
+                        <button
+                          id="checkout-sucursal"
+                          type="button"
+                          required
+                          aria-haspopup="listbox"
+                          aria-expanded={sucursalesDropdownOpen}
+                          aria-controls="checkout-sucursal-options"
+                          onClick={() => setSucursalesDropdownOpen((isOpen) => !isOpen)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') setSucursalesDropdownOpen(false);
+                          }}
+                          className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-left text-sm leading-5 text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        >
+                          <span className="min-w-0 truncate">
+                            {sucursales.find((branch) => String(branch.id) === sucursalId)
+                              ? `${sucursales.find((branch) => String(branch.id) === sucursalId)?.nombre}${localDemo ? ' (solo demostración)' : ''} — ${sucursales.find((branch) => String(branch.id) === sucursalId)?.direccion}`
+                              : 'Elige una sucursal...'}
+                          </span>
+                          <span aria-hidden="true" className="shrink-0 text-gray-500">▾</span>
+                        </button>
+                        {sucursalesDropdownOpen && (
+                          <ul
+                            id="checkout-sucursal-options"
+                            role="listbox"
+                            aria-labelledby="checkout-sucursal"
+                            onKeyDown={(event) => {
+                              if (event.key === 'Escape') setSucursalesDropdownOpen(false);
+                            }}
+                            className="absolute left-0 right-0 z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                          >
+                            {sucursales.map((branch) => {
+                              const value = String(branch.id);
+                              const selected = sucursalId === value;
+                              return (
+                                <li key={branch.id} role="option" aria-selected={selected}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSucursalId(value);
+                                      setSucursalesDropdownOpen(false);
+                                    }}
+                                    className={`w-full px-3 py-2 text-left text-sm leading-snug transition-colors hover:bg-[#fbf7f2] ${selected ? 'bg-[#fbf7f2] font-medium text-[#735c3f]' : 'text-gray-800'}`}
+                                  >
+                                    <span className="block">{branch.nombre}{localDemo ? ' (solo demostración)' : ''}</span>
+                                    <span className="mt-0.5 block text-xs text-gray-500">{branch.direccion}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                        {loadingSucursales ? 'Cargando sucursales...' : 'Aún no hay sucursales activas disponibles. Elige otra modalidad o inténtalo más tarde.'}
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-xs text-gray-500">Retira tu pedido en el horario de atención de la sucursal.</p>
+                  </div>
+                </>
+              )}
+
+              {fulfillmentType === 'envio_nacional' && (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-800">Datos para envío</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderCustomerFields({ widePhone: true })}
+                    <div>
+                      <fieldset>
+                        <legend className="mb-2 block text-sm font-medium text-gray-700">Empresa de envío</legend>
+                        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Empresa de envío">
+                          {[
+                            { value: 'MRW', label: 'MRW' },
+                            { value: 'ZOOM', label: 'ZOOM' },
+                            { value: 'OTRA', label: 'Otra' },
+                          ].map(({ value, label }) => (
+                            <label key={value} className="cursor-pointer">
+                              <input
+                                className="peer sr-only"
+                                type="radio"
+                                name="checkout-transportista"
+                                value={value}
+                                required
+                                checked={empresaEnvio === value}
+                                onChange={() => setEmpresaEnvio(value)}
+                              />
+                              <span className="flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 transition-colors hover:bg-[#fbf7f2] peer-checked:border-[#cbb496] peer-checked:bg-[#fbf7f2] peer-checked:font-semibold peer-checked:text-[#735c3f] peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[#cbb496]">
+                                {label}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                    <div>
+                      {empresaEnvio === 'OTRA' ? (
+                        <>
+                          <label htmlFor="checkout-transportista-otra" className="mb-2 block text-sm font-medium text-gray-700">¿Cuál empresa?</label>
+                          <input
+                            id="checkout-transportista-otra"
+                            required
+                            maxLength={100}
+                            value={empresaEnvioOtra}
+                            onChange={(event) => setEmpresaEnvioOtra(event.target.value)}
+                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#b4936a] focus:ring-[#b4936a]"
+                            placeholder="Nombre de la empresa"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <label htmlFor="checkout-agencia-codigo" className="mb-2 block text-sm font-medium text-gray-700">Código de agencia</label>
+                          <input
+                            id="checkout-agencia-codigo"
+                            required
+                            value={agenciaCodigo}
+                            onChange={(event) => setAgenciaCodigo(event.target.value)}
+                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                            placeholder="Código de sucursal"
+                          />
+                        </>
+                      )}
+                    </div>
+                    <div className="col-span-2">
+                      <label className="mb-2 block text-sm font-medium text-gray-700">Dirección de la agencia</label>
+                      <input
+                        required
+                        value={agenciaDireccion}
+                        onChange={(event) => setAgenciaDireccion(event.target.value)}
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        placeholder="Ciudad, Estado, Sector"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {fulfillmentType === 'delivery' && (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-800">Datos para delivery</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderCustomerFields({ widePhone: true })}
+                  </div>
+                  <hr className="border-gray-200" />
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-800">Ubicación de entrega</h4>
+                    <button
+                      type="button"
+                      disabled={localizando}
+                      onClick={capturarUbicacionActual}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-100 px-5 py-2.5 text-sm font-medium text-primary-800 transition-colors hover:bg-primary-200 disabled:opacity-60"
+                    >
+                      <Navigation className="h-5 w-5" />
+                      {localizando ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                    </button>
+                    <div className="flex items-center text-sm text-gray-400 before:mr-4 before:flex-1 before:border-t before:border-gray-200 after:ml-4 after:flex-1 after:border-t after:border-gray-200">O</div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">Pegar enlace de Google Maps (opcional si compartes ubicación actual)</label>
+                      <input
+                        type="url"
+                        value={ubicacionLink}
+                        onChange={(event) => {
+                          setUbicacionLink(event.target.value);
+                          setUbicacionActual(null);
+                        }}
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        placeholder="https://maps.app.goo.gl/..."
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://www.google.com/maps', '_blank', 'noopener,noreferrer')}
+                      className="flex h-48 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-50"
+                    >
+                      <MapPin className="mb-2 h-8 w-8 text-gray-400" />
+                      <span className="text-sm font-medium">Google Maps</span>
+                      <span className="mt-1 text-xs">Haz clic para elegir una ubicación y luego pega el enlace</span>
+                    </button>
+                    {ubicacionActual && (
+                      <p className="text-xs text-emerald-700">
+                        Ubicación actual incluida: {ubicacionActual.latitude.toFixed(5)}, {ubicacionActual.longitude.toFixed(5)}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+            </>
+          )}
+
+          {checkoutStep === 'review' && (
+            <section className="mx-auto w-full max-w-md space-y-5" aria-labelledby="checkout-review-title">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={useTasaActiva} onChange={(e) => setUseTasaActiva(e.target.checked)} />
-                    <span className="text-sm">Usar tasa activa</span>
-                  </label>
+                  <h3 id="checkout-review-title" className="text-lg font-semibold text-gray-900">Revisa tu pedido</h3>
+                  <p className="mt-1 text-sm text-gray-500">Ajusta cantidades o elimina productos antes de confirmar.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutStep('delivery')}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-[#806747] hover:bg-[#fbf7f2]"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar entrega
+                </button>
+              </div>
+
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+                {items.length > 0 ? items.map((item) => {
+                  const unitPrice = getItemPrice(item);
+                  return (
+                    <div key={item.key} className="flex items-center gap-3 p-3">
+                      <img
+                        src={item.product.image_url || '/asset/muestra1.jpeg'}
+                        alt=""
+                        className="h-14 w-14 shrink-0 rounded-lg border border-gray-100 bg-gray-50 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-800">{item.product.name}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">{displayPrice(unitPrice)} c/u</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={`Reducir cantidad de ${item.product.name}`}
+                            disabled={item.qty <= 1}
+                            onClick={() => onUpdateQty?.(item.key, item.qty - 1)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-600 disabled:opacity-40"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="min-w-5 text-center text-sm font-medium">{item.qty}</span>
+                          <button
+                            type="button"
+                            aria-label={`Aumentar cantidad de ${item.product.name}`}
+                            onClick={() => onUpdateQty?.(item.key, item.qty + 1)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-600"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex h-full flex-col items-end justify-between gap-3">
+                        <span className="text-sm font-semibold text-gray-900">{displayPrice(unitPrice * item.qty)}</span>
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${item.product.name} del pedido`}
+                          onClick={() => onRemoveItem?.(item.key)}
+                          className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <p className="p-4 text-sm text-gray-500">No quedan productos en tu carrito.</p>
+                )}
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Total estimado</p>
+                    {couponCode && <p className="mt-0.5 text-xs text-emerald-700">Cupón {couponCode} aplicado</p>}
+                  </div>
+                  <p className="text-lg font-bold text-gray-900">
+                    {displayPrice(cartTotal ?? items.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0))}
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="mt-2 text-sm text-muted-foreground">No hay tasa activa disponible</div>
-            )}
-          </div>
 
-          <div>
-            <h4 className="font-medium">Resumen</h4>
-            <ul className="mt-2 space-y-2 max-h-40 overflow-auto">
-              {items.map((it) => {
-                const base = Number(it.product.price || 0);
-                const qty = Number(it.qty || 0);
-                const useConv = useTasaActiva && tasaActiva && (typeof tasaActiva.monto === 'number' && tasaActiva.monto > 0);
-                const priceDisplay = useConv ? `${tasaActiva.simbolo || 'USD'} ${Number(base * Number(tasaActiva.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${Number(base).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              <div className="space-y-2 rounded-xl border border-[#eadfce] bg-[#fbf7f2] p-4 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local'}
+                    </p>
+                    {fulfillmentType === 'tienda' && selectedBranch && (
+                      <p className="mt-1 text-gray-600">{selectedBranch.nombre} · {selectedBranch.direccion}</p>
+                    )}
+                    {fulfillmentType === 'envio_nacional' && (
+                      <>
+                        <p className="mt-1 text-gray-600">
+                          {empresaEnvio === 'OTRA' ? empresaEnvioOtra : empresaEnvio}
+                          {empresaEnvio !== 'OTRA' && agenciaCodigo ? ` · Agencia ${agenciaCodigo}` : ''}
+                        </p>
+                        <p className="text-gray-600">{agenciaDireccion}</p>
+                      </>
+                    )}
+                    {fulfillmentType === 'delivery' && (
+                      <p className="mt-1 break-all text-gray-600">
+                        {ubicacionLink || (ubicacionActual ? 'Ubicación actual compartida' : '')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {fulfillmentType !== 'tienda' && (
+                  <p className="border-t border-[#eadfce] pt-2 text-xs text-gray-600">
+                    {nombreCliente} · {cedula} · {telefono}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {checkoutStep === 'delivery' && !inline && tasaActiva ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-3">
+              <p className="text-sm text-gray-600">Tasa activa: <strong>{tasaActiva.simbolo} {tasaActiva.monto}</strong></p>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={useTasaActiva} onChange={(event) => setUseTasaActiva(event.target.checked)} />
+                Usar tasa activa
+              </label>
+            </div>
+          ) : checkoutStep === 'delivery' && !inline ? (
+            <p className="text-sm text-gray-500">No hay tasa activa disponible</p>
+          ) : null}
+
+          {checkoutStep === 'delivery' && !inline && <section className="rounded-xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-800">Resumen de compra</h4>
+            <ul className="mt-3 max-h-36 space-y-2 overflow-auto text-sm">
+              {items.map((item) => {
+                const base = Number(item.product.price || 0);
+                const qty = Number(item.qty || 0);
+                const converted = useTasaActiva && tasaActiva && Number(tasaActiva.monto) > 0;
+                const amount = converted ? base * Number(tasaActiva.monto) : base;
                 return (
-                  <li key={it.product.id} className="flex justify-between">
-                    <span>{it.product.name} x {qty}</span>
-                    <span className="font-semibold">{priceDisplay}</span>
+                  <li key={item.key} className="flex justify-between gap-4">
+                    <span className="text-gray-600">{item.product.name} × {qty}</span>
+                    <span className="shrink-0 font-medium text-gray-800">
+                      {converted ? `${tasaActiva.simbolo || 'USD'} ` : ''}
+                      {Number(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </li>
                 );
               })}
             </ul>
-            <div className="mt-3 text-right">
-              <div className="text-sm text-muted-foreground">Total</div>
-              <div className="font-semibold">
+            <div className="mt-3 flex justify-between border-t border-gray-200 pt-3">
+              <span className="font-semibold text-gray-800">Total</span>
+              <span className="font-bold text-gray-900">
                 {(() => {
-                  const subtotal = items.reduce((s, it) => s + (Number(it.product.price || 0) * Number(it.qty || 0)), 0);
-                  if (useTasaActiva && tasaActiva && typeof tasaActiva.monto === 'number' && tasaActiva.monto > 0) {
-                    const totalConv = subtotal * Number(tasaActiva.monto);
-                    return `${tasaActiva.simbolo || 'USD'} ${Number(totalConv).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                  }
-                  return `${Number(subtotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  const subtotal = items.reduce((sum, item) => sum + Number(item.product.price || 0) * Number(item.qty || 0), 0);
+                  const total = useTasaActiva && tasaActiva && Number(tasaActiva.monto) > 0
+                    ? subtotal * Number(tasaActiva.monto)
+                    : subtotal;
+                  return `${useTasaActiva && tasaActiva ? `${tasaActiva.simbolo || 'USD'} ` : ''}${total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 })()}
-              </div>
+              </span>
             </div>
-          </div>
+          </section>}
 
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md border">Cancelar</button>
-            <button type="submit" className="px-4 py-2 rounded-md bg-copper-600 text-cream-50" disabled={loading}>{loading ? 'Enviando...' : 'Confirmar pedido'}</button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading || !fulfillmentType || (checkoutStep === 'review' && items.length === 0)}
+            className="w-full rounded-lg bg-[#b4936a] px-5 py-3.5 text-center text-sm font-medium text-white transition-colors hover:bg-[#a4825b] focus:outline-none focus:ring-4 focus:ring-[#eadfce] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Enviando...' : checkoutStep === 'delivery' ? fulfillmentType ? 'Guardar entrega y volver al carrito' : 'Elige una opción de entrega' : 'Confirmar pedido'}
+          </button>
+          {checkoutStep === 'delivery' && (
+            <p className="-mt-3 text-center text-xs leading-relaxed text-gray-500">
+              Volverás al carrito para revisar tus productos. Podrás editar la entrega antes de confirmar.
+            </p>
+          )}
         </form>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3, Megaphone, Star, TicketPercent } from "lucide-react";
+import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3, Megaphone, Star, TicketPercent, Store } from "lucide-react";
 import { useLocation } from 'react-router-dom';
 import React, { useEffect } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -79,6 +79,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' },
       { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' },
       { title: "Cintillo", url: "/admin/cintillo", icon: Megaphone, module: 'usuarios' },
+      { title: "Sucursales", url: "/admin/sucursales", icon: Store, module: 'usuarios' },
     ],
   },
 ];

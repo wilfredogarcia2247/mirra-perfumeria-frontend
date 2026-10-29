@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
-import ProductCard from '@/components/ProductCard';
+import CatalogProductCard from '@/components/CatalogProductCard';
+import ProductQuickSheet from '@/components/ProductQuickSheet';
+import { volarAlCarrito } from '@/lib/catalog';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic } from '@/integrations/api';
 import useCart, { CartItem } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { trackCatalogPageView } from '@/lib/google-ads';
 import { toast } from 'sonner';
-import { Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle, TicketPercent, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Search, User, Phone, FileText, Trash2, Send, MessageCircle, TicketPercent, Check } from 'lucide-react';
 
 import Footer from '@/components/Footer';
-import ProductCarousel from '@/components/SocialMediaCarousel';
+import FeaturedShowcase from '@/components/FeaturedShowcase';
 import { useIsMobile } from '@/hooks/use-mobile';
+import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
 interface CuponPublico {
   id: number;
@@ -21,6 +24,26 @@ interface CuponPublico {
   descripcion?: string | null;
   es_global?: boolean;
   colaborador_nombre?: string | null;
+}
+
+function slugifyCategory(name: string) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Nombres de todas las categorías del producto (la API envía `categorias`; `categoria` es la antigua única)
+function categoryNames(item: any): string[] {
+  const list = Array.isArray(item?.categorias) ? item.categorias : [];
+  const names = list.map((c: any) => String(c?.nombre ?? c?.name ?? '')).filter(Boolean);
+  if (names.length > 0) return names;
+  const single = (item?.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item?.categoria_nombre ?? item?.category ?? '';
+  return single ? [String(single)] : [];
+}
+
+// Texto que ve el cliente: si es de Hombre y de Mujer se muestra "Unisex"
+function categoryLabel(names: string[]) {
+  const slugs = names.map(slugifyCategory);
+  if (slugs.includes('hombre') && slugs.includes('mujer')) return 'Unisex';
+  return names.join(', ');
 }
 
 export default function Hero() {
@@ -35,8 +58,19 @@ export default function Hero() {
   const { categorySlug } = useParams();
   const selectedCategory = categorySlug || 'all';
   const [search, setSearch] = useState<string>('');
+  const navigate = useNavigate();
+  // Ventana con la foto grande para elegir la presentación
+  const [sheetProduct, setSheetProduct] = useState<{ product: Product; foto: HTMLImageElement | null } | null>(null);
+  // Altura del encabezado fijo: los filtros se pegan justo debajo al bajar
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const filtrosRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [deliveryReview, setDeliveryReview] = useState<CheckoutDeliveryReview | null>(null);
+  const [confirmOrderRequest, setConfirmOrderRequest] = useState(0);
+  const [editDeliveryRequest, setEditDeliveryRequest] = useState(0);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [tipoDocumento, setTipoDocumento] = useState('V');
@@ -119,8 +153,11 @@ export default function Hero() {
           name: item.nombre ?? item.name ?? '',
           image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
           featured: Boolean(item.destacado ?? item.featured ?? false),
+          agotado: Boolean(item.agotado),
+          mas_pedido: Boolean(item.mas_pedido),
           brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
-          category: (item.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item.categoria_nombre ?? item.categoria ?? item.category ?? '',
+          categories: categoryNames(item),
+          category: categoryLabel(categoryNames(item)),
           description: item.descripcion ?? item.description ?? '',
           price: Number(item.precio_venta ?? item.price ?? 0) || 0,
           precio_venta: item.precio_venta ?? null,
@@ -161,16 +198,17 @@ export default function Hero() {
         (product.name || '').toLowerCase().includes(q) ||
         (product.brand || '').toLowerCase().includes(q) ||
         (product.description || '').toLowerCase().includes(q) ||
-        (product.category || '').toLowerCase().includes(q)
+        (product.category || '').toLowerCase().includes(q) ||
+        (product.categories || []).join(' ').toLowerCase().includes(q)
       ))
       : catalogProducts;
 
     const categoryFiltered = selectedCategory === 'all'
       ? filtered
       : filtered.filter((product) => {
-        const catName = product.category || '';
-        const catSlug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        return catSlug === selectedCategory.toLowerCase();
+        // Un perfume unisex (Hombre y Mujer) aparece en las dos categorías
+        const names = product.categories && product.categories.length > 0 ? product.categories : [product.category || ''];
+        return names.map(slugifyCategory).includes(selectedCategory.toLowerCase());
       });
 
     setFullProducts(categoryFiltered);
@@ -208,6 +246,47 @@ export default function Hero() {
   }, []);
 
   // not exposing categories selector on the public Hero
+
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    const medir = () => setHeaderHeight(header.getBoundingClientRect().height);
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
+  // Filtros rápidos: solo los que tienen perfumes
+  const filtrosRapidos = (() => {
+    const slugsDe = (p: Product) => (p.categories && p.categories.length > 0 ? p.categories : [p.category || '']).map(slugifyCategory);
+    const lista: { slug: string; label: string }[] = [{ slug: 'all', label: 'Todos' }];
+    if (catalogProducts.some((p) => slugsDe(p).includes('hombre'))) lista.push({ slug: 'hombre', label: 'Hombre' });
+    if (catalogProducts.some((p) => slugsDe(p).includes('mujer'))) lista.push({ slug: 'mujer', label: 'Mujer' });
+    return lista.length > 1 ? lista : [];
+  })();
+
+  function elegirFiltro(slug: string) {
+    navigate(slug === 'all' ? '/' : `/categoria/${slug}`);
+    setPage(1);
+    // Si el cliente ya bajó por la lista, volver a su inicio (justo debajo de los filtros fijos).
+    // Se calcula después de que la página se actualiza, porque los textos de arriba cambian con el filtro.
+    window.setTimeout(() => {
+      const lista = listaRef.current;
+      const filtros = filtrosRef.current;
+      if (!lista || !filtros) return;
+      const altoFiltros = filtros.getBoundingClientRect().height;
+      const destino = window.scrollY + lista.getBoundingClientRect().top - headerHeight - altoFiltros - 8;
+      if (window.scrollY > destino + 1) window.scrollTo({ top: Math.max(0, destino), behavior: 'smooth' });
+    }, 60);
+  }
+
+  // Agregar desde la ventana: la foto vuela al carrito y luego se suma
+  function handleAddFromSheet(item: Product, foto: HTMLImageElement | null) {
+    const espera = volarAlCarrito(foto?.currentSrc || getImageUrl(item), foto ? foto.getBoundingClientRect() : null);
+    window.setTimeout(() => handleAddToCart(item), espera);
+  }
 
   function handleAddToCart(product: Product) {
     addItem(product, 1);
@@ -286,7 +365,7 @@ export default function Hero() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-x-clip">
       {/* Decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -right-20 -top-20 w-96 h-96 bg-primary-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -329,8 +408,8 @@ export default function Hero() {
       </section>
 
       {!loading && catalogProducts.length > 0 && (
-        <div className="relative z-10 py-8 sm:py-12 bg-gradient-to-b from-white/80 to-transparent">
-          <ProductCarousel products={catalogProducts} />
+        <div className="relative z-10">
+          <FeaturedShowcase products={catalogProducts} onAddToCart={handleAddFromSheet} />
         </div>
       )}
 
@@ -361,14 +440,56 @@ export default function Hero() {
           {/* Category filter removed from Landing (Hero) */}
         </div>
 
+        {filtrosRapidos.length > 0 && (
+          <div
+            ref={filtrosRef}
+            className="sticky z-30 -mx-4 mb-4 bg-gray-50/95 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6"
+            style={{ top: headerHeight }}
+          >
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar perfumes">
+              {filtrosRapidos.map((f) => {
+                const activo = selectedCategory.toLowerCase() === f.slug;
+                return (
+                  <button
+                    key={f.slug}
+                    type="button"
+                    role="tab"
+                    aria-selected={activo}
+                    onClick={() => elegirFiltro(f.slug)}
+                    className={`shrink-0 rounded-full border-[1.5px] px-4 py-2 text-sm font-semibold transition ${activo ? 'border-gray-900 bg-gray-900 text-white' : 'border-[#e8d9c5] bg-white text-gray-800 hover:border-[#CA9E67]'}`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} openModalOnAdd={true} showStock={false} />
+          <div ref={listaRef} className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+            {products.map((p, i) => (
+              <CatalogProductCard
+                key={p.id}
+                product={p}
+                tasa={tasaPublic}
+                index={i}
+                onOpen={(product, foto) => setSheetProduct({ product, foto })}
+              />
             ))}
           </div>
+        )}
+
+        {sheetProduct && (
+          <ProductQuickSheet
+            product={sheetProduct.product}
+            origen={sheetProduct.foto}
+            tasa={tasaPublic}
+            onClose={() => setSheetProduct(null)}
+            onAdd={handleAddFromSheet}
+          />
         )}
 
         <div className="flex flex-col items-center justify-center mt-6 sm:mt-8 gap-4">
@@ -510,31 +631,86 @@ export default function Hero() {
           {/* Backdrop with fade effect */}
           <div
             className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsCartOpen(false)}
+            onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}
           />
 
           {/* Slide-over panel */}
-          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-out animate-in slide-in-from-right">
+          <div className={`relative w-full bg-white shadow-2xl flex flex-col h-full transform transition-all duration-300 ease-out animate-in slide-in-from-right ${isCheckoutOpen ? 'max-w-lg bg-site' : 'max-w-md'}`}>
 
             {/* Header fixed */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 z-10 sticky top-0">
-              <h2 className="text-xl font-bold font-bell-mt text-gray-800 flex items-center gap-2">
-                Tu Carrito
-                <span className="text-sm font-sans font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {cartItems.reduce((acc, item) => acc + item.qty, 0)} items
-                </span>
+            <div className={`flex items-center justify-between px-6 py-4 border-b z-10 sticky top-0 ${isCheckoutOpen ? 'border-primary-900 bg-primary-800 text-white' : 'border-gray-100 bg-gradient-to-r from-white to-gray-50'}`}>
+              <h2 className={`text-xl font-bold font-bell-mt flex items-center gap-2 ${isCheckoutOpen ? 'text-white' : 'text-gray-800'}`}>
+                {isCheckoutOpen ? (
+                  <span>
+                    Finalizar Compra
+                    <span className="mt-1 block font-sans text-xs font-normal text-primary-100">
+                      {isCheckoutOpen ? 'Indica cómo deseas recibir tu pedido.' : deliveryReview ? 'Revisa los productos y confirma tu método de entrega.' : ''}
+                    </span>
+                  </span>
+                ) : 'Tu Carrito'}
+                {!isCheckoutOpen && (
+                  <span className="text-sm font-sans font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {cartItems.reduce((acc, item) => acc + item.qty, 0)} items
+                  </span>
+                )}
               </h2>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                aria-label="Cerrar carrito"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-1">
+                {isCheckoutOpen && (
+                  <button
+                    onClick={() => setIsCheckoutOpen(false)}
+                    className="rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label="Volver al carrito"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}
+                  className={`rounded-full p-2 transition-colors ${isCheckoutOpen ? 'text-gray-300 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                  aria-label="Cerrar carrito"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* Content Area - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-thumb-gray-300">
+            <div             className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-5 py-5' : 'px-6 py-6'}`}>
+              <CheckoutModal
+                open
+                visible={isCheckoutOpen}
+                inline
+                items={cartItems}
+                couponCode={cuponAplicado?.codigo}
+                cartTotal={totalCarrito}
+                formatPrice={formatMonto}
+                onUpdateQty={updateQty}
+                onRemoveItem={removeItem}
+                confirmRequest={confirmOrderRequest}
+                editDeliveryRequest={editDeliveryRequest}
+                initialDelivery={deliveryReview}
+                onReview={(review) => {
+                  setDeliveryReview(review);
+                  setIsCheckoutOpen(false);
+                }}
+                onSubmittingChange={setCheckoutSubmitting}
+                onClose={() => setIsCheckoutOpen(false)}
+                onSuccess={() => {
+                  clear();
+                  quitarCupon();
+                  setDeliveryReview(null);
+                  setIsCartOpen(false);
+                  setIsCheckoutOpen(false);
+                  setNombreCliente('');
+                  setTelefonoCliente('');
+                  setCedulaCliente('');
+                  setTipoDocumento('V');
+                  setClienteId(null);
+                  setClienteExistente(false);
+                  setDocumentoConsultado(false);
+                }}
+              />
+              <div className={isCheckoutOpen ? 'hidden' : ''}>
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
                   <div className="bg-gray-100 p-6 rounded-full">
@@ -552,7 +728,38 @@ export default function Hero() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6 pb-20"> {/* pb-20 for extra scroll space */}
+                <div className="space-y-4 pb-20"> {/* pb-20 for extra scroll space */}
+                  {deliveryReview && (
+                    <>
+                    <section className="rounded-xl border border-[#eadfce] bg-white px-3 py-2" aria-label="Paso 2 de 2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#806747]">Paso 2 de 2 · Revisión</p>
+                      <p className="mt-0.5 text-xs text-gray-600">Verifica productos y entrega antes de confirmar.</p>
+                    </section>
+                    <section className="rounded-xl border border-[#eadfce] bg-[#fbf7f2] px-3 py-2.5" aria-label="Método de entrega seleccionado">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#806747]">Entrega elegida</p>
+                          <p className="mt-0.5 text-sm font-semibold leading-tight text-gray-900">{deliveryReview.method}</p>
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                            {deliveryReview.details.map((detail, index) => (
+                              <p key={`${index}-${detail}`} className="break-words text-xs leading-snug text-gray-600">{detail}</p>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditDeliveryRequest((request) => request + 1);
+                            setIsCheckoutOpen(true);
+                          }}
+                          className="shrink-0 rounded-lg px-1.5 py-0.5 text-xs font-medium text-[#806747] underline underline-offset-2"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </section>
+                    </>
+                  )}
                   {/* Cart Items List */}
                   <div className="space-y-4">
                     {cartItems.map((it) => {
@@ -631,7 +838,7 @@ export default function Hero() {
                   </div>
 
                   {/* Checkout Form */}
-                  {isCheckoutOpen && (
+                  {false && isCheckoutOpen && (
                     <div className="mt-8 pt-6 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <User className="w-4 h-4" /> Datos de Envío
@@ -861,10 +1068,11 @@ export default function Hero() {
                   )}
                 </div>
               )}
+              </div>
             </div>
 
             {/* Footer with Total and Actions (Fixed at bottom) */}
-            {cartItems.length > 0 && (
+            {cartItems.length > 0 && !isCheckoutOpen && (
               <div className="border-t border-gray-100 bg-white p-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 sticky bottom-0">
                 {/* Campo de cupón de descuento */}
                 <div className="mb-4">
@@ -931,7 +1139,11 @@ export default function Hero() {
                       {formatMonto(totalCarrito)}
                     </p>
                   </div>
-                  {!isCheckoutOpen && <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">Envío por coordinar</p>}
+                  {!isCheckoutOpen && (
+                    <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">
+                      {deliveryReview?.method || 'Envío por coordinar'}
+                    </p>
+                  )}
                 </div>
 
                 {descuentoCupon > 0 && (
@@ -957,11 +1169,18 @@ export default function Hero() {
                       <Trash2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setIsCheckoutOpen(true)}
-                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
+                      onClick={() => {
+                        if (deliveryReview) {
+                          setConfirmOrderRequest((request) => request + 1);
+                        } else {
+                          setIsCheckoutOpen(true);
+                        }
+                      }}
+                      disabled={checkoutSubmitting}
+                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60"
                     >
-                      <span>Finalizar Compra</span>
-                      <Send className="w-4 h-4" />
+                      <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
+                      {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
                 ) : null}

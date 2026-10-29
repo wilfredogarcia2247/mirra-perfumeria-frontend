@@ -3,8 +3,14 @@ export interface Product {
   name: string;
   image_url?: string;
   featured?: boolean;
+  // Sin esencia suficiente: se muestra con el cartel AGOTADO y no se puede pedir
+  agotado?: boolean;
+  // Entre los más pedidos recientemente: etiqueta "🔥 Más pedido"
+  mas_pedido?: boolean;
   brand?: string;
   category?: string;
+  // Todas las categorías del perfume (Hombre y Mujer a la vez = unisex)
+  categories?: string[];
   description?: string;
   price?: number;
   precio_venta?: number;

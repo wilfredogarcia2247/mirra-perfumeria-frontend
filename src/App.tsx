@@ -23,10 +23,13 @@ import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
+import Sucursales from "./pages/Sucursales";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
 import InfluencerDashboard from "./pages/InfluencerDashboard";
 import InfluencerAdminPreview from "./pages/InfluencerAdminPreview";
+import OrderCopyAdminPreview from "./pages/OrderCopyAdminPreview";
+import DailySalesClosePreview from "./pages/DailySalesClosePreview";
 import MarketingInfluencersPreview from "./pages/MarketingInfluencersPreview";
 import Reportes from "./pages/Reportes";
 import Rastreo from "./pages/Rastreo";
@@ -56,6 +59,8 @@ const App = () => (
           {import.meta.env.DEV && <Route path="/influencer-preview" element={<InfluencerDashboard preview />} />}
           {import.meta.env.DEV && <Route path="/influencer-admin-preview" element={<InfluencerAdminPreview />} />}
           {import.meta.env.DEV && <Route path="/marketing-influencers-preview" element={<MarketingInfluencersPreview />} />}
+          {import.meta.env.DEV && <Route path="/order-copy-preview" element={<OrderCopyAdminPreview />} />}
+          {import.meta.env.DEV && <Route path="/daily-close-preview" element={<DailySalesClosePreview />} />}
 
           {/* Rutas protegidas */}
           <Route element={<ProtectedRoute />}>
@@ -107,6 +112,7 @@ const App = () => (
             <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
               <Route path="/admin/whatsapp" element={<WhatsappAdmin />} />
               <Route path="/admin/cintillo" element={<CintilloMensajes />} />
+              <Route path="/admin/sucursales" element={<Sucursales />} />
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />
               <Route path="/admin/marketing/cupones" element={<Cupones />} />
             </Route>

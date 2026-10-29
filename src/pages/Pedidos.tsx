@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy } from 'lucide-react';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -68,6 +68,36 @@ const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummar
     total_recargos: totalRec,
     total_final: totalFinal,
   };
+};
+
+// Líneas del método de entrega para el mensaje de WhatsApp (mismos datos que el detalle del pedido)
+const buildDeliveryLines = (pedido: any): string[] => {
+  const type = String(pedido?.tipo_entrega || '');
+  if (!type) return [];
+  const details = pedido?.datos_entrega || {};
+  const lines = ['🚚 *Método de entrega*'];
+  if (type === 'tienda') {
+    lines.push('🏬 Retiro en tienda');
+    if (details.sucursal_nombre) lines.push(details.sucursal_nombre);
+    if (details.sucursal_direccion) lines.push(`📍 ${details.sucursal_direccion}`);
+  } else if (type === 'envio_nacional') {
+    const carrier = details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW';
+    const agencyCode = details.agencia_codigo || details.agencia_mrw_codigo;
+    const agencyAddress = details.agencia_direccion || details.agencia_mrw_direccion;
+    lines.push(`📦 Envío nacional por ${carrier}`);
+    if (agencyCode) lines.push(`Agencia: ${agencyCode}`);
+    if (agencyAddress) lines.push(`📍 ${agencyAddress}`);
+  } else if (type === 'delivery') {
+    const locationLink = details.ubicacion_link
+      || (details.ubicacion_latitud != null && details.ubicacion_longitud != null
+        ? `https://www.google.com/maps/search/?api=1&query=${details.ubicacion_latitud},${details.ubicacion_longitud}`
+        : null);
+    lines.push('🛵 Delivery');
+    if (locationLink) lines.push(`📍 Ubicación: ${locationLink}`);
+  } else {
+    lines.push(type);
+  }
+  return lines;
 };
 
 const adaptAjusteFromApi = (aj: any): AjusteDraft => {
@@ -621,9 +651,17 @@ export default function Pedidos() {
     setAjustesError(null);
   }, []);
 
+  // Vista previa de los ajustes sin guardar. El descuento del cupón también se resta,
+  // igual que hace el backend al calcular el total del pedido.
   const ajustesPreview = React.useMemo(() => {
     const base = Number(selectedPedido?.total_base ?? 0);
-    return computeAjustesSummary(base, ajustesDraft);
+    const summary = computeAjustesSummary(base, ajustesDraft);
+    const descuentoCupon = roundMoney(selectedPedido?.descuento_cupon ?? 0);
+    return {
+      ...summary,
+      descuento_cupon: descuentoCupon,
+      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon)),
+    };
   }, [selectedPedido, ajustesDraft]);
 
   const handleAddAjuste = () => {
@@ -748,13 +786,108 @@ export default function Pedidos() {
   };
 
   const persistedTotals = React.useMemo(() => {
-    if (!selectedPedido) return { base: 0, descuentos: 0, recargos: 0, final: 0 };
+    if (!selectedPedido) return { base: 0, descuentos: 0, descuentosAjustes: 0, recargos: 0, final: 0 };
     const base = roundMoney(selectedPedido?.total_base ?? selectedPedido?.total ?? 0);
     const descuentos = roundMoney(selectedPedido?.total_descuentos ?? 0);
+    // total_descuentos del backend incluye el cupón; el cupón ya se muestra en su propia línea
+    const descuentosAjustes = Math.max(0, roundMoney(descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0)));
     const recargos = roundMoney(selectedPedido?.total_recargos ?? 0);
     const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
-    return { base, descuentos, recargos, final };
+    return { base, descuentos, descuentosAjustes, recargos, final };
   }, [selectedPedido]);
+
+  const copiarPedidoParaWhatsApp = async () => {
+    if (!selectedPedido) return;
+    if (ajustesDirty) {
+      toast.error('Guarda los descuentos o recargos antes de copiar el pedido');
+      return;
+    }
+
+    const customerName = String(selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'cliente')
+      .trim()
+      .split(/\s+/)[0];
+    const products = Array.isArray(selectedPedido.productos) ? selectedPedido.productos : [];
+    if (products.length === 0) {
+      toast.error('Este pedido no tiene productos para copiar');
+      return;
+    }
+
+    const productLines = products.map((product: any) => {
+      const name = String(
+        product.producto_nombre
+        || product.nombre_producto
+        || product.producto?.nombre
+        || product.producto?.name
+        || product.nombre
+        || product.name
+        || 'Producto',
+      ).trim();
+      const quantity = Number(product.cantidad);
+      return `• ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
+    });
+    const exchangeRate = fmtTasa(selectedPedido);
+    const formatMoney = (amount: number) => roundMoney(exchangeRate ? amount * exchangeRate : amount)
+      .toLocaleString('es-VE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const currencyLabel = exchangeRate ? 'Bs' : '$';
+    const money = (amount: number) => `${currencyLabel} ${formatMoney(amount)}`;
+    const breakdown: string[] = [];
+    const savedAdjustments = Array.isArray(selectedPedido.ajustes)
+      ? selectedPedido.ajustes.map(adaptAjusteFromApi)
+      : [];
+    const appliedAdjustments = computeAjustesSummary(persistedTotals.base, savedAdjustments).ajustes;
+
+    if (persistedTotals.base > 0) {
+      breakdown.push(`Subtotal: ${money(persistedTotals.base)}`);
+    }
+
+    const couponDiscount = roundMoney(selectedPedido.descuento_cupon ?? 0);
+    if (couponDiscount > 0) {
+      const couponCode = String(selectedPedido.cupon_codigo || '').trim();
+      const couponPercent = fmtCuponPct(selectedPedido);
+      breakdown.push(`🎟️ Cupón${couponCode ? ` ${couponCode}` : ''}${couponPercent ? ` (${couponPercent})` : ''}: - ${money(couponDiscount)}`);
+    }
+
+    for (const adjustment of appliedAdjustments) {
+      const amount = adjustment.modo === 'porcentaje'
+        ? roundMoney(persistedTotals.base * (adjustment.valor / 100))
+        : roundMoney(adjustment.valor);
+      const isDiscount = adjustment.tipo === 'descuento';
+      const valueLabel = adjustment.modo === 'porcentaje' ? ` ${adjustment.valor}%` : '';
+      const reason = adjustment.motivo ? ` (${adjustment.motivo})` : '';
+      breakdown.push(
+        `${isDiscount ? '➖ Descuento' : '➕ Recargo'}${valueLabel}${reason}: ${isDiscount ? '-' : '+'} ${money(amount)}`,
+      );
+    }
+
+    const deliveryLines = buildDeliveryLines(selectedPedido);
+    const message = [
+      `¡Hola, ${customerName}! 👋✨`,
+      'Recibimos tu pedido y queremos confirmarlo contigo.',
+      '',
+      `🧾 *Pedido #${selectedPedido.id}*`,
+      '',
+      '🛍️ *Productos*',
+      ...productLines,
+      '',
+      '💰 *Resumen*',
+      ...breakdown,
+      `*Total a pagar: ${money(persistedTotals.final)}*`,
+      ...(deliveryLines.length > 0 ? ['', ...deliveryLines] : []),
+      '',
+      'Por favor, confírmanos si todo está correcto ✅',
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success('Pedido copiado para enviar por WhatsApp');
+    } catch (error) {
+      console.error('No se pudo copiar el pedido al portapapeles:', error);
+      toast.error('No se pudo copiar el pedido. Revisa los permisos del navegador.');
+    }
+  };
 
   // Datos del cupón aplicado al pedido abierto
   const cuponDetalle = React.useMemo(() => {
@@ -792,6 +925,8 @@ export default function Pedidos() {
   // Estados para eliminar línea de pedido
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteLine, setDeleteLine] = useState<any | null>(null);
+  // Unidades a quitar de la línea (solo se pregunta si la línea tiene más de 1 unidad)
+  const [deleteUnits, setDeleteUnits] = useState('1');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   // Estados para agregar producto al pedido
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1658,8 +1793,16 @@ export default function Pedidos() {
     }
   }
 
-  async function handleDeleteLineConfirmed() {
+  // units: cuántas unidades quitar; 'all' (o todas las de la línea) elimina la línea completa
+  async function handleDeleteLineConfirmed(units: number | 'all' = 'all') {
     if (!selectedPedido?.id || !deleteLine?.id) return;
+    const lineQuantity = Number(deleteLine?.cantidad) || 1;
+    const unitsToRemove = units === 'all' ? lineQuantity : units;
+    if (!Number.isInteger(unitsToRemove) || unitsToRemove < 1 || unitsToRemove > lineQuantity) {
+      toast.error(`Indica cuántas unidades quitar (entre 1 y ${lineQuantity})`);
+      return;
+    }
+    const removesWholeLine = unitsToRemove >= lineQuantity;
     // Guard client-side: should not happen if button was disabled
     const hasOrder = Boolean(deleteLine?.orden_produccion_id ?? deleteLine?.orden_id ?? deleteLine?.ordenes_produccion_id ?? deleteLine?.produccion_id ?? deleteLine?.produccionId);
     const createdFlag = (deleteLine?.produccion_creada === true);
@@ -1668,11 +1811,9 @@ export default function Pedidos() {
       setDeleteModalOpen(false);
       return;
     }
-    const ok = window.confirm('¿Eliminar línea? Esta acción no se puede deshacer.');
-    if (!ok) return;
     setDeleteSubmitting(true);
     try {
-      const endpoint = `/pedidos-venta/${selectedPedido.id}/lineas/${deleteLine.id}`;
+      const endpoint = `/pedidos-venta/${selectedPedido.id}/lineas/${deleteLine.id}${removesWholeLine ? '' : `?cantidad=${unitsToRemove}`}`;
       const resp = await apiFetch(endpoint, { method: 'DELETE' });
       // El backend devuelve el pedido actualizado en caso de éxito
       if (resp) {
@@ -1689,7 +1830,7 @@ export default function Pedidos() {
       } else {
         await openDetalle(selectedPedido.id);
       }
-      toast.success('Línea eliminada');
+      toast.success(removesWholeLine ? 'Línea eliminada' : `${unitsToRemove} ${unitsToRemove === 1 ? 'unidad quitada' : 'unidades quitadas'}`);
       setDeleteModalOpen(false);
       setDeleteLine(null);
     } catch (err: any) {
@@ -2018,6 +2159,45 @@ export default function Pedidos() {
                   <span>Cargando...</span>
                 )}
               </DialogDescription>
+              {selectedPedido?.tipo_entrega && (
+                <div className="rounded-lg border border-copper-200 bg-copper-50 px-3 py-2 text-sm text-copper-900">
+                  {(() => {
+                    const details = selectedPedido.datos_entrega || {};
+                    const type = String(selectedPedido.tipo_entrega);
+                    const locationLink = details.ubicacion_link
+                      || (details.ubicacion_latitud != null && details.ubicacion_longitud != null
+                        ? `https://www.google.com/maps/search/?api=1&query=${details.ubicacion_latitud},${details.ubicacion_longitud}`
+                        : null);
+                    return (
+                      <>
+                        <p className="font-semibold">
+                          {type === 'tienda' ? 'Retiro en tienda' : type === 'envio_nacional' ? `Envío nacional · ${details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}` : 'Delivery'}
+                        </p>
+                        {type === 'tienda' && (
+                          <>
+                            <p>{details.sucursal_nombre || 'Sucursal'}</p>
+                            {details.sucursal_direccion && <p>{details.sucursal_direccion}</p>}
+                          </>
+                        )}
+                        {type === 'envio_nacional' && (
+                          <>
+                            <p>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</p>
+                            {(details.agencia_codigo || details.agencia_mrw_codigo) && (
+                              <p>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</p>
+                            )}
+                            <p>Dirección: {details.agencia_direccion || details.agencia_mrw_direccion || '-'}</p>
+                          </>
+                        )}
+                        {type === 'delivery' && locationLink && (
+                          <a className="mt-1 inline-block underline" href={locationLink} target="_blank" rel="noreferrer">
+                            Ver ubicación de delivery en Google Maps
+                          </a>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
               {cuponDetalle && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   <TicketPercent className="w-4 h-4 shrink-0" />
@@ -2039,7 +2219,17 @@ export default function Pedidos() {
                 <div className={`space-y-6 ${showPaymentInline ? 'hidden' : ''}`}>
                   <div className="flex justify-between items-center">
                     <div />
-                    <div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copiarPedidoParaWhatsApp()}
+                        disabled={ajustesDirty || detailLoading}
+                        title={ajustesDirty ? 'Guarda los descuentos o recargos antes de copiar' : 'Copiar mensaje de confirmación para WhatsApp'}
+                      >
+                        <ClipboardCopy className="mr-2 h-4 w-4" />
+                        Copiar pedido
+                      </Button>
                       <Button size="sm" variant="outline" onClick={async () => { await loadProductosOptions(); setAddProductId(null); setAddPresentacionId(null); setAddPrecio(null); setAddCantidad(1); setProductSearchTerm(''); setShowProductDropdown(false); setAddModalOpen(true); }}>Agregar producto</Button>
                     </div>
                   </div>
@@ -2047,19 +2237,19 @@ export default function Pedidos() {
                     <table className="w-full table-auto text-sm">
                       <thead>
                         <tr className="text-left text-xs text-muted-foreground">
-                          <th className="pb-2">Imagen</th>
+                          <th className="hidden pb-2 md:table-cell">Imagen</th>
                           <th className="pb-2">Nombre</th>
                           <th className="pb-2">Precio</th>
-                          <th className="pb-2">Costo</th>
-                          <th className="pb-2">Cantidad</th>
+                          <th className="hidden pb-2 md:table-cell">Costo</th>
+                          <th className="pb-2 text-center"><span className="md:hidden">Cant.</span><span className="hidden md:inline">Cantidad</span></th>
                           <th className="pb-2">Subtotal</th>
-                          <th className="pb-2">Producción</th>
+                          <th className="hidden pb-2 md:table-cell">Producción</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Array.isArray(selectedPedido.productos) && selectedPedido.productos.map((it: any) => (
                           <tr key={it.id} className="border-t">
-                            <td className="py-2 w-16">
+                            <td className="hidden py-2 w-16 md:table-cell">
                               <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
                                 <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => {
                                   const t = e.currentTarget as HTMLImageElement;
@@ -2072,7 +2262,7 @@ export default function Pedidos() {
                                 }} />
                               </div>
                             </td>
-                            <td className="py-2 align-top">
+                            <td className="py-2 pr-2 align-top">
                               <div className="font-medium">{it.producto_nombre || it.nombre || '-'}</div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {(() => {
@@ -2141,7 +2331,7 @@ export default function Pedidos() {
                                           <Button
                                             size="sm"
                                             variant="destructive"
-                                            onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteModalOpen(true); }}
+                                            onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteUnits('1'); setDeleteModalOpen(true); }}
                                             disabled={!canDelete}
                                             title={canDelete ? 'Eliminar línea' : 'No se puede eliminar: orden de producción asociada'}
                                           >Eliminar</Button>
@@ -2153,10 +2343,10 @@ export default function Pedidos() {
                               </div>
                             </td>
                             <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
-                            <td className="py-2">{typeof it.costo === 'number' ? `$${it.costo.toFixed(2)}` : it.costo}</td>
-                            <td className="py-2">{it.cantidad}</td>
+                            <td className="hidden py-2 md:table-cell">{typeof it.costo === 'number' ? `${it.costo.toFixed(2)}` : it.costo}</td>
+                            <td className="py-2" style={{ textAlign: 'center' }}>{it.cantidad}</td>
                             <td className="py-2">{typeof it.subtotal === 'number' ? `$${it.subtotal.toFixed(2)}` : it.subtotal}</td>
-                            <td className="py-2">
+                            <td className="hidden py-2 md:table-cell">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (
@@ -2184,8 +2374,8 @@ export default function Pedidos() {
                           {ajustesDraft.map((ajuste, index) => {
                             const previewRow = ajustesPreview.ajustes[index];
                             return (
-                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-12 gap-2 items-end">
-                                <div className="col-span-2">
+                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-2 gap-2 items-end rounded-md border p-2 md:grid-cols-12 md:border-0 md:p-0">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">Tipo</label>
                                   <select
                                     value={ajuste.tipo}
@@ -2196,7 +2386,7 @@ export default function Pedidos() {
                                     <option value="recargo">Recargo</option>
                                   </select>
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">Modo</label>
                                   <select
                                     value={ajuste.modo}
@@ -2207,7 +2397,7 @@ export default function Pedidos() {
                                     <option value="monto">Monto</option>
                                   </select>
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1 md:col-span-2">
                                   <label className="text-xs text-muted-foreground">{ajuste.modo === 'porcentaje' ? 'Porcentaje' : 'Monto ($)'}</label>
                                   <input
                                     type="number"
@@ -2218,7 +2408,7 @@ export default function Pedidos() {
                                     className="w-full border rounded px-2 py-1 text-sm"
                                   />
                                 </div>
-                                <div className="col-span-4">
+                                <div className="col-span-2 md:col-span-4">
                                   <label className="text-xs text-muted-foreground">Motivo</label>
                                   <input
                                     type="text"
@@ -2228,7 +2418,7 @@ export default function Pedidos() {
                                     placeholder="Ej. Descuento promocional"
                                   />
                                 </div>
-                                <div className="col-span-1 text-right text-sm font-medium">
+                                <div className="col-span-1 self-center text-left text-sm font-medium md:text-right">
                                   {previewRow ? `$${previewRow.monto_aplicado.toFixed(2)}` : '$0.00'}
                                 </div>
                                 <div className="col-span-1 flex justify-end">
@@ -2255,6 +2445,7 @@ export default function Pedidos() {
                       </div>
                       <div className="mt-3 text-xs text-muted-foreground">
                         Vista previa: Subtotal ${ajustesPreview.total_base.toFixed(2)}
+                        {ajustesPreview.descuento_cupon > 0 && ` - cupón $${ajustesPreview.descuento_cupon.toFixed(2)}`}
                         {ajustesPreview.total_descuentos > 0 && ` - $${ajustesPreview.total_descuentos.toFixed(2)}`}
                         {ajustesPreview.total_recargos > 0 && ` + $${ajustesPreview.total_recargos.toFixed(2)}`}
                         {' = '}
@@ -2271,8 +2462,8 @@ export default function Pedidos() {
                             - Cupón {cuponDetalle.codigo}{cuponDetalle.pct ? ` (${cuponDetalle.pct})` : ''}: ${cuponDetalle.descuento.toFixed(2)}
                           </div>
                         )}
-                        {persistedTotals.descuentos > 0 && (
-                          <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentos.toFixed(2)}</div>
+                        {persistedTotals.descuentosAjustes > 0 && (
+                          <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentosAjustes.toFixed(2)}</div>
                         )}
                         {persistedTotals.recargos > 0 && (
                           <div className="text-sm text-rose-600">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
@@ -2759,8 +2950,8 @@ export default function Pedidos() {
             )}
 
             <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full">
-              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-2">
-                <div className="flex gap-2">
+              <div className="w-full flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
+                <div className="grid grid-cols-1 gap-2 md:flex">
                   <Button size="lg" variant="default" onClick={() => {
                     if (ajustesDirty) {
                       toast.error('Guarda los ajustes antes de registrar el pago');
@@ -2792,7 +2983,7 @@ export default function Pedidos() {
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2 md:flex">
                   <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="hover:bg-slate-50">
                     {canceling ? 'Procesando...' : 'Cancelar pedido'}
                   </Button>
@@ -2810,13 +3001,45 @@ export default function Pedidos() {
               <DialogTitle>Eliminar línea</DialogTitle>
               <DialogDescription>Confirme la eliminación de la línea del pedido. Esta acción no se puede deshacer.</DialogDescription>
             </DialogHeader>
-            <div className="p-2">
-              <div className="text-sm">{deleteLine ? `${deleteLine.producto_nombre || deleteLine.nombre || 'Línea #' + deleteLine.id}` : '¿Eliminar esta línea?'} </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setDeleteModalOpen(false); setDeleteLine(null); }} disabled={deleteSubmitting}>Cancelar</Button>
-              <Button variant="destructive" onClick={handleDeleteLineConfirmed} disabled={deleteSubmitting}>{deleteSubmitting ? 'Eliminando...' : 'Eliminar'}</Button>
-            </DialogFooter>
+            {(() => {
+              const lineQuantity = Number(deleteLine?.cantidad) || 1;
+              const lineName = deleteLine ? `${deleteLine.producto_nombre || deleteLine.nombre || 'Línea #' + deleteLine.id}` : '¿Eliminar esta línea?';
+              const units = Number(deleteUnits);
+              const validUnits = Number.isInteger(units) && units >= 1 && units <= lineQuantity;
+              return (
+                <>
+                  <div className="space-y-3 p-2">
+                    <div className="text-sm">{lineName}{lineQuantity > 1 ? ` (${lineQuantity} unidades)` : ''}</div>
+                    {lineQuantity > 1 && (
+                      <label className="block space-y-1 text-sm">
+                        <span className="font-medium">Unidades a quitar</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={lineQuantity}
+                          step={1}
+                          value={deleteUnits}
+                          onChange={(e) => setDeleteUnits(e.target.value)}
+                          className="w-28 rounded border px-2 py-1"
+                        />
+                        <span className="block text-xs text-muted-foreground">Máximo {lineQuantity}</span>
+                      </label>
+                    )}
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => { setDeleteModalOpen(false); setDeleteLine(null); }} disabled={deleteSubmitting}>Cancelar</Button>
+                    {lineQuantity > 1 && units < lineQuantity && (
+                      <Button variant="destructive" onClick={() => void handleDeleteLineConfirmed(units)} disabled={deleteSubmitting || !validUnits}>
+                        {deleteSubmitting ? 'Quitando...' : `Quitar ${validUnits ? units : ''} ${units === 1 ? 'unidad' : 'unidades'}`}
+                      </Button>
+                    )}
+                    <Button variant="destructive" onClick={() => void handleDeleteLineConfirmed('all')} disabled={deleteSubmitting}>
+                      {deleteSubmitting ? 'Eliminando...' : lineQuantity > 1 ? 'Quitar todas' : 'Eliminar'}
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
           </DialogContent>
         </Dialog>
         {/* Modal para producir desde una línea del pedido */}

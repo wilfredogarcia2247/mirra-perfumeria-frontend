@@ -75,10 +75,14 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
         const items = Array.isArray(res) ? res : (res?.items ?? res?.data ?? []);
         const catsMap: Record<string, any> = {};
         (Array.isArray(items) ? items : []).forEach((it: any) => {
-          const cat = it.categoria ?? it.categoria_obj ?? (it.categoria_nombre ? { nombre: it.categoria_nombre, slug: (it.categoria_nombre || '').toLowerCase().replace(/\s+/g, '-') } : null);
-          if (!cat) return;
-          const key = (cat.id ?? cat.nombre ?? cat.slug ?? JSON.stringify(cat)).toString();
-          if (!catsMap[key]) catsMap[key] = { ...cat, __key: key };
+          // Un perfume puede tener varias categorías (Hombre y Mujer = unisex)
+          const single = it.categoria ?? it.categoria_obj ?? (it.categoria_nombre ? { nombre: it.categoria_nombre, slug: (it.categoria_nombre || '').toLowerCase().replace(/\s+/g, '-') } : null);
+          const list = Array.isArray(it.categorias) && it.categorias.length > 0 ? it.categorias : (single ? [single] : []);
+          list.forEach((cat: any) => {
+            if (!cat) return;
+            const key = (cat.id ?? cat.nombre ?? cat.slug ?? JSON.stringify(cat)).toString();
+            if (!catsMap[key]) catsMap[key] = { ...cat, __key: key };
+          });
         });
 
         const cats = Object.values(catsMap) as any[];

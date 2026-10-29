@@ -5,6 +5,7 @@ import { getImageUrl } from '@/lib/utils';
 import { getCachedTasaActiva } from '@/integrations/api';
 import { getPrecioMostrar } from '@/lib/utils';
 import ProductModal from './ProductModal';
+import SoldOutOverlay from './SoldOutOverlay';
 
 interface ProductCardProps {
   product: Product;
@@ -88,6 +89,7 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
             />
           </button>
           {/* badge de URL en dev removido - UI limpia */}
+          {product.agotado && <SoldOutOverlay />}
 
           {product.featured && (
             <span className="absolute top-3 right-3 bg-copper-600 text-cream-50 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 shadow">
@@ -168,11 +170,17 @@ export function ProductCard({ product, onAddToCart, openModalOnAdd = false, show
                   const item = { ...product, tamano: selectedTamano ?? undefined, precio_snapshot: pm.precio ?? undefined };
                   onAddToCart(item as any);
                 }}
-                disabled={(getPrecioMostrar(product, selectedTamano ?? undefined).precio == null)}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 bg-copper-500 text-cream-50 font-semibold hover:scale-105 transition"
+                disabled={product.agotado || (getPrecioMostrar(product, selectedTamano ?? undefined).precio == null)}
+                className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 py-2 font-semibold transition ${product.agotado ? 'cursor-not-allowed bg-gray-200 text-gray-500' : 'bg-copper-500 text-cream-50 hover:scale-105'}`}
               >
-                <ShoppingCart className="w-4 h-4" />
-                <span className="hidden sm:inline">Agregar</span>
+                {product.agotado ? (
+                  <span className="text-xs">Agotado</span>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-4 h-4" />
+                    <span className="hidden sm:inline">Agregar</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
