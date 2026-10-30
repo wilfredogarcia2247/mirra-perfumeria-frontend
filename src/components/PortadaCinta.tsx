@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
+import { bajarAlCatalogo } from '@/lib/catalog';
 
 const MUESTRAS = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const FILAS = 3;
@@ -123,6 +124,10 @@ export default function PortadaCinta({ products, selectedCategory }: PortadaCint
           <div className="mt-5 flex items-stretch justify-center gap-2 sm:mt-7 sm:gap-4">
             <a
               href="#catalog"
+              onClick={(e) => {
+                // Baja dejando el título "Nuestros Productos" visible bajo el menú fijo
+                if (bajarAlCatalogo()) e.preventDefault();
+              }}
               className="flex-1 transform rounded-lg bg-gradient-to-r from-primary-500 to-amber-600 whitespace-nowrap px-2 py-3 text-center text-[13px] font-semibold min-[400px]:text-sm text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-500/30 sm:flex-none sm:px-8 sm:py-4 sm:text-base"
             >
               Explorar Colección
