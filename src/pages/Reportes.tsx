@@ -14,6 +14,7 @@ import {
   getProductos,
   getVentasPorMetodoMoneda,
   getVentasPorPresentacion,
+  getReporteEntregas,
 } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, TicketPercent } from 'lucide-react';
@@ -34,7 +35,8 @@ type ReportSlug =
   | 'rentabilidad'
   | 'ticket-promedio'
   | 'cierre-diario'
-  | 'historial-produccion';
+  | 'historial-produccion'
+  | 'entregas';
 
 type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'produccionResumen' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones' | 'cierre';
 
@@ -53,6 +55,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'rentabilidad', title: 'Rentabilidad', description: 'Margen estimado por ventas y costos' },
   { slug: 'ticket-promedio', title: 'Ticket promedio', description: 'Monto promedio por pedido completado' },
   { slug: 'cierre-diario', title: 'Cierre diario', description: 'Ventas, ajustes y presentaciones del día' },
+  { slug: 'entregas', title: 'Entregas y ciudades', description: 'Cómo reciben sus pedidos y desde dónde nos compran' },
 ];
 
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
@@ -72,6 +75,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   rentabilidad: ['pedidos', 'productos'],
   'ticket-promedio': ['pedidos'],
   'cierre-diario': ['cierre'],
+  entregas: [],
 };
 
 const DATA_LABELS: Record<DataKey, string> = {
@@ -98,6 +102,7 @@ const DATE_FILTER_REPORTS = new Set<ReportSlug>([
   'compras',
   'rentabilidad',
   'ticket-promedio',
+  'entregas',
 ]);
 
 const MONTH_SHORT_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -187,6 +192,7 @@ export default function Reportes() {
   const [productos, setProductos] = useState<any[]>([]);
   const [ventasMetodo, setVentasMetodo] = useState<any[]>([]);
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
+  const [reporteEntregas, setReporteEntregas] = useState<any>(null);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
   const [produccionResumen, setProduccionResumen] = useState<any[]>([]);
   const [fechaCierre, setFechaCierre] = useState(getTodayDateValue);
@@ -274,6 +280,27 @@ export default function Reportes() {
     return () => { cancelled = true; };
   }, [selectedReport, fechaInicio, fechaFin]);
 
+  // Reporte de entregas y ciudades (se recarga al cambiar el periodo)
+  useEffect(() => {
+    if (selectedReport !== 'entregas') return;
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingInfo({ active: true, progress: 0, message: 'Cargando entregas y ciudades...', etaSeconds: 0 });
+      try {
+        const res = await getReporteEntregas(fechaInicio || undefined, fechaFin || undefined);
+        if (!cancelled) setReporteEntregas(res || null);
+      } catch (error) {
+        if (!cancelled) setReporteEntregas(null);
+      } finally {
+        if (!cancelled) setLoadingInfo({ active: false, progress: 100, message: 'Reporte listo', etaSeconds: 0 });
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [selectedReport, fechaInicio, fechaFin]);
+
   useEffect(() => {
     if (selectedReport !== 'historial-produccion') return;
 
@@ -298,7 +325,7 @@ export default function Reportes() {
   }, [selectedReport, prodFechaInicio, prodFechaFin]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas') return;
     setLoaded((prev) => ({
       ...prev,
       pedidos: false,
@@ -308,7 +335,7 @@ export default function Reportes() {
   }, [fechaInicio, fechaFin, selectedReport]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas') return;
 
     let cancelled = false;
 
@@ -1020,6 +1047,72 @@ export default function Reportes() {
             ))}
           </CardContent>
         </Card>
+      );
+    }
+
+    if (selectedReport === 'entregas') {
+      const r = reporteEntregas;
+      if (!r) {
+        return <Card><CardContent className="p-6 text-sm text-muted-foreground">No se pudo cargar el reporte de entregas.</CardContent></Card>;
+      }
+      const usd = (n: number) => `$${Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // Mismos colores que las etiquetas de entrega en Pedidos
+      const colorMetodo: Record<string, string> = { tienda: 'bg-violet-600', envio_nacional: 'bg-cyan-600', delivery: 'bg-pink-600', sin_dato: 'bg-gray-400' };
+      const Ranking = ({ titulo, filas, etiqueta, color, vacio }: { titulo: string; filas: any[]; etiqueta: (f: any) => string; color: string; vacio: string }) => {
+        const max = Math.max(1, ...filas.map((f) => Number(f.pedidos) || 0));
+        return (
+          <Card>
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">{titulo}</CardTitle></CardHeader>
+            <CardContent className="space-y-3 p-4">
+              {filas.length === 0 ? <p className="text-sm text-muted-foreground">{vacio}</p> : filas.map((f, i) => (
+                <div key={i}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate font-medium">{i + 1}. {etiqueta(f)}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">{f.pedidos} pedido{f.pedidos === 1 ? '' : 's'} · {usd(f.monto)}</span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-muted"><div className={`h-2 rounded-full ${color}`} style={{ width: `${(Number(f.pedidos) / max) * 100}%` }} /></div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      };
+      return (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pedidos del periodo</p><p className="text-2xl font-semibold tabular-nums">{r.total_pedidos}</p><p className="text-xs text-muted-foreground">{usd(r.total_monto)} · sin cancelados</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Envíos nacionales</p><p className="text-2xl font-semibold tabular-nums">{r.envios_nacionales}</p><p className="text-xs text-muted-foreground">{r.estados?.length || 0} estado(s) distintos</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Estado con más compras</p><p className="truncate text-2xl font-semibold">{r.estados?.[0]?.estado || '—'}</p><p className="text-xs text-muted-foreground">{r.ciudades?.[0] ? `Ciudad top: ${r.ciudades[0].ciudad}` : 'Aún sin datos de ciudad'}</p></CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Por método de entrega</CardTitle></CardHeader>
+            <CardContent className="space-y-3 p-4">
+              {(r.metodos || []).length === 0 ? <p className="text-sm text-muted-foreground">No hay pedidos en este periodo.</p> : r.metodos.map((m: any) => (
+                <div key={m.tipo}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium">{m.metodo}</span>
+                    <span className="tabular-nums text-muted-foreground">{m.pedidos} · {m.porcentaje}% · {usd(m.monto)}</span>
+                  </div>
+                  <div className="mt-1 h-2.5 rounded-full bg-muted"><div className={`h-2.5 rounded-full ${colorMetodo[m.tipo] || 'bg-gray-400'}`} style={{ width: `${m.porcentaje}%` }} /></div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Ranking titulo="Estados desde donde más nos compran" filas={r.estados || []} etiqueta={(f) => f.estado} color="bg-cyan-600" vacio="Aún no hay envíos nacionales con estado registrado." />
+            <Ranking titulo="Ciudades desde donde más nos compran" filas={(r.ciudades || []).slice(0, 15)} etiqueta={(f) => `${f.ciudad}, ${f.estado}`} color="bg-cyan-500" vacio="Aún no hay envíos nacionales con ciudad registrada." />
+            <Ranking titulo="Empresas de envío" filas={r.empresas_envio || []} etiqueta={(f) => f.empresa} color="bg-cyan-400" vacio="Sin envíos nacionales en este periodo." />
+            <Ranking titulo="Retiro en tienda por sucursal" filas={r.sucursales || []} etiqueta={(f) => f.sucursal} color="bg-violet-500" vacio="Sin retiros en tienda en este periodo." />
+          </div>
+
+          {r.envios_sin_destino > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {r.envios_sin_destino} envío(s) nacional(es) de este periodo no tienen estado ni ciudad: se hicieron antes de que la tienda empezara a pedir esos datos.
+            </p>
+          )}
+        </div>
       );
     }
 

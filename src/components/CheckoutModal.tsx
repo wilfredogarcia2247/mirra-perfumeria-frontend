@@ -3,6 +3,7 @@ import { Building2, Check, MapPin, Minus, Navigation, Pencil, Plus, Trash2, Truc
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
 import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
+import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 
 type FulfillmentType = 'tienda' | 'envio_nacional' | 'delivery';
 const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '');
@@ -21,6 +22,9 @@ export interface CheckoutDeliveryReview {
   empresaEnvioOtra: string;
   agenciaCodigo: string;
   agenciaDireccion: string;
+  estadoEnvio?: string;
+  ciudadEnvio?: string;
+  ciudadOtra?: string;
   ubicacionLink: string;
   ubicacionActual: { latitude: number; longitude: number } | null;
 }
@@ -42,6 +46,84 @@ interface Props {
   onSubmittingChange?: (submitting: boolean) => void;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+// Lista desplegable propia (misma apariencia que la de sucursales).
+// La lista nativa del navegador se abre enorme en algunos teléfonos; esta muestra unas 6 opciones
+// con desplazamiento y se cierra al elegir o al tocar fuera.
+function ListaDesplegable({ id, value, placeholder, opciones, onChange }: {
+  id: string;
+  value: string;
+  placeholder: string;
+  // detalle: segunda línea opcional (por ejemplo, la dirección de la sucursal)
+  opciones: { value: string; label: string; detalle?: string }[];
+  onChange: (value: string) => void;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const contenedor = useRef<HTMLDivElement>(null);
+  const lista = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!abierta) return;
+    const cerrarSiFuera = (event: PointerEvent) => {
+      if (contenedor.current && !contenedor.current.contains(event.target as Node)) setAbierta(false);
+    };
+    document.addEventListener('pointerdown', cerrarSiFuera);
+    // Mostrar la opción elegida dentro de la lista y, si la lista queda por debajo
+    // del borde de la pantalla, desplazar la ventana para que se vea completa
+    const ul = lista.current;
+    const elegidaEl = ul?.querySelector('[aria-selected="true"]') as HTMLElement | null;
+    if (ul && elegidaEl) ul.scrollTop = elegidaEl.offsetTop - ul.clientHeight / 2 + elegidaEl.clientHeight / 2;
+    requestAnimationFrame(() => ul?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    return () => document.removeEventListener('pointerdown', cerrarSiFuera);
+  }, [abierta]);
+
+  const elegida = opciones.find((o) => o.value === value);
+  return (
+    <div ref={contenedor} className="relative">
+      <button
+        id={id}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={abierta}
+        aria-controls={`${id}-opciones`}
+        onClick={() => setAbierta((a) => !a)}
+        onKeyDown={(event) => { if (event.key === 'Escape') setAbierta(false); }}
+        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-left text-base leading-5 text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700 md:text-sm"
+      >
+        <span className={`min-w-0 truncate ${elegida ? '' : 'text-gray-400'}`}>
+          {elegida ? `${elegida.label}${elegida.detalle ? ` — ${elegida.detalle}` : ''}` : placeholder}
+        </span>
+        <span aria-hidden="true" className={`shrink-0 text-gray-500 transition-transform ${abierta ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {abierta && (
+        <ul
+          ref={lista}
+          id={`${id}-opciones`}
+          role="listbox"
+          aria-labelledby={id}
+          onKeyDown={(event) => { if (event.key === 'Escape') setAbierta(false); }}
+          className="absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        >
+          {opciones.map((o) => {
+            const seleccionada = o.value === value;
+            return (
+              <li key={o.value} role="option" aria-selected={seleccionada}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(o.value); setAbierta(false); }}
+                  className={`w-full px-3 py-2.5 text-left text-[15px] leading-snug transition-colors hover:bg-[#fbf7f2] md:text-sm ${seleccionada ? 'bg-[#fbf7f2] font-medium text-[#735c3f]' : 'text-gray-800'}`}
+                >
+                  <span className="block">{o.label}</span>
+                  {o.detalle && <span className="mt-0.5 block text-xs font-normal text-gray-500">{o.detalle}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export default function CheckoutModal({
@@ -79,11 +161,19 @@ export default function CheckoutModal({
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [sucursalesError, setSucursalesError] = useState('');
   const [sucursalId, setSucursalId] = useState('');
-  const [sucursalesDropdownOpen, setSucursalesDropdownOpen] = useState(false);
   const [empresaEnvio, setEmpresaEnvio] = useState('');
   const [empresaEnvioOtra, setEmpresaEnvioOtra] = useState('');
   const [agenciaCodigo, setAgenciaCodigo] = useState('');
   const [agenciaDireccion, setAgenciaDireccion] = useState('');
+  // Destino del envío nacional: primero el estado, luego la ciudad (lista o "Otra ciudad")
+  const [estadoEnvio, setEstadoEnvio] = useState('');
+  const [ciudadEnvio, setCiudadEnvio] = useState('');
+  const [ciudadOtra, setCiudadOtra] = useState('');
+  const ciudadFinal = ciudadEnvio === OTRA_CIUDAD ? ciudadOtra.trim() : ciudadEnvio;
+  // Los pasos de envío nacional se muestran uno a uno: primero los datos del cliente completos
+  const datosClienteListos = clienteLookupComplete
+    && nombreCliente.trim().length > 0
+    && normalizePhoneDigits(telefono).length >= 11;
   const [ubicacionLink, setUbicacionLink] = useState('');
   const [ubicacionActual, setUbicacionActual] = useState<{ latitude: number; longitude: number } | null>(null);
   const [localizando, setLocalizando] = useState(false);
@@ -119,6 +209,9 @@ export default function CheckoutModal({
     setEmpresaEnvioOtra(initialDelivery.empresaEnvioOtra);
     setAgenciaCodigo(initialDelivery.agenciaCodigo);
     setAgenciaDireccion(initialDelivery.agenciaDireccion);
+    setEstadoEnvio(initialDelivery.estadoEnvio ?? '');
+    setCiudadEnvio(initialDelivery.ciudadEnvio ?? '');
+    setCiudadOtra(initialDelivery.ciudadOtra ?? '');
     setUbicacionLink(initialDelivery.ubicacionLink);
     setUbicacionActual(initialDelivery.ubicacionActual);
     nombreClienteRef.current = initialDelivery.nombreCliente;
@@ -372,6 +465,12 @@ export default function CheckoutModal({
     if (fulfillmentType === 'tienda' && !sucursales.some((branch) => String(branch.id) === sucursalId)) {
       return toast.error('Selecciona una sucursal disponible');
     }
+    if (fulfillmentType === 'envio_nacional' && !estadoEnvio) {
+      return toast.error('Selecciona tu estado');
+    }
+    if (fulfillmentType === 'envio_nacional' && !ciudadFinal) {
+      return toast.error(ciudadEnvio === OTRA_CIUDAD ? 'Escribe el nombre de tu ciudad' : 'Selecciona tu ciudad');
+    }
     if (fulfillmentType === 'envio_nacional' && !empresaEnvio) {
       return toast.error('Selecciona la empresa de envío');
     }
@@ -399,7 +498,7 @@ export default function CheckoutModal({
         details: fulfillmentType === 'tienda'
           ? [selectedBranch?.nombre, selectedBranch?.direccion, ...customerDetails].filter(Boolean)
           : fulfillmentType === 'envio_nacional'
-            ? [carrier, empresaEnvio !== 'OTRA' && agenciaCodigo.trim() ? `Agencia ${agenciaCodigo.trim()}` : '', agenciaDireccion.trim(), ...customerDetails]
+            ? [`${ciudadFinal}, ${estadoEnvio}`, carrier, empresaEnvio !== 'OTRA' && agenciaCodigo.trim() ? `Agencia ${agenciaCodigo.trim()}` : '', agenciaDireccion.trim(), ...customerDetails]
               .filter(Boolean)
             : [
               ...customerDetails,
@@ -416,6 +515,9 @@ export default function CheckoutModal({
         empresaEnvioOtra: empresaEnvioOtra.trim(),
         agenciaCodigo: agenciaCodigo.trim(),
         agenciaDireccion: agenciaDireccion.trim(),
+        estadoEnvio,
+        ciudadEnvio,
+        ciudadOtra: ciudadOtra.trim(),
         ubicacionLink: ubicacionLink.trim(),
         ubicacionActual,
       });
@@ -571,6 +673,8 @@ export default function CheckoutModal({
         : fulfillmentType === 'envio_nacional'
           ? {
             tipo: fulfillmentType,
+            estado: estadoEnvio,
+            ciudad: ciudadFinal,
             transportista: empresaEnvio,
             ...(empresaEnvio === 'OTRA' ? { transportista_otro: empresaEnvioOtra.trim() } : {}),
             agencia_codigo: agenciaCodigo.trim(),
@@ -718,7 +822,6 @@ export default function CheckoutModal({
                   aria-pressed={fulfillmentType === value}
                   onClick={() => {
                     if (fulfillmentType !== value) setClienteLookupComplete(false);
-                    setSucursalesDropdownOpen(false);
                     setFulfillmentType(value);
                   }}
                   className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-gray-700 transition-colors hover:bg-[#fbf7f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cbb496] ${fulfillmentType === value ? 'border-[#b4936a] bg-[#fbf7f2] ring-2 ring-[#d8c5aa]' : 'border-gray-200'}`}
@@ -762,59 +865,17 @@ export default function CheckoutModal({
                     {sucursalesError ? (
                       <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{sucursalesError}</p>
                     ) : sucursales.length > 0 ? (
-                      <div className="relative">
-                        <button
-                          id="checkout-sucursal"
-                          type="button"
-                          required
-                          aria-haspopup="listbox"
-                          aria-expanded={sucursalesDropdownOpen}
-                          aria-controls="checkout-sucursal-options"
-                          onClick={() => setSucursalesDropdownOpen((isOpen) => !isOpen)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Escape') setSucursalesDropdownOpen(false);
-                          }}
-                          className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-left text-sm leading-5 text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
-                        >
-                          <span className="min-w-0 truncate">
-                            {sucursales.find((branch) => String(branch.id) === sucursalId)
-                              ? `${sucursales.find((branch) => String(branch.id) === sucursalId)?.nombre}${localDemo ? ' (solo demostración)' : ''} — ${sucursales.find((branch) => String(branch.id) === sucursalId)?.direccion}`
-                              : 'Elige una sucursal...'}
-                          </span>
-                          <span aria-hidden="true" className="shrink-0 text-gray-500">▾</span>
-                        </button>
-                        {sucursalesDropdownOpen && (
-                          <ul
-                            id="checkout-sucursal-options"
-                            role="listbox"
-                            aria-labelledby="checkout-sucursal"
-                            onKeyDown={(event) => {
-                              if (event.key === 'Escape') setSucursalesDropdownOpen(false);
-                            }}
-                            className="absolute left-0 right-0 z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-                          >
-                            {sucursales.map((branch) => {
-                              const value = String(branch.id);
-                              const selected = sucursalId === value;
-                              return (
-                                <li key={branch.id} role="option" aria-selected={selected}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSucursalId(value);
-                                      setSucursalesDropdownOpen(false);
-                                    }}
-                                    className={`w-full px-3 py-2 text-left text-sm leading-snug transition-colors hover:bg-[#fbf7f2] ${selected ? 'bg-[#fbf7f2] font-medium text-[#735c3f]' : 'text-gray-800'}`}
-                                  >
-                                    <span className="block">{branch.nombre}{localDemo ? ' (solo demostración)' : ''}</span>
-                                    <span className="mt-0.5 block text-xs text-gray-500">{branch.direccion}</span>
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </div>
+                      <ListaDesplegable
+                        id="checkout-sucursal"
+                        value={sucursalId}
+                        placeholder="Elige una sucursal..."
+                        opciones={sucursales.map((branch) => ({
+                          value: String(branch.id),
+                          label: `${branch.nombre}${localDemo ? ' (solo demostración)' : ''}`,
+                          detalle: branch.direccion,
+                        }))}
+                        onChange={setSucursalId}
+                      />
                     ) : (
                       <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         {loadingSucursales ? 'Cargando sucursales...' : 'Aún no hay sucursales activas disponibles. Elige otra modalidad o inténtalo más tarde.'}
@@ -830,6 +891,57 @@ export default function CheckoutModal({
                   <h3 className="text-lg font-semibold text-gray-800">Datos para envío</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {renderCustomerFields({ widePhone: true })}
+                    {/* Paso 2: estado (aparece cuando los datos del cliente están completos) */}
+                    {datosClienteListos && (
+                      <div className="col-span-2">
+                        <label htmlFor="checkout-estado" className="mb-2 block text-sm font-medium text-gray-700">Estado</label>
+                        <ListaDesplegable
+                          id="checkout-estado"
+                          value={estadoEnvio}
+                          placeholder="Elige tu estado..."
+                          opciones={ESTADOS_VENEZUELA.map(({ estado }) => ({ value: estado, label: estado }))}
+                          onChange={(estado) => {
+                            if (estado === estadoEnvio) return;
+                            setEstadoEnvio(estado);
+                            setCiudadEnvio('');
+                            setCiudadOtra('');
+                          }}
+                        />
+                      </div>
+                    )}
+                    {/* Paso 3: ciudad (aparece al elegir el estado) */}
+                    {datosClienteListos && estadoEnvio && (
+                      <div className="col-span-2">
+                        <label htmlFor="checkout-ciudad" className="mb-2 block text-sm font-medium text-gray-700">Ciudad</label>
+                        <ListaDesplegable
+                          id="checkout-ciudad"
+                          value={ciudadEnvio}
+                          placeholder="Elige tu ciudad..."
+                          opciones={[
+                            ...ciudadesDe(estadoEnvio).map((ciudad) => ({ value: ciudad, label: ciudad })),
+                            { value: OTRA_CIUDAD, label: 'Otra ciudad' },
+                          ]}
+                          onChange={(ciudad) => {
+                            setCiudadEnvio(ciudad);
+                            if (ciudad !== OTRA_CIUDAD) setCiudadOtra('');
+                          }}
+                        />
+                        {ciudadEnvio === OTRA_CIUDAD && (
+                          <input
+                            id="checkout-ciudad-otra"
+                            required
+                            maxLength={100}
+                            value={ciudadOtra}
+                            onChange={(event) => setCiudadOtra(event.target.value)}
+                            className="mt-2 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                            placeholder="Escribe tu ciudad"
+                          />
+                        )}
+                      </div>
+                    )}
+                    {/* Paso 4: empresa de envío y agencia (aparece al tener la ciudad) */}
+                    {datosClienteListos && estadoEnvio && ciudadFinal && (
+                    <>
                     <div>
                       <fieldset>
                         <legend className="mb-2 block text-sm font-medium text-gray-700">Empresa de envío</legend>
@@ -892,9 +1004,11 @@ export default function CheckoutModal({
                         value={agenciaDireccion}
                         onChange={(event) => setAgenciaDireccion(event.target.value)}
                         className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
-                        placeholder="Ciudad, Estado, Sector"
+                        placeholder="Sector, calle o punto de referencia"
                       />
                     </div>
+                    </>
+                    )}
                   </div>
                 </>
               )}
@@ -1042,6 +1156,7 @@ export default function CheckoutModal({
                     )}
                     {fulfillmentType === 'envio_nacional' && (
                       <>
+                        {estadoEnvio && <p className="mt-1 font-medium text-gray-700">{ciudadFinal}, {estadoEnvio}</p>}
                         <p className="mt-1 text-gray-600">
                           {empresaEnvio === 'OTRA' ? empresaEnvioOtra : empresaEnvio}
                           {empresaEnvio !== 'OTRA' && agenciaCodigo ? ` · Agencia ${agenciaCodigo}` : ''}

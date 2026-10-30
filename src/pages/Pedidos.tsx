@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike } from 'lucide-react';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -70,7 +70,46 @@ const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummar
   };
 };
 
+// Método de entrega con su propio color (sólido, para que resalte en la lista y en el detalle).
+// Colores distintos a los de los estados (ámbar, azul, verde, rojo) y al del cupón.
+type EntregaInfo = { etiqueta: string; Icono: typeof Store; etiquetaClase: string; cajaClase: string };
+const entregaInfo = (pedido: any): EntregaInfo | null => {
+  const type = String(pedido?.tipo_entrega || '');
+  if (!type) return null;
+  const details = pedido?.datos_entrega || {};
+  if (type === 'tienda') {
+    return { etiqueta: 'Retiro en tienda', Icono: Store, etiquetaClase: 'bg-violet-600 text-white', cajaClase: 'border-violet-300 bg-violet-50 text-violet-950' };
+  }
+  if (type === 'envio_nacional') {
+    const carrier = details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW';
+    return { etiqueta: `Envío nacional · ${carrier}`, Icono: Truck, etiquetaClase: 'bg-cyan-600 text-white', cajaClase: 'border-cyan-300 bg-cyan-50 text-cyan-950' };
+  }
+  if (type === 'delivery') {
+    return { etiqueta: 'Delivery', Icono: Bike, etiquetaClase: 'bg-pink-600 text-white', cajaClase: 'border-pink-300 bg-pink-50 text-pink-950' };
+  }
+  return { etiqueta: type, Icono: Truck, etiquetaClase: 'bg-gray-600 text-white', cajaClase: 'border-gray-300 bg-gray-50 text-gray-900' };
+};
+
+function EntregaBadge({ pedido, className = '' }: { pedido: any; className?: string }) {
+  const info = entregaInfo(pedido);
+  if (!info) return null;
+  const { Icono } = info;
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold shadow-sm ${info.etiquetaClase} ${className}`}>
+      <Icono className="h-3 w-3 shrink-0" />
+      {info.etiqueta}
+    </span>
+  );
+}
+
 // Líneas del método de entrega para el mensaje de WhatsApp (mismos datos que el detalle del pedido)
+// Monto en $ con 2 decimales (acepta números o textos como "5.40"); "—" si no hay dato
+const fmtDinero = (valor: any): string => {
+  if (valor === null || valor === undefined || valor === '') return '—';
+  const n = Number(valor);
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : String(valor);
+};
+
 const buildDeliveryLines = (pedido: any): string[] => {
   const type = String(pedido?.tipo_entrega || '');
   if (!type) return [];
@@ -85,6 +124,7 @@ const buildDeliveryLines = (pedido: any): string[] => {
     const agencyCode = details.agencia_codigo || details.agencia_mrw_codigo;
     const agencyAddress = details.agencia_direccion || details.agencia_mrw_direccion;
     lines.push(`📦 Envío nacional por ${carrier}`);
+    if (details.estado) lines.push(`🏙️ ${details.ciudad ? `${details.ciudad}, ` : ""}${details.estado}`);
     if (agencyCode) lines.push(`Agencia: ${agencyCode}`);
     if (agencyAddress) lines.push(`📍 ${agencyAddress}`);
   } else if (type === 'delivery') {
@@ -1948,7 +1988,7 @@ export default function Pedidos() {
         )}
 
         {loading ? (
-          <TableSkeleton columns={8} rows={10} />
+          <TableSkeleton columns={9} rows={10} />
         ) : (
           <>
             {/* ── Móvil: tarjetas ── */}
@@ -1978,6 +2018,7 @@ export default function Pedidos() {
                             <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
                           )
                         )}
+                        <EntregaBadge pedido={p} />
                         <span className="text-xs text-muted-foreground">{fmtProductosCount(p)} prod.</span>
                         {fmtCupon(p) && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-[2px] text-[10.5px] font-medium text-amber-800">
@@ -2014,6 +2055,7 @@ export default function Pedidos() {
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Entrega</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
@@ -2044,6 +2086,7 @@ export default function Pedidos() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>{entregaInfo(p) ? <EntregaBadge pedido={p} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
                           <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
                           <TableCell className="text-right">
@@ -2160,7 +2203,11 @@ export default function Pedidos() {
                 )}
               </DialogDescription>
               {selectedPedido?.tipo_entrega && (
-                <div className="rounded-lg border border-copper-200 bg-copper-50 px-3 py-2 text-sm text-copper-900">
+                <div className={`rounded-lg border-2 px-3 py-2 text-sm ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
+                    <EntregaBadge pedido={selectedPedido} className="text-xs" />
+                  </div>
                   {(() => {
                     const details = selectedPedido.datos_entrega || {};
                     const type = String(selectedPedido.tipo_entrega);
@@ -2170,17 +2217,15 @@ export default function Pedidos() {
                         : null);
                     return (
                       <>
-                        <p className="font-semibold">
-                          {type === 'tienda' ? 'Retiro en tienda' : type === 'envio_nacional' ? `Envío nacional · ${details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}` : 'Delivery'}
-                        </p>
                         {type === 'tienda' && (
                           <>
-                            <p>{details.sucursal_nombre || 'Sucursal'}</p>
+                            <p className="font-semibold">{details.sucursal_nombre || 'Sucursal'}</p>
                             {details.sucursal_direccion && <p>{details.sucursal_direccion}</p>}
                           </>
                         )}
                         {type === 'envio_nacional' && (
                           <>
+                            {details.estado && <p className="font-semibold">Destino: {details.ciudad ? `${details.ciudad}, ` : ""}{details.estado}</p>}
                             <p>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</p>
                             {(details.agencia_codigo || details.agencia_mrw_codigo) && (
                               <p>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</p>
@@ -2236,14 +2281,15 @@ export default function Pedidos() {
                   <div className="overflow-auto">
                     <table className="w-full table-auto text-sm">
                       <thead>
-                        <tr className="text-left text-xs text-muted-foreground">
-                          <th className="hidden pb-2 md:table-cell">Imagen</th>
-                          <th className="pb-2">Nombre</th>
-                          <th className="pb-2">Precio</th>
-                          <th className="hidden pb-2 md:table-cell">Costo</th>
-                          <th className="pb-2 text-center"><span className="md:hidden">Cant.</span><span className="hidden md:inline">Cantidad</span></th>
-                          <th className="pb-2">Subtotal</th>
-                          <th className="hidden pb-2 md:table-cell">Producción</th>
+                        <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <th className="hidden pb-2 pr-3 md:table-cell">Imagen</th>
+                          <th className="pb-2 pr-2">Nombre</th>
+                          {/* Títulos abreviados; al pasar el ratón se ve el nombre completo */}
+                          <th className="px-3 pb-2 text-right" title="Precio">Prec.</th>
+                          <th className="hidden px-3 pb-2 text-right md:table-cell" title="Costo">Cost.</th>
+                          <th className="px-3 pb-2 text-center" title="Cantidad">Cant.</th>
+                          <th className="px-3 pb-2 text-right" title="Subtotal">Subt.</th>
+                          <th className="hidden pb-2 pl-3 text-center md:table-cell" title="Producción">Prod.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2342,11 +2388,11 @@ export default function Pedidos() {
                                 })()}
                               </div>
                             </td>
-                            <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
-                            <td className="hidden py-2 md:table-cell">{typeof it.costo === 'number' ? `${it.costo.toFixed(2)}` : it.costo}</td>
-                            <td className="py-2" style={{ textAlign: 'center' }}>{it.cantidad}</td>
-                            <td className="py-2">{typeof it.subtotal === 'number' ? `$${it.subtotal.toFixed(2)}` : it.subtotal}</td>
-                            <td className="hidden py-2 md:table-cell">
+                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
+                            <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground md:table-cell">{fmtDinero(it.costo)}</td>
+                            <td className="px-3 py-2 text-center tabular-nums">{it.cantidad}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
+                            <td className="hidden py-2 pl-3 text-center md:table-cell">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (

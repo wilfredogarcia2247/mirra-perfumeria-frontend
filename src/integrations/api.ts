@@ -1728,3 +1728,12 @@ export async function login(email: string, password: string) {
   }
   return data;
 }
+
+// Reporte de métodos de entrega y de dónde nos compran (estado/ciudad de envíos nacionales)
+export async function getReporteEntregas(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/reportes-entregas${qs}`);
+}
