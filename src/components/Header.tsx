@@ -64,8 +64,10 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      if ((Header as any)._catsCache) {
-        setCatGroups((Header as any)._catsCache);
+      // Si ya se cargaron antes (al cambiar de página), se usan de la memoria
+      const cached = (Header as any)._catsCache;
+      if (Array.isArray(cached) && cached.length > 0) {
+        setCategoriesList(cached);
         return;
       }
       setCatsLoading(true);
@@ -90,8 +92,8 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
         cats.sort((a: any, b: any) => ((a.nombre || a.name || '') > (b.nombre || b.name || '') ? 1 : -1));
 
         if (!mounted) return;
-        // cache the flat list
-        (Header as any)._catsCache = cats;
+        // cache the flat list (solo si llegó algo, para reintentar si falló)
+        if (cats.length > 0) (Header as any)._catsCache = cats;
         setCategoriesList(cats);
         // also keep catGroups for backward compatibility (empty)
         setCatGroups({});
@@ -269,13 +271,6 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           >
             Sobre Nosotros
           </Link>
-          <Link
-            to="/pedidos"
-            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-          >
-            Pedidos
-          </Link>
-
           {/* Sección Productos */}
           <div>
             <p className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">

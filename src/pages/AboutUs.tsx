@@ -51,7 +51,7 @@ export default function AboutUs() {
       <Header cartItemsCount={count} onCartClick={handleCartClick} />
 
       {/* Hero Banner Area */}
-      <div className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden bg-primary-100/50">
+      <div className="relative pt-36 pb-14 sm:pt-44 sm:pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-primary-100/50">
         <div className="absolute inset-0 z-0 opacity-10 pattern-grid-lg text-primary-500"></div>
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <FadeInSection>

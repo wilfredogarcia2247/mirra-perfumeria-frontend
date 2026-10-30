@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
@@ -14,6 +14,7 @@ import { ArrowLeft, Loader2, X, Search, User, Phone, FileText, Trash2, Send, Mes
 
 import Footer from '@/components/Footer';
 import FeaturedShowcase from '@/components/FeaturedShowcase';
+import PortadaCinta from '@/components/PortadaCinta';
 import { useIsMobile } from '@/hooks/use-mobile';
 import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
@@ -268,16 +269,25 @@ export default function Hero() {
   })();
 
   function elegirFiltro(slug: string) {
-    navigate(slug === 'all' ? '/' : `/categoria/${slug}`);
+    // keepScroll: no volver arriba de la página, el cliente sigue en la lista
+    navigate(slug === 'all' ? '/' : `/categoria/${slug}`, { state: { keepScroll: true } });
     setPage(1);
-    // Si el cliente ya bajó por la lista, volver a su inicio (justo debajo de los filtros fijos).
-    // Se calcula después de que la página se actualiza, porque los textos de arriba cambian con el filtro.
+    subirALaLista();
+  }
+
+  // Cambiar de página en el paginado y subir al inicio de la lista
+  function irAPagina(numero: number) {
+    setPage(numero);
+    subirALaLista();
+  }
+
+  // Si el cliente ya bajó por la lista, volver a su inicio (mostrando los filtros Todos/Hombre/Mujer).
+  // Se calcula después de que la página se actualiza, porque los textos de arriba pueden cambiar.
+  function subirALaLista() {
     window.setTimeout(() => {
-      const lista = listaRef.current;
-      const filtros = filtrosRef.current;
-      if (!lista || !filtros) return;
-      const altoFiltros = filtros.getBoundingClientRect().height;
-      const destino = window.scrollY + lista.getBoundingClientRect().top - headerHeight - altoFiltros - 8;
+      const inicio = filtrosRef.current ?? listaRef.current;
+      if (!inicio) return;
+      const destino = window.scrollY + inicio.getBoundingClientRect().top - headerHeight - 8;
       if (window.scrollY > destino + 1) window.scrollTo({ top: Math.max(0, destino), behavior: 'smooth' });
     }, 60);
   }
@@ -375,37 +385,7 @@ export default function Hero() {
 
       <Header cartItemsCount={count} cartPulseKey={cartPulseKey} onCartClick={() => setIsCartOpen(true)} />
 
-      <section className="relative z-10 px-4 sm:px-6 pt-32 sm:pt-32">
-        <div className="max-w-7xl mx-auto pb-12 sm:pb-20 md:pb-28 text-center">
-          <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 mb-3 sm:mb-4 bg-primary-50 text-primary-700 text-xs sm:text-sm font-medium rounded-full border border-primary-100 uppercase tracking-wide">
-            {selectedCategory === 'all'
-              ? 'Colección 2026'
-              : selectedCategory.split('-').join(' ')}
-          </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-bell-mt leading-tight mb-4 sm:mb-6">
-            Descubre la Esencia de la <span className="text-primary-600">Elegancia</span>
-          </h1>
-          <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed px-2 sm:px-0">
-            {selectedCategory === 'all'
-              ? "Sumérgete en nuestra exclusiva colección de fragancias que capturan la esencia del lujo y la sofisticación."
-              : `Descubre nuestra selección exclusiva de ${selectedCategory.replace(/-/g, ' ')}.`}
-          </p>
-          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <a
-              href="#catalog"
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary-500 to-amber-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base"
-            >
-              Explorar Colección
-            </a>
-            <Link
-              to="/about"
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 border-2 border-gray-200 bg-white/80 text-gray-700 font-medium rounded-lg hover:bg-white hover:border-primary-200 transition-all duration-300 backdrop-blur-sm text-sm sm:text-base text-center"
-            >
-              Nuestra Historia
-            </Link>
-          </div>
-        </div>
-      </section>
+      <PortadaCinta products={catalogProducts} selectedCategory={selectedCategory} />
 
       {!loading && catalogProducts.length > 0 && (
         <div className="relative z-10">
@@ -443,8 +423,7 @@ export default function Hero() {
         {filtrosRapidos.length > 0 && (
           <div
             ref={filtrosRef}
-            className="sticky z-30 -mx-4 mb-4 bg-gray-50/95 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6"
-            style={{ top: headerHeight }}
+            className="mb-4 py-2.5"
           >
             <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar perfumes">
               {filtrosRapidos.map((f) => {
@@ -503,7 +482,7 @@ export default function Hero() {
             {/* Jump to first page */}
             <button
               className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
-              onClick={() => setPage(1)}
+              onClick={() => irAPagina(1)}
               disabled={page === 1}
               title="Ir a la primera página"
             >
@@ -513,7 +492,7 @@ export default function Hero() {
             {/* Previous page */}
             <button
               className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => irAPagina(Math.max(1, page - 1))}
               disabled={page === 1}
             >
               ← Anterior
@@ -538,7 +517,7 @@ export default function Hero() {
                 pageNumbers.push(
                   <button
                     key={1}
-                    onClick={() => setPage(1)}
+                    onClick={() => irAPagina(1)}
                     className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
                   >
                     1
@@ -556,7 +535,7 @@ export default function Hero() {
                 pageNumbers.push(
                   <button
                     key={i}
-                    onClick={() => setPage(i)}
+                    onClick={() => irAPagina(i)}
                     className={`w-8 h-8 flex items-center justify-center text-xs sm:text-sm rounded-md border transition-all font-medium ${i === page
                       ? 'bg-gradient-to-r from-primary-500 to-amber-600 text-white border-primary-600 shadow-md scale-110'
                       : 'border-gray-300 bg-white hover:bg-gray-50 hover:border-primary-300'
@@ -577,7 +556,7 @@ export default function Hero() {
                 pageNumbers.push(
                   <button
                     key={totalPages}
-                    onClick={() => setPage(totalPages)}
+                    onClick={() => irAPagina(totalPages)}
                     className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
                   >
                     {totalPages}
@@ -591,7 +570,7 @@ export default function Hero() {
             {/* Next page */}
             <button
               className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => irAPagina(page + 1)}
               disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}
             >
               Siguiente →
@@ -602,7 +581,7 @@ export default function Hero() {
               className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => {
                 const totalPages = Math.max(1, Math.ceil((total || 0) / perPage));
-                setPage(totalPages);
+                irAPagina(totalPages);
               }}
               disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}
               title="Ir a la última página"

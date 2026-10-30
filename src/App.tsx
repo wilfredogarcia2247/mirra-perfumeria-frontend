@@ -37,6 +37,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
 import PublicSite from "./components/PublicSite";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           {/* Web pública. El panel y el login no cargan Google Ads. */}
           <Route element={<PublicSite />}>
