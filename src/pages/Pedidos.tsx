@@ -866,13 +866,15 @@ export default function Pedidos() {
       return `• ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
     });
     const exchangeRate = fmtTasa(selectedPedido);
-    const formatMoney = (amount: number) => roundMoney(exchangeRate ? amount * exchangeRate : amount)
-      .toLocaleString('es-VE', {
+    // Montos en $ y, si el pedido tiene tasa, también en Bs: "$29,10 (Bs 247,35)"
+    // (mismo formato que el mensaje de WhatsApp que envía el cliente desde la web)
+    const formatNumber = (amount: number) => roundMoney(amount).toLocaleString('es-VE', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    const currencyLabel = exchangeRate ? 'Bs' : '$';
-    const money = (amount: number) => `${currencyLabel} ${formatMoney(amount)}`;
+    const money = (amount: number) => (exchangeRate
+      ? `$${formatNumber(amount)} (Bs ${formatNumber(amount * exchangeRate)})`
+      : `$${formatNumber(amount)}`);
     const breakdown: string[] = [];
     const savedAdjustments = Array.isArray(selectedPedido.ajustes)
       ? selectedPedido.ajustes.map(adaptAjusteFromApi)

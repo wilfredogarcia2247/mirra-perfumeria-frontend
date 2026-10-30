@@ -181,7 +181,7 @@ export default function AboutUs() {
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">Teléfono / WhatsApp</h3>
-                      <a href="https://wa.me/04141454086" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-800 font-medium">
+                      <a href="https://wa.me/584141454086" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-800 font-medium">
                         (0414) 145-40-86
                       </a>
                       <p className="text-sm text-gray-500 mt-1">Lunes a Sábado 9:00 AM - 6:00 PM</p>

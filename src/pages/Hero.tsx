@@ -69,6 +69,8 @@ export default function Hero() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [deliveryReview, setDeliveryReview] = useState<CheckoutDeliveryReview | null>(null);
+  // Pedido recién creado: pantalla "Pedido recibido" con el botón para enviarlo por WhatsApp
+  const [pedidoRecibido, setPedidoRecibido] = useState<{ pedidoId?: number; whatsappUrl: string } | null>(null);
   const [confirmOrderRequest, setConfirmOrderRequest] = useState(0);
   const [editDeliveryRequest, setEditDeliveryRequest] = useState(0);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
@@ -679,7 +681,8 @@ export default function Hero() {
                 }}
                 onSubmittingChange={setCheckoutSubmitting}
                 onClose={() => setIsCheckoutOpen(false)}
-                onSuccess={() => {
+                onSuccess={(resultado) => {
+                  if (resultado?.whatsappUrl) setPedidoRecibido(resultado);
                   clear();
                   quitarCupon();
                   setDeliveryReview(null);
@@ -1170,6 +1173,37 @@ export default function Hero() {
                 ) : null}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Pedido recibido: WhatsApp se abre solo; este botón es por si no se abrió */}
+      {pedidoRecibido && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="pedido-recibido-titulo">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+              <Check className="h-7 w-7 text-green-600" />
+            </div>
+            <h2 id="pedido-recibido-titulo" className="mt-4 font-bell-mt text-2xl font-bold text-gray-900">
+              ¡Pedido{pedidoRecibido.pedidoId ? ` #${pedidoRecibido.pedidoId}` : ''} recibido!
+            </h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-gray-600">
+              Último paso: envíanos tu pedido por WhatsApp para confirmarlo. Solo toca <strong>Enviar</strong>.
+            </p>
+            <a
+              href={pedidoRecibido.whatsappUrl}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 py-3.5 text-base font-bold text-white shadow-lg transition hover:bg-[#1ebe5b] active:scale-[0.98]"
+            >
+              <MessageCircle className="h-5 w-5" />
+              Enviar pedido por WhatsApp
+            </a>
+            <button
+              type="button"
+              onClick={() => setPedidoRecibido(null)}
+              className="mt-3 w-full rounded-xl px-5 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-50"
+            >
+              Volver a la tienda
+            </button>
           </div>
         </div>
       )}

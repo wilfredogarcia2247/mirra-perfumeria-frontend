@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
 import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
 import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
+import { enlaceWhatsappPedido } from '@/lib/pedidoWhatsapp';
 
 type FulfillmentType = 'tienda' | 'envio_nacional' | 'delivery';
 const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '');
@@ -45,7 +46,8 @@ interface Props {
   onReview?: (review: CheckoutDeliveryReview) => void;
   onSubmittingChange?: (submitting: boolean) => void;
   onClose: () => void;
-  onSuccess: () => void;
+  // Con `whatsappUrl` cuando el pedido se creó: la tienda muestra "Pedido recibido" con el botón de WhatsApp
+  onSuccess: (resultado?: { pedidoId?: number; whatsappUrl: string }) => void;
 }
 
 // Lista desplegable propia (misma apariencia que la de sucursales).
@@ -698,7 +700,6 @@ export default function CheckoutModal({
       setLoading(true);
       onSubmittingChange?.(true);
       const created = await createPedidoVentaPublic(payload);
-      toast.success('Pedido creado correctamente');
       // comprobar cambios de precio
       try {
         const sentMap = new Map<number, any>();
@@ -725,7 +726,10 @@ export default function CheckoutModal({
       } catch (e) {
         // ignore
       }
-      onSuccess();
+      // Mensaje de WhatsApp con todo el pedido: se abre solo y queda un botón de respaldo en la tienda
+      const whatsappUrl = enlaceWhatsappPedido(created);
+      onSuccess({ pedidoId: created?.id, whatsappUrl });
+      window.setTimeout(() => { window.location.assign(whatsappUrl); }, 600);
     } catch (err: any) {
       console.error('Error creando pedido:', err);
       let raw = err?.message || (err?.toString && err.toString()) || '';
