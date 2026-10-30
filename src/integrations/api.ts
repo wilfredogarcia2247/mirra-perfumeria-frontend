@@ -663,8 +663,8 @@ export async function getVentasPorMetodoMoneda(fechaInicio?: string, fechaFin?: 
   return apiFetch(`/pagos/resumen-metodo-moneda${qs}`);
 }
 
-export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string) {
-  const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit) });
+export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string, orden: 'monto' | 'pedidos' = 'monto') {
+  const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit), orden });
   if (fechaInicio) params.set('fecha_inicio', fechaInicio);
   if (fechaFin) params.set('fecha_fin', fechaFin);
   return apiFetch(`/pedidos-venta/clientes-top-resumen?${params.toString()}`);

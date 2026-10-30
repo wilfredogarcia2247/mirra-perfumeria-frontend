@@ -50,7 +50,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'rotacion-inventario', title: 'Rotación de inventario', description: 'Tiempo sin venta por producto, identifica stock muerto' },
   { slug: 'historial-produccion', title: 'Historial de producción', description: 'Cuántas veces se añadió esencia a cada producto terminado' },
   { slug: 'pedidos-estado', title: 'Pedidos por estado', description: 'Completados, cancelados y pendientes' },
-  { slug: 'clientes', title: 'Clientes frecuentes', description: 'Clientes con mayor recurrencia de compra' },
+  { slug: 'clientes', title: 'Clientes frecuentes', description: 'Quiénes más compran: monto y cantidad de compras' },
   { slug: 'compras', title: 'Compras y reposicion', description: 'Indicadores para planificar compras' },
   { slug: 'rentabilidad', title: 'Rentabilidad', description: 'Margen estimado por ventas y costos' },
   { slug: 'ticket-promedio', title: 'Ticket promedio', description: 'Monto promedio por pedido completado' },
@@ -70,7 +70,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   'rotacion-inventario': ['productos', 'pedidosTodos', 'categorias', 'formulasAll'],
   'historial-produccion': ['produccionResumen'],
   'pedidos-estado': ['pedidos'],
-  clientes: ['clientesResumen'],
+  clientes: [],
   compras: ['pedidos', 'productos'],
   rentabilidad: ['pedidos', 'productos'],
   'ticket-promedio': ['pedidos'],
@@ -194,6 +194,9 @@ export default function Reportes() {
   const [presentaciones, setPresentaciones] = useState<any[]>([]);
   const [reporteEntregas, setReporteEntregas] = useState<any>(null);
   const [clientesResumen, setClientesResumen] = useState<any[]>([]);
+  const [reporteClientes, setReporteClientes] = useState<any | null>(null);
+  const [ordenClientes, setOrdenClientes] = useState<'monto' | 'pedidos'>('monto');
+  const [limiteClientes, setLimiteClientes] = useState(20);
   const [produccionResumen, setProduccionResumen] = useState<any[]>([]);
   const [fechaCierre, setFechaCierre] = useState(getTodayDateValue);
   const [cierreDiario, setCierreDiario] = useState<any>(null);
@@ -280,6 +283,27 @@ export default function Reportes() {
     return () => { cancelled = true; };
   }, [selectedReport, fechaInicio, fechaFin]);
 
+  // Clientes frecuentes: ranking por monto comprado o por cantidad de compras
+  useEffect(() => {
+    if (selectedReport !== 'clientes') return;
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingInfo({ active: true, progress: 0, message: 'Cargando clientes frecuentes...', etaSeconds: 0 });
+      try {
+        const res = await getClientesTopResumen(limiteClientes, 5, fechaInicio || undefined, fechaFin || undefined, ordenClientes);
+        if (!cancelled) setReporteClientes(res || null);
+      } catch (error) {
+        if (!cancelled) setReporteClientes(null);
+      } finally {
+        if (!cancelled) setLoadingInfo({ active: false, progress: 100, message: 'Reporte listo', etaSeconds: 0 });
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [selectedReport, fechaInicio, fechaFin, ordenClientes, limiteClientes]);
+
   // Reporte de entregas y ciudades (se recarga al cambiar el periodo)
   useEffect(() => {
     if (selectedReport !== 'entregas') return;
@@ -325,7 +349,7 @@ export default function Reportes() {
   }, [selectedReport, prodFechaInicio, prodFechaFin]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas' || selectedReport === 'clientes') return;
     setLoaded((prev) => ({
       ...prev,
       pedidos: false,
@@ -335,7 +359,7 @@ export default function Reportes() {
   }, [fechaInicio, fechaFin, selectedReport]);
 
   useEffect(() => {
-    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas') return;
+    if (selectedReport === 'ventas-metodo' || selectedReport === 'historial-produccion' || selectedReport === 'cierre-diario' || selectedReport === 'entregas' || selectedReport === 'clientes') return;
 
     let cancelled = false;
 
@@ -1687,28 +1711,89 @@ export default function Reportes() {
     }
 
     if (selectedReport === 'clientes') {
+      const r = reporteClientes;
+      if (!r) {
+        return <Card><CardContent className="p-6 text-sm text-muted-foreground">No se pudo cargar el reporte de clientes.</CardContent></Card>;
+      }
+      const usd = (n: number) => `$${Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const fecha = (v: any) => (v ? new Date(v).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—');
+      const clientes: any[] = Array.isArray(r.data) ? r.data : [];
+      const resumen = r.resumen || { clientes: 0, recurrentes: 0, monto_total: 0, pedidos: 0 };
+      const valorBarra = (c: any) => Number(ordenClientes === 'monto' ? c.monto : c.pedidos) || 0;
+      const max = Math.max(1, ...clientes.map(valorBarra));
       return (
-        <Card>
-          <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Clientes frecuentes</CardTitle></CardHeader>
-          <CardContent className="space-y-2 pt-4">
-            {metrics.topCustomers.map((item, index) => (
-              <details key={`${item.nombre}-${index}`} className="rounded-md border p-3">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                  <span>{index + 1}. {item.nombre}</span>
-                  <span className="text-right text-sm text-muted-foreground">{item.pedidos} pedidos | {parseNumber(item.monto).toFixed(2)}</span>
-                </summary>
-                <div className="mt-2 space-y-1">
-                  {(Array.isArray(item.pedidos_resumen) ? item.pedidos_resumen : []).map((pedido: any) => (
-                    <div key={`${item.nombre}-pedido-${pedido.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-xs">
-                      <span>Pedido #{pedido.id} | {String(pedido.estado || 'N/A')}</span>
-                      <span>{parseNumber(pedido.total).toFixed(2)} | {parseNumber(pedido.items_count)} items</span>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Clientes que compraron</p><p className="text-2xl font-semibold tabular-nums">{resumen.clientes}</p><p className="text-xs text-muted-foreground">{resumen.pedidos} pedidos completados</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Clientes que repiten</p><p className="text-2xl font-semibold tabular-nums">{resumen.recurrentes}</p><p className="text-xs text-muted-foreground">{resumen.clientes > 0 ? Math.round((resumen.recurrentes / resumen.clientes) * 100) : 0}% compró 2 veces o más</p></CardContent></Card>
+            <Card className="col-span-2 sm:col-span-1"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total comprado</p><p className="text-2xl font-semibold tabular-nums">{usd(resumen.monto_total)}</p><p className="text-xs text-muted-foreground">Con descuentos, sin delivery ni envío</p></CardContent></Card>
+          </div>
+
+          <Card>
+            <CardHeader className="space-y-3 border-b border-border/60 pb-3">
+              <CardTitle className="text-base font-medium">Clientes frecuentes</CardTitle>
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm sm:max-w-sm">
+                {([['monto', 'Por monto ($)'], ['pedidos', 'Por compras']] as const).map(([valor, texto]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() => setOrdenClientes(valor)}
+                    aria-pressed={ordenClientes === valor}
+                    className={`rounded-md px-2 py-1.5 font-medium transition ${ordenClientes === valor ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 p-3 sm:p-4">
+              {clientes.length === 0 && <p className="text-sm text-muted-foreground">No hay pedidos completados en este periodo.</p>}
+              {clientes.map((c, index) => (
+                <details key={c.cliente_key} className="rounded-lg border p-3">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{index + 1}. {c.nombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">{[c.cedula, c.telefono].filter(Boolean).join(' · ') || 'Sin cédula'}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="font-semibold tabular-nums">{usd(c.monto)}</p>
+                        <p className="text-xs tabular-nums text-muted-foreground">{c.pedidos} compra{c.pedidos === 1 ? '' : 's'}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </details>
-            ))}
-          </CardContent>
-        </Card>
+                    <div className="mt-2 h-1.5 rounded-full bg-muted"><div className="h-1.5 rounded-full bg-[#CA9E67]" style={{ width: `${(valorBarra(c) / max) * 100}%` }} /></div>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Promedio {usd(c.ticket_promedio)} por compra · Última: {fecha(c.ultima_compra)}</p>
+                  </summary>
+                  <div className="mt-2 space-y-1 border-t pt-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Últimas compras</p>
+                    {(Array.isArray(c.pedidos_resumen) ? c.pedidos_resumen : []).map((pedido: any) => (
+                      <div key={pedido.id} className="flex items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-xs">
+                        <div>
+                          <p className="font-medium">Pedido #{pedido.id}</p>
+                          <p className="text-muted-foreground">{fecha(pedido.fecha)}</p>
+                        </div>
+                        <div className="text-right tabular-nums">
+                          <p className="font-medium">{usd(pedido.total)}</p>
+                          <p className="text-muted-foreground">{parseNumber(pedido.items_count)} perfume{parseNumber(pedido.items_count) === 1 ? '' : 's'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+              {clientes.length >= limiteClientes && limiteClientes < 100 && (
+                <button
+                  type="button"
+                  onClick={() => setLimiteClientes((n) => Math.min(100, n + 30))}
+                  className="w-full rounded-lg border py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  Ver más clientes
+                </button>
+              )}
+            </CardContent>
+          </Card>
+          <p className="text-xs text-muted-foreground">Solo cuenta pedidos completados (pagados). Un mismo cliente se reconoce por su cédula, aunque la haya escrito con o sin "V".</p>
+        </div>
       );
     }
 

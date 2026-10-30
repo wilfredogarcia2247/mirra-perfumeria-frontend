@@ -90,6 +90,25 @@ const entregaInfo = (pedido: any): EntregaInfo | null => {
   return { etiqueta: type, Icono: Truck, etiquetaClase: 'bg-gray-600 text-white', cajaClase: 'border-gray-300 bg-gray-50 text-gray-900' };
 };
 
+// Fidelización: cuántos pedidos completados lleva el cliente y cuánto ha comprado (con descuentos, sin delivery)
+function ClienteHistorialBadge({ historial }: { historial?: { pedidos_completados: number; monto_total: number } | null }) {
+  if (!historial) return null;
+  const n = Number(historial.pedidos_completados || 0);
+  if (n === 0) {
+    return <span className="whitespace-nowrap rounded-full bg-sky-100 px-2 py-[3px] text-[11px] font-semibold text-sky-800">Cliente nuevo</span>;
+  }
+  const monto = `$${Number(historial.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const frecuente = n >= 5;
+  return (
+    <span
+      title={`Ha comprado ${monto} en ${n} pedido${n === 1 ? '' : 's'} completado${n === 1 ? '' : 's'}`}
+      className={`whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold ${frecuente ? 'bg-[#CA9E67] text-white' : 'bg-amber-100 text-amber-900'}`}
+    >
+      {frecuente ? '★ ' : ''}{n} pedido{n === 1 ? '' : 's'} completado{n === 1 ? '' : 's'} · {monto}
+    </span>
+  );
+}
+
 function EntregaBadge({ pedido, className = '' }: { pedido: any; className?: string }) {
   const info = entregaInfo(pedido);
   if (!info) return null;
@@ -1907,7 +1926,7 @@ export default function Pedidos() {
       if (resp) {
         try {
           // si resp parece ser el pedido actualizado
-          const updated = resp;
+          const updated = { ...resp, cliente_historial: resp.cliente_historial ?? selectedPedido.cliente_historial };
           setSelectedPedido(updated);
           // actualizar listado de pedidos también
           setPedidos((list) => (Array.isArray(list) ? list.map((p: any) => (p.id === updated.id ? updated : p)) : list));
@@ -2238,7 +2257,10 @@ export default function Pedidos() {
               <DialogDescription className="text-sm text-gray-500 mt-1">
                 {selectedPedido ? (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
-                    <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                      <ClienteHistorialBadge historial={selectedPedido.cliente_historial} />
+                    </span>
                     <span className="hidden sm:inline text-gray-300">|</span>
                     <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
                     <span className="hidden sm:inline text-gray-300">|</span>
