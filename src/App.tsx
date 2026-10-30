@@ -23,6 +23,7 @@ import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
+import DescuentoMayor from "./pages/DescuentoMayor";
 import Sucursales from "./pages/Sucursales";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
@@ -117,6 +118,7 @@ const App = () => (
               <Route path="/admin/sucursales" element={<Sucursales />} />
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />
               <Route path="/admin/marketing/cupones" element={<Cupones />} />
+              <Route path="/admin/marketing/descuento-mayor" element={<DescuentoMayor />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="marcas" />}>

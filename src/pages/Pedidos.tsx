@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike } from 'lucide-react';
@@ -473,6 +473,11 @@ export default function Pedidos() {
   // Etiqueta del cupón aplicado: "MIRRA10 · -$10.00"
   const fmtCupon = (p: any) => {
     const codigo = String(p?.cupon_codigo || '').trim();
+    const mayor = roundMoney(p?.descuento_mayor ?? 0);
+    if (!codigo && mayor > 0) {
+      const pct = Number(p?.descuento_mayor_porcentaje);
+      return `Mayor${Number.isFinite(pct) && pct > 0 ? ` ${pct}%` : ''} · -$${mayor.toFixed(2)}`;
+    }
     if (!codigo) return '';
     const descuento = roundMoney(p?.descuento_cupon ?? 0);
     if (descuento <= 0) return codigo;
@@ -697,10 +702,12 @@ export default function Pedidos() {
     const base = Number(selectedPedido?.total_base ?? 0);
     const summary = computeAjustesSummary(base, ajustesDraft);
     const descuentoCupon = roundMoney(selectedPedido?.descuento_cupon ?? 0);
+    const descuentoMayor = roundMoney(selectedPedido?.descuento_mayor ?? 0);
     return {
       ...summary,
       descuento_cupon: descuentoCupon,
-      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon)),
+      descuento_mayor: descuentoMayor,
+      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon - descuentoMayor)),
     };
   }, [selectedPedido, ajustesDraft]);
 
@@ -829,8 +836,10 @@ export default function Pedidos() {
     if (!selectedPedido) return { base: 0, descuentos: 0, descuentosAjustes: 0, recargos: 0, final: 0 };
     const base = roundMoney(selectedPedido?.total_base ?? selectedPedido?.total ?? 0);
     const descuentos = roundMoney(selectedPedido?.total_descuentos ?? 0);
-    // total_descuentos del backend incluye el cupón; el cupón ya se muestra en su propia línea
-    const descuentosAjustes = Math.max(0, roundMoney(descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0)));
+    // total_descuentos del backend incluye el cupón y el descuento al mayor; esos ya tienen su propia línea
+    const descuentosAjustes = Math.max(0, roundMoney(
+      descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0) - roundMoney(selectedPedido?.descuento_mayor ?? 0),
+    ));
     const recargos = roundMoney(selectedPedido?.total_recargos ?? 0);
     const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
     return { base, descuentos, descuentosAjustes, recargos, final };
@@ -892,6 +901,12 @@ export default function Pedidos() {
       breakdown.push(`🎟️ Cupón${couponCode ? ` ${couponCode}` : ''}${couponPercent ? ` (${couponPercent})` : ''}: - ${money(couponDiscount)}`);
     }
 
+    const wholesaleDiscount = roundMoney(selectedPedido.descuento_mayor ?? 0);
+    if (wholesaleDiscount > 0) {
+      const pct = Number(selectedPedido.descuento_mayor_porcentaje);
+      breakdown.push(`🎁 Descuento al mayor${Number.isFinite(pct) && pct > 0 ? ` (${pct}%)` : ''}: - ${money(wholesaleDiscount)}`);
+    }
+
     for (const adjustment of appliedAdjustments) {
       const amount = adjustment.modo === 'porcentaje'
         ? roundMoney(persistedTotals.base * (adjustment.valor / 100))
@@ -945,6 +960,37 @@ export default function Pedidos() {
       descripcion: selectedPedido?.cupon_descripcion || null,
     };
   }, [selectedPedido]);
+
+  // Descuento al mayor del pedido abierto
+  // (quitado = se le quitó en el panel, por ejemplo porque paga con Cashea)
+  const mayorDetalle = React.useMemo(() => {
+    if (!selectedPedido) return null;
+    const descuento = roundMoney(selectedPedido?.descuento_mayor ?? 0);
+    const quitado = Boolean(selectedPedido?.descuento_mayor_quitado);
+    if (descuento <= 0 && !quitado) return null;
+    const pct = Number(selectedPedido?.descuento_mayor_porcentaje);
+    return { descuento, quitado, pct: Number.isFinite(pct) && pct > 0 ? `${pct}%` : null };
+  }, [selectedPedido]);
+
+  const [cambiandoMayor, setCambiandoMayor] = useState(false);
+  const cambiarDescuentoMayor = async (aplicar: boolean) => {
+    if (!selectedPedido || cambiandoMayor) return;
+    if (!aplicar && !window.confirm('¿Quitar el descuento al mayor de este pedido? El total sube al precio normal.')) return;
+    setCambiandoMayor(true);
+    try {
+      const id = Number(selectedPedido.id);
+      await setDescuentoMayorPedido(id, aplicar);
+      toast.success(aplicar ? 'Descuento al mayor aplicado de nuevo' : 'Descuento al mayor quitado');
+      // Total nuevo en el listado y detalle recargado completo (pagos y estado "Pagado" según el total nuevo)
+      const fresh = await getPedidoVenta(id);
+      setPedidos((list) => (Array.isArray(list) ? list.map((p: any) => (p.id === id ? { ...p, ...fresh } : p)) : list));
+      await openDetalle(id);
+    } catch (error) {
+      toast.error(parseApiError(error) || 'No se pudo cambiar el descuento al mayor');
+    } finally {
+      setCambiandoMayor(false);
+    }
+  };
 
   const tasaActual = fmtTasa(selectedPedido);
   const tasaSimbolo = selectedPedido?.tasa_simbolo || (selectedPedido?.tasa && selectedPedido.tasa.simbolo) || 'Bs';
@@ -2254,6 +2300,31 @@ export default function Pedidos() {
                   {cuponDetalle.colaborador && <span>· {cuponDetalle.colaborador}</span>}
                 </div>
               )}
+              {mayorDetalle && (
+                <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${mayorDetalle.quitado ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <TicketPercent className="w-4 h-4 shrink-0" />
+                  {mayorDetalle.quitado ? (
+                    <span className="font-medium">Descuento al mayor quitado{mayorDetalle.pct ? ` (${mayorDetalle.pct})` : ''}</span>
+                  ) : (
+                    <>
+                      <span className="font-medium">Descuento al mayor aplicado</span>
+                      {mayorDetalle.pct && <span>· {mayorDetalle.pct}</span>}
+                      <span>· -{mayorDetalle.descuento.toFixed(2)}</span>
+                    </>
+                  )}
+                  {!/^complet/i.test(String(selectedPedido?.estado || '')) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto h-8 bg-white"
+                      disabled={cambiandoMayor}
+                      onClick={() => void cambiarDescuentoMayor(mayorDetalle.quitado)}
+                    >
+                      {cambiandoMayor ? 'Guardando...' : mayorDetalle.quitado ? 'Volver a aplicar' : 'Quitar (Cashea)'}
+                    </Button>
+                  )}
+                </div>
+              )}
             </DialogHeader>
 
             <div id="modal-scroll-container" className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/50 space-y-6 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
@@ -2494,6 +2565,7 @@ export default function Pedidos() {
                       <div className="mt-3 text-xs text-muted-foreground">
                         Vista previa: Subtotal ${ajustesPreview.total_base.toFixed(2)}
                         {ajustesPreview.descuento_cupon > 0 && ` - cupón $${ajustesPreview.descuento_cupon.toFixed(2)}`}
+                        {ajustesPreview.descuento_mayor > 0 && ` - al mayor $${ajustesPreview.descuento_mayor.toFixed(2)}`}
                         {ajustesPreview.total_descuentos > 0 && ` - $${ajustesPreview.total_descuentos.toFixed(2)}`}
                         {ajustesPreview.total_recargos > 0 && ` + $${ajustesPreview.total_recargos.toFixed(2)}`}
                         {' = '}
@@ -2508,6 +2580,11 @@ export default function Pedidos() {
                         {cuponDetalle && (
                           <div className="text-sm text-amber-700">
                             - Cupón {cuponDetalle.codigo}{cuponDetalle.pct ? ` (${cuponDetalle.pct})` : ''}: ${cuponDetalle.descuento.toFixed(2)}
+                          </div>
+                        )}
+                        {mayorDetalle && !mayorDetalle.quitado && (
+                          <div className="text-sm text-amber-700">
+                            - Descuento al mayor{mayorDetalle.pct ? ` (${mayorDetalle.pct})` : ''}: ${mayorDetalle.descuento.toFixed(2)}
                           </div>
                         )}
                         {persistedTotals.descuentosAjustes > 0 && (

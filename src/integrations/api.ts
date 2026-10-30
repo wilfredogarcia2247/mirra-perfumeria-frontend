@@ -1471,6 +1471,38 @@ export async function deleteMensajeCintillo(id: number) {
   return apiFetch(`/cintillo/${id}`, { method: 'DELETE' });
 }
 
+// Descuento al mayor: reglas editables en el panel
+export interface NivelDescuentoMayor {
+  desde: number;
+  porcentaje: number;
+}
+
+export interface ConfigDescuentoMayor {
+  activo: boolean;
+  niveles: NivelDescuentoMayor[];
+  tamanos_ml: number[];
+  actualizado_en?: string | null;
+}
+
+export async function getDescuentoMayorPublic(): Promise<ConfigDescuentoMayor> {
+  const response = await fetch(`${API_URL}/descuento-mayor/activo`);
+  if (!response.ok) throw new Error('No se pudo cargar el descuento al mayor');
+  return response.json();
+}
+
+export async function getDescuentoMayorConfig(): Promise<ConfigDescuentoMayor> {
+  return apiFetch('/descuento-mayor');
+}
+
+export async function saveDescuentoMayorConfig(data: ConfigDescuentoMayor): Promise<ConfigDescuentoMayor> {
+  return apiFetch('/descuento-mayor', { method: 'PUT', body: JSON.stringify(data) });
+}
+
+// Quitar (aplicar=false) o volver a aplicar el descuento al mayor de un pedido, p. ej. pago con Cashea
+export async function setDescuentoMayorPedido(pedidoId: number, aplicar: boolean) {
+  return apiFetch(`/pedidos-venta/${pedidoId}/descuento-mayor`, { method: 'PUT', body: JSON.stringify({ aplicar }) });
+}
+
 // Image upload to MinIO/S3
 export async function uploadImage(file: File) {
   const formData = new FormData();

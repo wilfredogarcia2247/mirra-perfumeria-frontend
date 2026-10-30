@@ -4,7 +4,9 @@ import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito } from '@/lib/catalog';
-import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic } from '@/integrations/api';
+import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
+import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
+import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
 import useCart, { CartItem } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
@@ -93,6 +95,16 @@ export default function Hero() {
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count, syncWithCatalog } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
+  // Reglas del descuento al mayor (si no cargan, el carrito funciona igual sin la barra)
+  const [configMayor, setConfigMayor] = useState<ConfigDescuentoMayor | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    getDescuentoMayorPublic()
+      .then((config) => { if (activo) setConfigMayor(config); })
+      .catch(() => { /* sin descuento al mayor visible */ });
+    return () => { activo = false; };
+  }, []);
 
   // Al cargar el catálogo, el carrito guardado toma los precios actuales
   useEffect(() => {
@@ -325,11 +337,39 @@ export default function Hero() {
 
   const subtotalCarrito = cartItems.reduce((s, it) => s + (precioUnitario(it) * Number(it.qty || 0)), 0);
 
-  const descuentoCupon = cuponAplicado
+  const descuentoCuponPosible = cuponAplicado
     ? Math.round(subtotalCarrito * (Number(cuponAplicado.descuento_porcentaje || 0) / 100) * 100) / 100
     : 0;
 
-  const totalCarrito = Math.max(0, Math.round((subtotalCarrito - descuentoCupon) * 100) / 100);
+  // Descuento al mayor: solo perfumes de los tamaños configurados. Con cupón se aplica el mayor de los dos.
+  const mayor = calcularDescuentoMayor(
+    cartItems.map((it) => ({
+      nombre: (it.product as any)?.tamano?.nombre ?? (it.product as any)?.formula?.nombre,
+      cantidad: Number(it.qty || 0),
+      precio: precioUnitario(it),
+    })),
+    configMayor,
+  );
+  const descuentoElegido = elegirDescuento(descuentoCuponPosible, mayor.descuento);
+  const descuentoCupon = descuentoElegido === 'cupon' ? descuentoCuponPosible : 0;
+  const descuentoMayor = descuentoElegido === 'mayor' ? mayor.descuento : 0;
+  const textoDescuento = descuentoElegido === 'mayor'
+    ? `Descuento al mayor ${mayor.porcentaje}% aplicado`
+    : descuentoElegido === 'cupon' ? `Cupón ${cuponAplicado?.codigo} aplicado` : undefined;
+
+  // Tamaños que cuentan y que de verdad se venden hoy (si 60 ml no está a la venta, no se menciona)
+  const tamanosEnVenta = new Set<number>();
+  catalogProducts.forEach((p) => ((p.tamanos || p.formulas || []) as any[]).forEach((t: any) => {
+    const ml = mlDe(t?.nombre);
+    if (ml != null) tamanosEnVenta.add(ml);
+  }));
+  const tamanosMayor = (configMayor?.tamanos_ml || []).map(Number).filter((ml) => tamanosEnVenta.size === 0 || tamanosEnVenta.has(ml)).sort((a, b) => a - b);
+  const tamanosTexto = tamanosMayor.length === 0 ? ''
+    : tamanosMayor.length === 1 ? `${tamanosMayor[0]} ml`
+    : `${tamanosMayor.slice(0, -1).join(', ')} y ${tamanosMayor[tamanosMayor.length - 1]} ml`;
+  const mostrarMayor = Boolean(configMayor?.activo && configMayor.niveles.length > 0);
+
+  const totalCarrito = Math.max(0, Math.round((subtotalCarrito - descuentoCupon - descuentoMayor) * 100) / 100);
 
   const formatMonto = (valor: number) => {
     const monto = Number(valor) || 0;
@@ -668,6 +708,7 @@ export default function Hero() {
                 inline
                 items={cartItems}
                 couponCode={cuponAplicado?.codigo}
+                discountLabel={textoDescuento}
                 cartTotal={totalCarrito}
                 formatPrice={formatMonto}
                 onUpdateQty={updateQty}
@@ -747,6 +788,14 @@ export default function Hero() {
                     </section>
                     </>
                   )}
+                  {mostrarMayor && configMayor && (
+                    <BarraDescuentoMayor
+                      config={configMayor}
+                      mayor={mayor}
+                      tamanosTexto={tamanosTexto}
+                      ganaCupon={descuentoElegido === 'cupon' && mayor.descuento > 0}
+                    />
+                  )}
                   {/* Cart Items List */}
                   <div className="space-y-4">
                     {cartItems.map((it) => {
@@ -823,6 +872,18 @@ export default function Hero() {
                       );
                     })}
                   </div>
+
+                  {mostrarMayor && configMayor && mayor.siguiente && !deliveryReview && (
+                    <SugerenciasDescuentoMayor
+                      catalogo={catalogProducts}
+                      items={cartItems}
+                      config={configMayor}
+                      faltan={mayor.siguiente.faltan}
+                      abierto={isCartOpen}
+                      formatPrice={formatMonto}
+                      onAgregar={handleAddToCart}
+                    />
+                  )}
 
                   {/* Checkout Form */}
                   {false && isCheckoutOpen && (
@@ -1077,6 +1138,11 @@ export default function Hero() {
                             -{cuponAplicado.descuento_porcentaje}% de descuento
                             {cuponAplicado.colaborador_nombre ? ` · ${cuponAplicado.colaborador_nombre}` : ''}
                           </p>
+                          {descuentoElegido === 'mayor' && (
+                            <p className="text-xs font-medium text-amber-700">
+                              Tu descuento al mayor ({mayor.porcentaje}%) es más alto: se aplica ese en lugar del cupón.
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
@@ -1121,7 +1187,7 @@ export default function Hero() {
 
                 <div className="flex justify-between items-end mb-4">
                   <div>
-                    <p className="text-sm text-gray-500">{cuponAplicado ? 'Total con descuento' : 'Total estimado'}</p>
+                    <p className="text-sm text-gray-500">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
                     <p className="text-2xl font-bold text-gray-900 leading-none mt-1">
                       {formatMonto(totalCarrito)}
                     </p>
@@ -1133,15 +1199,19 @@ export default function Hero() {
                   )}
                 </div>
 
-                {descuentoCupon > 0 && (
+                {(descuentoCupon > 0 || descuentoMayor > 0) && (
                   <div className="mb-4 space-y-1 rounded-xl bg-emerald-50/70 px-3 py-2 text-sm">
                     <div className="flex justify-between text-gray-600">
                       <span>Subtotal</span>
                       <span>{formatMonto(subtotalCarrito)}</span>
                     </div>
-                    <div className="flex justify-between text-emerald-700 font-medium">
-                      <span>Descuento cupón ({cuponAplicado?.descuento_porcentaje}%)</span>
-                      <span>-{formatMonto(descuentoCupon)}</span>
+                    <div className="flex justify-between gap-2 text-emerald-700 font-medium">
+                      <span>
+                        {descuentoMayor > 0
+                          ? `Descuento al mayor (${mayor.porcentaje}%)`
+                          : `Descuento cupón (${cuponAplicado?.descuento_porcentaje}%)`}
+                      </span>
+                      <span>-{formatMonto(descuentoMayor > 0 ? descuentoMayor : descuentoCupon)}</span>
                     </div>
                   </div>
                 )}

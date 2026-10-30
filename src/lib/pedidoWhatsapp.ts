@@ -53,8 +53,10 @@ export function mensajePedidoWhatsapp(pedido: any): string {
   const dinero = (monto: number) => ambos(redondear(monto), enBs(monto));
 
   const descuento = redondear(pedido?.descuento_cupon ?? 0);
+  const descuentoMayor = redondear(pedido?.descuento_mayor ?? 0);
+  const porcentajeMayor = Number(pedido?.descuento_mayor_porcentaje);
   const total = redondear(pedido?.total ?? 0);
-  const subtotal = redondear(pedido?.total_base ?? total + descuento);
+  const subtotal = redondear(pedido?.total_base ?? total + descuento + descuentoMayor);
   const porcentaje = Number(pedido?.cupon_descuento_porcentaje);
 
   const lineasProductos = productos.map((p) => {
@@ -69,6 +71,15 @@ export function mensajePedidoWhatsapp(pedido: any): string {
     const codigo = String(pedido?.cupon_codigo || '').trim();
     resumen.push(`🎟️ Cupón${codigo ? ` ${codigo}` : ''}${Number.isFinite(porcentaje) && porcentaje > 0 ? ` (${porcentaje}%)` : ''}: - ${ambos(redondear(subtotal - total), redondear(enBs(subtotal) - enBs(total)))}`);
     // (el descuento se calcula como subtotal - total, en cada moneda, para que la resta cuadre al céntimo)
+  }
+  if (descuentoMayor > 0) {
+    const pct = Number.isFinite(porcentajeMayor) && porcentajeMayor > 0 ? ` (${porcentajeMayor}%)` : '';
+    resumen.push(`🎁 Descuento al mayor${pct}: - ${ambos(redondear(subtotal - total), redondear(enBs(subtotal) - enBs(total)))}`);
+  }
+  // Si escribió un cupón pero el descuento al mayor era más alto, se aplicó solo el mayor
+  const cuponNoAplicado = pedido?.cupon_no_aplicado?.codigo;
+  if (cuponNoAplicado && descuentoMayor > 0) {
+    resumen.push(`(El cupón ${cuponNoAplicado} no se sumó: se aplicó el descuento al mayor, que es más alto)`);
   }
 
   const entrega = lineasEntrega(pedido);
@@ -89,7 +100,7 @@ export function mensajePedidoWhatsapp(pedido: any): string {
     '💰 *Resumen*',
     ...resumen,
     `*Total de productos: ${dinero(total)}*`,
-    '_El costo de delivery o envío y cualquier descuento por compra al mayor me lo confirman por aquí._',
+    '_El costo de delivery o envío me lo confirman por aquí._',
     ...(entrega.length > 0 ? ['', ...entrega] : []),
     '',
     'Quedo atento(a) a la confirmación ✅',
@@ -97,5 +108,6 @@ export function mensajePedidoWhatsapp(pedido: any): string {
 }
 
 export function enlaceWhatsappPedido(pedido: any): string {
-  return `https://wa.me/${WHATSAPP_PEDIDOS}?text=${encodeURIComponent(mensajePedidoWhatsapp(pedido))}`;
+  // Enlace directo (no wa.me): la redirección de wa.me daña los emojis en WhatsApp Web y escritorio ("��")
+  return `https://api.whatsapp.com/send?phone=${WHATSAPP_PEDIDOS}&text=${encodeURIComponent(mensajePedidoWhatsapp(pedido))}`;
 }

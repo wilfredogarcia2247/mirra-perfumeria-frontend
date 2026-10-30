@@ -964,6 +964,12 @@ export default function Reportes() {
                                 <span className="tabular-nums">−{formatCloseUsd(pedido.descuento_cupon_usd)} · −{formatCloseBs(pedido.descuento_cupon_bs)}</span>
                               </div>
                             )}
+                            {pedido.descuento_mayor_usd > 0 && (
+                              <div className="flex flex-wrap justify-between gap-2 text-amber-800">
+                                <span>Descuento al mayor {pedido.descuento_mayor_porcentaje ? `(${pedido.descuento_mayor_porcentaje}%)` : ''}</span>
+                                <span className="tabular-nums">−{formatCloseUsd(pedido.descuento_mayor_usd)} · −{formatCloseBs(pedido.descuento_mayor_bs)}</span>
+                              </div>
+                            )}
                             {(pedido.ajustes || []).map((ajuste: any) => (
                               <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-rose-700'}`}>
                                 <span>
@@ -978,7 +984,7 @@ export default function Reportes() {
                                 </span>
                               </div>
                             ))}
-                            {pedido.descuento_cupon_usd <= 0 && (pedido.ajustes || []).length === 0 && (
+                            {pedido.descuento_cupon_usd <= 0 && !(pedido.descuento_mayor_usd > 0) && (pedido.ajustes || []).length === 0 && (
                               <p className="text-xs text-muted-foreground">Sin descuentos ni recargos.</p>
                             )}
                           </div>

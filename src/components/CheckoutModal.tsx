@@ -36,6 +36,8 @@ interface Props {
   items: CartItem[];
   inline?: boolean;
   couponCode?: string;
+  // Texto del descuento que se aplica (cupón o al mayor); con cupón sin texto se muestra el cupón
+  discountLabel?: string;
   cartTotal?: number;
   formatPrice?: (value: number) => string;
   onUpdateQty?: (key: string, qty: number) => void;
@@ -134,6 +136,7 @@ export default function CheckoutModal({
   items,
   inline = false,
   couponCode,
+  discountLabel,
   cartTotal,
   formatPrice,
   onUpdateQty,
@@ -1141,7 +1144,9 @@ export default function CheckoutModal({
                 <div className="flex items-center justify-between gap-3 p-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Total estimado</p>
-                    {couponCode && <p className="mt-0.5 text-xs text-emerald-700">Cupón {couponCode} aplicado</p>}
+                    {(discountLabel || couponCode) && (
+                      <p className="mt-0.5 text-xs text-emerald-700">{discountLabel || `Cupón ${couponCode} aplicado`}</p>
+                    )}
                   </div>
                   <p className="text-lg font-bold text-gray-900">
                     {displayPrice(cartTotal ?? items.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0))}
