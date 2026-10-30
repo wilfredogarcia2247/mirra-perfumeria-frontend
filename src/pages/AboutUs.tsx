@@ -42,6 +42,23 @@ export default function AboutUs() {
   const { count } = useCart();
   const [isCartOpen, setIsCartOpen] = React.useState(false);
 
+  // Alto del menú fijo (cambia si hay mensajes en la franja de arriba): el título queda centrado debajo
+  const [altoMenu, setAltoMenu] = useState<number | null>(null);
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    // Solo se mide arriba de la página: al bajar, el menú cambia unos píxeles y la página saltaría
+    const medir = () => {
+      const alto = Math.round(header.getBoundingClientRect().height);
+      setAltoMenu((prev) => (prev == null || window.scrollY <= 10 ? alto : prev));
+    };
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
   const handleCartClick = () => {
     console.log('Cart clicked from About Us page');
   };
@@ -51,7 +68,13 @@ export default function AboutUs() {
       <Header cartItemsCount={count} onCartClick={handleCartClick} />
 
       {/* Hero Banner Area */}
-      <div className="relative pt-36 pb-14 sm:pt-44 sm:pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-primary-100/50">
+      {/* Arriba: alto del menú + el mismo espacio que abajo (56 px en teléfono, 64 px en pantallas grandes) */}
+      <div
+        className={`relative pb-14 sm:pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-primary-100/50 ${
+          altoMenu != null ? 'pt-[calc(var(--alto-menu)+3.5rem)] sm:pt-[calc(var(--alto-menu)+4rem)]' : 'pt-36 sm:pt-44'
+        }`}
+        style={altoMenu != null ? ({ '--alto-menu': `${altoMenu}px` } as React.CSSProperties) : undefined}
+      >
         <div className="absolute inset-0 z-0 opacity-10 pattern-grid-lg text-primary-500"></div>
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <FadeInSection>

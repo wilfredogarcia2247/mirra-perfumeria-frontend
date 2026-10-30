@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
-import { volarAlCarrito } from '@/lib/catalog';
+import { volarAlCarrito, bajarAlCatalogo } from '@/lib/catalog';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
 import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
@@ -92,6 +92,8 @@ export default function Hero() {
   const [cuponAplicado, setCuponAplicado] = useState<CuponPublico | null>(null);
   const [cuponCargando, setCuponCargando] = useState(false);
   const [cuponError, setCuponError] = useState<string>('');
+  // El campo del cupón empieza cerrado (una línea) para dejar espacio a los perfumes
+  const [cuponAbierto, setCuponAbierto] = useState(false);
 
   const { items: cartItems, addItem, removeItem, updateQty, clear, count, syncWithCatalog } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
@@ -114,6 +116,20 @@ export default function Hero() {
   useEffect(() => {
     trackCatalogPageView();
   }, []);
+
+  // Llegó desde "Comprar Ahora" en otra página: bajar a la lista de perfumes
+  const location = useLocation();
+  const irAlCatalogo = Boolean((location.state as { irAlCatalogo?: boolean } | null)?.irAlCatalogo);
+  useEffect(() => {
+    if (!irAlCatalogo) return;
+    const t = window.setTimeout(() => {
+      bajarAlCatalogo();
+      // Se usa una sola vez: si el cliente recarga la página, no vuelve a bajar sola
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }, 150);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [irAlCatalogo, location.key]);
 
   const buscarClientePorCedula = async (value: string) => {
     const cedula = value.trim();
@@ -413,6 +429,7 @@ export default function Hero() {
     setCuponAplicado(null);
     setCuponCodigo('');
     setCuponError('');
+    setCuponAbierto(false);
   }
 
   function vaciarCarrito() {
@@ -1122,47 +1139,64 @@ export default function Hero() {
             {/* Footer with Total and Actions (Fixed at bottom) */}
             {cartItems.length > 0 && !isCheckoutOpen && (
               <div className="border-t border-gray-100 bg-white p-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 sticky bottom-0">
-                {/* Campo de cupón de descuento */}
-                <div className="mb-4">
+                {/* Cupón: una sola línea; el campo se abre solo si el cliente lo toca */}
+                <div className="mb-3">
                   {cuponAplicado ? (
-                    <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-                          <Check className="w-4 h-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-emerald-800">
-                            Cupón {cuponAplicado.codigo} aplicado
-                          </p>
-                          <p className="text-xs text-emerald-700">
-                            -{cuponAplicado.descuento_porcentaje}% de descuento
-                            {cuponAplicado.colaborador_nombre ? ` · ${cuponAplicado.colaborador_nombre}` : ''}
-                          </p>
-                          {descuentoElegido === 'mayor' && (
-                            <p className="text-xs font-medium text-amber-700">
-                              Tu descuento al mayor ({mayor.porcentaje}%) es más alto: se aplica ese en lugar del cupón.
-                            </p>
-                          )}
-                        </div>
+                    <div>
+                      <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5">
+                        <p className="flex min-w-0 items-center gap-1.5 text-sm text-emerald-800">
+                          <Check className="h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            Cupón <strong>{cuponAplicado.codigo}</strong> −{cuponAplicado.descuento_porcentaje}%
+                          </span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={quitarCupon}
+                          className="-mr-1 shrink-0 rounded-md p-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
+                          title="Quitar cupón"
+                          aria-label="Quitar cupón"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={quitarCupon}
-                        className="p-1 rounded-md text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
-                        title="Quitar cupón"
-                        aria-label="Quitar cupón"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {descuentoElegido === 'mayor' && (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          Tu descuento al mayor ({mayor.porcentaje}%) es más alto: se aplica ese en lugar del cupón.
+                        </p>
+                      )}
                     </div>
+                  ) : !cuponAbierto ? (
+                    <button
+                      type="button"
+                      onClick={() => setCuponAbierto(true)}
+                      className="flex w-full items-center justify-between gap-2 py-1 text-sm text-gray-600 transition-colors hover:text-gray-900"
+                      aria-expanded={false}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <TicketPercent className="h-4 w-4" /> ¿Tienes un cupón?
+                      </span>
+                      <span className="font-semibold text-gray-900">Aplicar ›</span>
+                    </button>
                   ) : (
                     <>
-                      <label htmlFor="cupon-carrito" className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-700">
-                        <TicketPercent className="w-4 h-4" /> ¿Tienes un cupón de descuento?
-                      </label>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <label htmlFor="cupon-carrito" className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                          <TicketPercent className="w-4 h-4" /> Código de cupón
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => { setCuponAbierto(false); setCuponCodigo(''); setCuponError(''); }}
+                          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                          aria-label="Cerrar cupón"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                       <div className="flex gap-2">
                         <input
                           id="cupon-carrito"
+                          autoFocus
                           type="text"
                           value={cuponCodigo}
                           onChange={(e) => { setCuponCodigo(e.target.value.toUpperCase()); setCuponError(''); }}
@@ -1208,7 +1242,7 @@ export default function Hero() {
                     <div className="flex justify-between gap-2 text-emerald-700 font-medium">
                       <span>
                         {descuentoMayor > 0
-                          ? `Descuento al mayor (${mayor.porcentaje}%)`
+                          ? `Descuento (${mayor.porcentaje}%)`
                           : `Descuento cupón (${cuponAplicado?.descuento_porcentaje}%)`}
                       </span>
                       <span>-{formatMonto(descuentoMayor > 0 ? descuentoMayor : descuentoCupon)}</span>

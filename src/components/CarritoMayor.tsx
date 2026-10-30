@@ -10,6 +10,13 @@ import { mlDe, cuentaParaMayor, type ResultadoMayor } from '@/lib/descuentoMayor
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 
+// "Lleva 4 perfumes y ahorra 10%, o 24 y ahorra 15%."
+function fraseNiveles(niveles: { desde: number; porcentaje: number }[]): string {
+  const partes = niveles.map((n, i) => (i === 0 ? `Lleva ${n.desde} perfumes y ahorra ${n.porcentaje}%` : `${n.desde} y ahorra ${n.porcentaje}%`));
+  if (partes.length === 1) return `${partes[0]}.`;
+  return `${partes.slice(0, -1).join(', ')}, o ${partes[partes.length - 1]}.`;
+}
+
 // ── Barra de progreso ────────────────────────────────────────────────────
 export function BarraDescuentoMayor({
   config,
@@ -65,15 +72,15 @@ export function BarraDescuentoMayor({
         />
       </div>
       <p className="mt-1.5 text-[11px] leading-snug text-gray-600">
-        {niveles.map((n) => `${n.desde}+ perfumes: ${n.porcentaje}%`).join(' · ')}
-        {tamanosTexto ? ` · Cuentan los de ${tamanosTexto}` : ''}
+        {fraseNiveles(niveles)}
+        {tamanosTexto && <><br />Aplica en perfumes de {tamanosTexto}.</>}
       </p>
       {ganaCupon && porcentaje > 0 && (
         <p className="mt-1 text-[11px] font-medium text-amber-800">Tu cupón da más descuento, así que se aplica el cupón.</p>
       )}
       {!ganaCupon && porcentaje > 0 && (
         <p className="mt-1.5 rounded-lg bg-white/70 px-2 py-1 text-[11px] font-medium text-gray-700">
-          💳 El descuento al mayor no aplica para pagos con Cashea.
+          💳 Este descuento no aplica para pagos con Cashea.
         </p>
       )}
     </section>
