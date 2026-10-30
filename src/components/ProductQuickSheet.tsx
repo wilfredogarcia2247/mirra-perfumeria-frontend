@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
@@ -19,12 +19,11 @@ interface Props {
 }
 
 // Ventana alta con la foto grande del perfume para elegir la presentación y agregar al carrito.
-// La foto es la protagonista: ocupa todo el ancho y al tocarla se amplía para leer las notas.
+// La foto es la protagonista: ocupa todo el ancho.
 export default function ProductQuickSheet({ product, tasa, origen, onClose, onAdd }: Props) {
   const presentaciones = presentacionesDe(product);
   const [elegida, setElegida] = useState(0);
   const [abierta, setAbierta] = useState(false);
-  const [zoom, setZoom] = useState<'no' | 'normal' | 'grande'>('no');
   const [fotoLista, setFotoLista] = useState(!origen);
   const sheetRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -89,8 +88,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (zoom !== 'no') setZoom('no'); else cerrar();
+      if (e.key === 'Escape') cerrar();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -150,8 +148,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
         <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
           <div
             ref={heroRef}
-            className="relative aspect-square max-h-[58dvh] w-full cursor-zoom-in bg-[#f5eee6]"
-            onClick={() => setZoom('normal')}
+            className="relative aspect-square max-h-[58dvh] w-full bg-[#f5eee6]"
           >
             <img
               ref={heroImgRef}
@@ -173,9 +170,6 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
             >
               <X className="h-5 w-5" />
             </button>
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-[#1f1a17]/75 px-2.5 py-1.5 text-[11px] font-semibold text-white">
-              <Search className="h-3.5 w-3.5" /> Toca para ampliar
-            </span>
             {product.agotado && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/45">
                 <span className="rounded-full bg-gray-900/85 px-6 py-2.5 text-base font-bold uppercase tracking-[0.25em] text-white shadow-lg">Agotado</span>
@@ -223,30 +217,6 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           </button>
         </div>
       </div>
-
-      {zoom !== 'no' && (
-        <div className="fixed inset-0 z-[110] overflow-auto bg-[#111] [touch-action:pinch-zoom_pan-x_pan-y]" role="dialog" aria-label="Foto ampliada">
-          <button
-            type="button"
-            onClick={() => setZoom('no')}
-            aria-label="Cerrar foto"
-            className="fixed right-3.5 top-[calc(14px+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-gray-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div className={`min-h-full ${zoom === 'grande' ? 'block' : 'flex items-center justify-center'}`}>
-            <img
-              src={src}
-              alt={product.name}
-              onClick={() => setZoom(zoom === 'grande' ? 'normal' : 'grande')}
-              className={zoom === 'grande' ? 'block w-[220%] max-w-none cursor-zoom-out' : 'block w-full max-w-3xl cursor-zoom-in'}
-            />
-          </div>
-          <p className="pointer-events-none fixed bottom-[calc(18px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/50 px-3 py-1.5 text-xs text-gray-200">
-            Toca la foto para acercar · pellizca con dos dedos
-          </p>
-        </div>
-      )}
     </>,
     document.body,
   );
