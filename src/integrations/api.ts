@@ -663,6 +663,28 @@ export async function getVentasPorMetodoMoneda(fechaInicio?: string, fechaFin?: 
   return apiFetch(`/pagos/resumen-metodo-moneda${qs}`);
 }
 
+// Recompras: nuevos vs. recompras, por mes, y clientes agrupados por veces que compraron
+export async function getClientesRecompra(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
+}
+
+export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string }) {
+  const params = new URLSearchParams({
+    grupo: opts.grupo,
+    page: String(opts.page || 1),
+    page_size: String(opts.pageSize || 20),
+    orden: opts.orden || 'monto',
+  });
+  if (opts.q) params.set('q', opts.q);
+  if (opts.fechaInicio) params.set('fecha_inicio', opts.fechaInicio);
+  if (opts.fechaFin) params.set('fecha_fin', opts.fechaFin);
+  return apiFetch(`/pedidos-venta/clientes-grupo?${params.toString()}`);
+}
+
 export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string, orden: 'monto' | 'pedidos' = 'monto') {
   const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit), orden });
   if (fechaInicio) params.set('fecha_inicio', fechaInicio);
