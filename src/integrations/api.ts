@@ -884,13 +884,12 @@ export async function getTasaActiva() {
     const resp = await fetch(publicUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
     if (resp.ok) {
       const body = await resp.json();
-      // Si el endpoint devuelve { active: null, message: ... } tratamos como no encontrada
-      if (body && body.active) {
-        const activa = body.active;
-        const monto = typeof activa.monto === 'number' ? activa.monto : (activa.monto ? Number(String(activa.monto).replace(',', '.')) : null);
-        return { ...activa, monto };
-      }
-      return null;
+      // Si el endpoint devuelve { active: null, message: ... } no hay tasa activa.
+      // Si hay, el backend devuelve la tasa directamente ({ id, monto, simbolo, ... }).
+      if (!body || body.active === null) return null;
+      const activa = body.active || body;
+      const monto = typeof activa.monto === 'number' ? activa.monto : (activa.monto ? Number(String(activa.monto).replace(',', '.')) : null);
+      return monto != null && Number.isFinite(monto) && monto > 0 ? { ...activa, monto } : null;
     }
   } catch (e) {
     // silent, fallback abajo
