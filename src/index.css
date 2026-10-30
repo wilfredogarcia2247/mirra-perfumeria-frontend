@@ -385,7 +385,7 @@
   to { transform: translateX(-50%); }
 }
 .cinta-fila {
-  animation: cinta-deslizar 60s linear infinite;
+  animation: cinta-deslizar 90s linear infinite;
 }
 .cinta-fila.cinta-reversa {
   animation-direction: reverse;

@@ -5,7 +5,7 @@ import { getImageUrl } from '@/lib/utils';
 
 const MUESTRAS = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const FILAS = 3;
-const FOTOS_POR_FILA = 10;
+const FOTOS_POR_FILA = 15;
 
 // Las fotos de la cinta se ven pequeñas: si están en Cloudinary se pide una versión liviana
 // (máx. 320px de ancho, calidad y formato automáticos) para no gastar datos en el celular.
@@ -15,15 +15,46 @@ function versionPequena(url: string) {
     : url;
 }
 
-// Fotos para la cinta: las de los productos (sin repetir); si hay pocas, se completan con las de muestra.
+const TOTAL_FOTOS = FILAS * FOTOS_POR_FILA; // 45
+const LUGARES_DESTACADOS = Math.ceil(TOTAL_FOTOS / 2); // la mitad (23) es para Recomendados y Más pedidos
+
+// Mezcla al azar (Fisher-Yates) sin modificar la lista original
+function mezclar<T>(lista: T[]): T[] {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+// Fotos para la cinta, elegidas en cada visita:
+// 1. Todos los Recomendados.
+// 2. Más pedidos al azar hasta completar la mitad de la cinta.
+// 3. El resto (hasta 45) con perfumes al azar del catálogo.
+// Al final se mezcla todo. No se usan agotados ni fotos repetidas.
+// Si hay menos de 6 fotos, se completan con las de muestra.
 function fotosDe(products: Product[]): string[] {
-  const urls = Array.from(new Set(
-    products
-      .map((p) => (p.image_url ? getImageUrl(p) : undefined))
-      .filter((u): u is string => Boolean(u))
-      .map(versionPequena),
-  ));
-  return urls.length >= 6 ? urls.slice(0, FILAS * FOTOS_POR_FILA) : [...urls, ...MUESTRAS];
+  const disponibles = products.filter((p) => p.image_url && !p.agotado);
+  const recomendados = disponibles.filter((p) => p.featured);
+  const masPedidos = mezclar(disponibles.filter((p) => p.mas_pedido && !p.featured));
+  const resto = mezclar(disponibles.filter((p) => !p.featured && !p.mas_pedido));
+
+  const elegidos = [
+    ...recomendados,
+    ...masPedidos.slice(0, Math.max(0, LUGARES_DESTACADOS - recomendados.length)),
+  ];
+  // Si no hay suficientes "otros", se completa con los Más pedidos que sobraron
+  const relleno = [...resto, ...masPedidos.slice(Math.max(0, LUGARES_DESTACADOS - recomendados.length))];
+
+  const urls = new Set<string>();
+  for (const p of [...elegidos, ...relleno]) {
+    if (urls.size >= TOTAL_FOTOS) break;
+    const url = getImageUrl(p);
+    if (url) urls.add(versionPequena(url));
+  }
+  const fotos = mezclar(Array.from(urls));
+  return fotos.length >= 6 ? fotos : [...fotos, ...MUESTRAS];
 }
 
 function Foto({ src, index }: { src: string; index: number }) {
