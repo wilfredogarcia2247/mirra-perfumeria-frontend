@@ -89,8 +89,13 @@ export default function Hero() {
   const [cuponCargando, setCuponCargando] = useState(false);
   const [cuponError, setCuponError] = useState<string>('');
 
-  const { items: cartItems, addItem, removeItem, updateQty, clear, count } = useCart();
+  const { items: cartItems, addItem, removeItem, updateQty, clear, count, syncWithCatalog } = useCart();
   const [tasaPublic, setTasaPublic] = useState<any | null>(null);
+
+  // Al cargar el catálogo, el carrito guardado toma los precios actuales
+  useEffect(() => {
+    syncWithCatalog(catalogProducts);
+  }, [catalogProducts, syncWithCatalog]);
 
   useEffect(() => {
     trackCatalogPageView();

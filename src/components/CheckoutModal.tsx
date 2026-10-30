@@ -547,10 +547,11 @@ export default function CheckoutModal({
         producto_id: p.id,
         cantidad: Number(it.qty || 0),
         producto_nombre: p.name || p.nombre,
-        precio_venta: Number(p.price ?? p.precio_venta ?? 0),
+        // El mismo precio que el cliente ve en el carrito (el del tamaño elegido)
+        precio_venta: getItemPrice(it),
         costo: p.costo ?? undefined,
         image_url: p.image_url ?? p.image ?? undefined,
-        subtotal: Number(p.price ?? p.precio_venta ?? 0) * Number(it.qty || 0),
+        subtotal: getItemPrice(it) * Number(it.qty || 0),
         ...(formulaId != null ? { formula_id: Number(formulaId), tamano_id: Number(formulaId) } : {}),
         ...(formulaName != null ? { formula_nombre: String(formulaName), tamano_nombre: String(formulaName) } : {}),
       };
@@ -612,9 +613,10 @@ export default function CheckoutModal({
             mismatches.push(`producto ${pid}: enviado ${sentPrice}/${sentSubtotal} → recibido ${retPrice}/${retSubtotal}`);
           }
         });
+        // El servidor recalcula los precios (fuente de verdad, incluye descuentos):
+        // la diferencia solo queda registrada para los desarrolladores, no se le muestra al cliente.
         if (mismatches.length > 0) {
           console.warn('Precio mismatch al crear pedido:', mismatches, { sent: payload, created });
-          toast.warning('Atención: el servidor ajustó los precios del pedido. Revisa el detalle.');
         }
       } catch (e) {
         // ignore

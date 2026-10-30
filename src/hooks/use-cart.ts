@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { Product } from '@/lib/types';
+import { presentacionesDe } from '@/lib/catalog';
 
 export interface CartItem {
   key: string; // composite key: `${productoId}:${tamanoId || ''}`
@@ -114,9 +115,31 @@ export function useCart() {
     updateItems(() => []);
   }, []);
 
+  // El carrito queda guardado en el teléfono con el precio del día en que se agregó cada perfume.
+  // Al cargar el catálogo se actualiza cada producto con sus datos actuales (precio del tamaño
+  // elegido y si está agotado), para que el cliente vea el mismo precio que se guardará en el pedido.
+  const syncWithCatalog = useCallback((catalog: Product[]) => {
+    if (!Array.isArray(catalog) || catalog.length === 0) return;
+    const porId = new Map(catalog.map((p) => [String(p.id), p]));
+    let cambio = false;
+    const next = items.map((it) => {
+      const actual = porId.get(String(it.product?.id));
+      if (!actual) return it;
+      const viejo = it.product as any;
+      const tamanoId = viejo?.tamano?.id ?? viejo?.formula?.id ?? viejo?.formula_id ?? viejo?.tamano_id;
+      if (tamanoId == null) return it;
+      const presentacion = presentacionesDe(actual).find((pr) => String(pr.tamano?.id) === String(tamanoId));
+      if (!presentacion || presentacion.precio == null) return it;
+      if (Number(viejo.precio_snapshot) === presentacion.precio && Boolean(viejo.agotado) === Boolean(actual.agotado)) return it;
+      cambio = true;
+      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio } as Product };
+    });
+    if (cambio) setItems(next);
+  }, []);
+
   const count = cartItems.reduce((s, it) => s + it.qty, 0);
 
-  return { items: cartItems, addItem, removeItem, updateQty, clear, count };
+  return { items: cartItems, addItem, removeItem, updateQty, clear, count, syncWithCatalog };
 }
 
 export default useCart;
