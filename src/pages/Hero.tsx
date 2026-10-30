@@ -675,7 +675,7 @@ export default function Hero() {
             </div>
 
             {/* Content Area - Scrollable */}
-            <div             className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-5 py-5' : 'px-6 py-6'}`}>
+            <div             className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-3 py-4' : 'px-6 py-6'}`}>
               <CheckoutModal
                 open
                 visible={isCheckoutOpen}
@@ -823,7 +823,7 @@ export default function Hero() {
                                   min={1}
                                   value={it.qty}
                                   onChange={(e) => updateQty(it.key, Math.max(1, Number(e.target.value || 1)))}
-                                  className="w-8 text-center bg-transparent text-sm font-medium focus:outline-none appearance-none m-0 p-0"
+                                  className="w-8 text-center bg-transparent text-base md:text-sm font-medium focus:outline-none appearance-none m-0 p-0"
                                 />
                                 <button
                                   className="px-2 h-full hover:bg-gray-200 text-gray-600 rounded-r-lg transition-colors flex items-center justify-center active:bg-gray-300"
@@ -969,7 +969,7 @@ export default function Hero() {
                                   setNombreCliente('');
                                   setTelefonoCliente('');
                                 }}
-                                className="w-20 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                className="w-20 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
                               >
                                 <option value="V">V</option>
                                 <option value="J">J</option>
@@ -992,7 +992,7 @@ export default function Hero() {
                                     setTelefonoCliente('');
                                   }}
                                   onBlur={() => void buscarClientePorCedula(`${tipoDocumento}-${cedulaCliente}`)}
-                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
                                 />
                               </div>
                             </div>
@@ -1009,7 +1009,7 @@ export default function Hero() {
                                 placeholder="Tu nombre"
                                 value={nombreCliente}
                                 onChange={(e) => setNombreCliente(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
                               />
                             </div>
                           </div>}
@@ -1022,7 +1022,7 @@ export default function Hero() {
                                 type="text"
                                 value={nombreCliente}
                                 readOnly
-                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700"
+                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-base md:text-sm text-gray-700"
                               />
                             </div>
                           </div>}
@@ -1037,7 +1037,7 @@ export default function Hero() {
                                   placeholder="04129465465"
                                   value={telefonoCliente}
                                   onChange={(e) => setTelefonoCliente(e.target.value)}
-                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
                                 />
                               </div>
                             </div>
@@ -1115,7 +1115,7 @@ export default function Hero() {
                           onChange={(e) => { setCuponCodigo(e.target.value.toUpperCase()); setCuponError(''); }}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicarCupon(); } }}
                           placeholder="Ingresa tu código"
-                          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm uppercase focus:border-copper-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-copper-500/30 transition-all"
+                          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-base md:text-sm uppercase focus:border-copper-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-copper-500/30 transition-all"
                         />
                         <button
                           type="button"

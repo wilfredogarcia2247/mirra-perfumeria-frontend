@@ -293,7 +293,7 @@ export default function CheckoutModal({
               telefonoAutocompletado.current = false;
             }
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
           placeholder="Escribe tu cédula"
         />
         {buscandoCliente && <p className="mt-1 text-xs text-gray-500">Buscando tus datos...</p>}
@@ -317,7 +317,7 @@ export default function CheckoutModal({
             nombreAutocompletado.current = false;
             setNombreCliente(event.target.value);
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
           placeholder="Ej. María González"
         />
       </div>
@@ -337,7 +337,7 @@ export default function CheckoutModal({
             telefonoAutocompletado.current = false;
             setTelefono(digits);
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
           placeholder="Ej. 584141234567"
         />
         <p className="mt-1 text-xs text-gray-500">Solo números, mínimo 11 dígitos.</p>
@@ -684,7 +684,7 @@ export default function CheckoutModal({
   return (
     <div className={`${inline ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/60 p-4 backdrop-blur-sm'} ${visible ? '' : 'hidden'}`}>
       {!inline && <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="absolute inset-0 h-full w-full cursor-default" />}
-      <section className={inline ? 'w-full bg-white' : 'relative z-10 my-auto max-h-[94vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl'}>
+      <section className={inline ? 'w-full rounded-2xl border border-[#eadfce] bg-white px-4 py-5 shadow-sm' : 'relative z-10 my-auto max-h-[94vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl'}>
         {!inline &&         <header className="flex items-start justify-between bg-primary-800 px-6 py-5">
           <div>
             <h2 className="text-2xl font-bold text-white">Finalizar compra</h2>
@@ -865,7 +865,7 @@ export default function CheckoutModal({
                             maxLength={100}
                             value={empresaEnvioOtra}
                             onChange={(event) => setEmpresaEnvioOtra(event.target.value)}
-                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#b4936a] focus:ring-[#b4936a]"
+                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-[#b4936a] focus:ring-[#b4936a]"
                             placeholder="Nombre de la empresa"
                           />
                         </>
@@ -877,7 +877,7 @@ export default function CheckoutModal({
                             required
                             value={agenciaCodigo}
                             onChange={(event) => setAgenciaCodigo(event.target.value)}
-                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
                             placeholder="Código de sucursal"
                           />
                         </>
@@ -889,7 +889,7 @@ export default function CheckoutModal({
                         required
                         value={agenciaDireccion}
                         onChange={(event) => setAgenciaDireccion(event.target.value)}
-                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
                         placeholder="Ciudad, Estado, Sector"
                       />
                     </div>
@@ -925,7 +925,7 @@ export default function CheckoutModal({
                           setUbicacionLink(event.target.value);
                           setUbicacionActual(null);
                         }}
-                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
                         placeholder="https://maps.app.goo.gl/..."
                       />
                     </div>
