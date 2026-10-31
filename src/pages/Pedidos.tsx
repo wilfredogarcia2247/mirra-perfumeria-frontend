@@ -393,6 +393,12 @@ export default function Pedidos() {
     return () => clearTimeout(debounceTimer);
   }, [page, limit, selectedStatus, searchTerm, conCupon]);
 
+  // Si la página actual quedó más allá de la última (p. ej. porque ahora hay menos pedidos),
+  // ir a la última página que sí tiene pedidos en vez de mostrar la lista vacía
+  useEffect(() => {
+    if (!loading && totalPages >= 1 && page > totalPages) setPage(totalPages);
+  }, [loading, totalPages, page]);
+
   // Filtrado local ya no es necesario porque filtramos en servidor
   const visiblePedidos = pedidos;
 
@@ -2000,7 +2006,7 @@ export default function Pedidos() {
           <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit min-w-max">
             <button
               className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setSelectedStatus('')}
+              onClick={() => { setSelectedStatus(''); setPage(1); }}
             >
               Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
             </button>
@@ -2008,7 +2014,7 @@ export default function Pedidos() {
               <button
                 key={s}
                 className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setSelectedStatus(selectedStatus === s ? '' : s)}
+                onClick={() => { setSelectedStatus(selectedStatus === s ? '' : s); setPage(1); }}
               >
                 <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
                 {s} <span className="text-xs opacity-60">{countFor(s)}</span>
