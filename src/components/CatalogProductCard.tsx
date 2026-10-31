@@ -4,6 +4,7 @@ import { Product } from '@/lib/types';
 import { getImageUrl, getPrecioMostrar } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, Tasa } from '@/lib/catalog';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
+import { useImagenMini } from '@/hooks/use-imagen-mini';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 
@@ -40,6 +41,7 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
 
   const precio = formatPrecio(getPrecioMostrar(product).precio, tasa);
   const open = () => onOpen(product, imgRef.current);
+  const { src: imageSrc, usandoMini, onMiniError } = useImagenMini(getImageUrl(product));
 
   return (
     <article
@@ -51,10 +53,11 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
         <button type="button" onClick={open} className="block h-full w-full" aria-label={`Ver ${product.name}`}>
           <img
             ref={imgRef}
-            src={getImageUrl(product)}
+            src={imageSrc}
             alt={product.name}
             loading="lazy"
             onError={(e) => {
+              if (usandoMini) { onMiniError(); return; }
               const img = e.currentTarget as HTMLImageElement;
               img.onerror = null;
               img.src = FALLBACK_IMAGES[Number(product.id) % FALLBACK_IMAGES.length];

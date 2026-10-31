@@ -53,6 +53,23 @@ export function getImageUrl(obj?: any, fallbackIndex?: number): string | undefin
   return httpUrl;
 }
 
+// Dirección de la miniatura liviana (~8 KB, 320 px) de una foto de producto.
+// - Cloudinary la genera al vuelo con parámetros en la dirección.
+// - En MinIO el backend guarda una copia en products/mini/<nombre>.webp (services/miniaturas.js).
+//   Se pide directo por https para evitar la redirección desde http.
+// Devuelve null si no se pudo deducir (por ejemplo, URLs locales o de otro origen):
+// en ese caso hay que seguir usando la foto original.
+export function miniaturaDe(url: string): string | null {
+  if (!url) return null;
+  if (url.includes('res.cloudinary.com') && url.includes('/image/upload/')) {
+    return url.replace('/image/upload/', '/image/upload/c_limit,w_320,q_auto,f_auto/');
+  }
+  const m = url.match(/^(https?):\/\/([^/]+)(\/(?:.*\/)?products\/)([^/?#]+)\.[^./?#]+$/i);
+  if (!m || m[4].length === 0) return null;
+  const protocolo = /(^|\.)mirraperfumeria\.com$/i.test(m[2]) ? 'https' : m[1];
+  return `${protocolo}://${m[2]}${m[3]}mini/${m[4]}.webp`;
+}
+
 // Extrae un mensaje legible de un error devuelto por `apiFetch`.
 // `apiFetch` actualmente lanza `new Error(await res.text())`, por lo que
 // `err.message` puede ser JSON serializado o texto plano. Esta función

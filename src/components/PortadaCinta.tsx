@@ -1,27 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '@/lib/types';
-import { getImageUrl } from '@/lib/utils';
+import { getImageUrl, miniaturaDe } from '@/lib/utils';
 import { bajarAlCatalogo } from '@/lib/catalog';
 
 const FILAS = 3;
 const FOTOS_POR_FILA = 15;
 
 // Las fotos de la cinta se ven pequeñas, pero las originales pesan ~400 KB cada una.
-// Se pide una versión liviana (~8 KB, 320 px de ancho):
-// - Cloudinary la genera al vuelo con parámetros en la dirección.
-// - En MinIO el backend guarda una copia en products/mini/<nombre>.webp (services/miniaturas.js).
-//   Se pide directo por https para evitar la redirección desde http.
-// Si la miniatura no existe todavía, la cinta usa la foto original (ver Foto).
-function miniaturaDe(url: string): string | null {
-  if (url.includes('res.cloudinary.com') && url.includes('/image/upload/')) {
-    return url.replace('/image/upload/', '/image/upload/c_limit,w_320,q_auto,f_auto/');
-  }
-  const m = url.match(/^(https?):\/\/([^/]+)(\/(?:.*\/)?products\/)([^/?#]+)\.[^./?#]+$/i);
-  if (!m || m[4].length === 0) return null;
-  const protocolo = /(^|\.)mirraperfumeria\.com$/i.test(m[2]) ? 'https' : m[1];
-  return `${protocolo}://${m[2]}${m[3]}mini/${m[4]}.webp`;
-}
+// Se pide la versión liviana de cada una (ver miniaturaDe en lib/utils); si no existe
+// todavía, la cinta usa la foto original (ver Foto).
 
 interface FotoCinta {
   mini: string | null;
