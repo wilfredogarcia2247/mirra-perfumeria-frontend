@@ -23,7 +23,8 @@ export function useIsMobile() {
 const TABLET_VERTICAL = "(pointer: coarse) and (min-width: 700px) and (max-width: 1023px) and (min-height: 600px)";
 
 export function useIsTabletVertical() {
-  const [esTablet, setEsTablet] = React.useState(false);
+  // Se lee de entrada para que el menú lateral no aparezca abierto un instante y luego se esconda
+  const [esTablet, setEsTablet] = React.useState(() => typeof window !== "undefined" && window.matchMedia(TABLET_VERTICAL).matches);
 
   React.useEffect(() => {
     const mql = window.matchMedia(TABLET_VERTICAL);

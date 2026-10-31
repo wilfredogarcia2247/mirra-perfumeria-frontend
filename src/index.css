@@ -397,7 +397,7 @@
 /* Tablet (táctil, ancha y alta; ver `tablet` en tailwind.config.ts): en la administración los botones
    de las tablas tienen al menos 40 px para tocarlos con el dedo. No aplica en PC ni en celular. */
 @media (pointer: coarse) and (min-width: 700px) and (min-height: 600px) {
-  .admin-main table button {
+  .admin-main table button:not([role="switch"]):not([role="checkbox"]) {
     min-width: 40px;
     min-height: 40px;
   }
