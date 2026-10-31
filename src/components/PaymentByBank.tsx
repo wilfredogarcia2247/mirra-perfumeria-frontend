@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, registrarPagoCashea } from '../integrations/api';
+import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, registrarPagoCashea, getPagosByPedido } from '../integrations/api';
 import CasheaPanel, { type CompraCashea, type BorradorCashea } from './CasheaPanel';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
@@ -21,6 +21,14 @@ function limpiarBorradoresViejos() {
       } catch { localStorage.removeItem(k); }
     }
   } catch { /* sin almacenamiento */ }
+}
+
+// Pagos registrados de un pedido (el detalle del pedido no los trae: se piden aparte, como en "Ver pagos")
+async function pagosRegistrados(pedidoId: number): Promise<any[]> {
+  try {
+    const r: any = await getPagosByPedido(pedidoId);
+    return Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
+  } catch { return []; }
 }
 
 // El servidor responde los errores como {"error":"..."}: mostrar solo el texto
@@ -1163,10 +1171,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         // Verificar que el pedido ahora incluye los pagos recién creados
         try {
           const fresh = await getPedidoVenta(pedidoId);
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
-            (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
-              (Array.isArray(fresh?.payments) ? fresh.payments :
-                (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos : [])));
+          const pagosList = await pagosRegistrados(pedidoId);
 
           if (createdCount > 0 && pagosList.length === 0) {
             setErrors('Pedido completado pero no se detectaron pagos asociados. Revisa la respuesta del servidor.');
@@ -1276,7 +1281,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         // Verificar que el pago quedó asociado
         try {
           const fresh = await getPedidoVenta(pedidoId);
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          const pagosList = await pagosRegistrados(pedidoId);
           if (!pagosList || pagosList.length === 0) {
             exito(fresh);
             if (onClose) onClose();
@@ -1523,12 +1528,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
             const fresh = await getPedidoVenta(pedidoId);
             console.log('🔍 PEDIDO FRESH (después de completar):', JSON.stringify(fresh, null, 2));
             // Buscar pagos en múltiples posibles campos
-            const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
-              (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
-                (Array.isArray(fresh?.payments) ? fresh.payments :
-                  (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos :
-                    (Array.isArray(data?.pago) ? [data.pago] :
-                      (data?.pago ? [data.pago] : [])))));
+            const pagosList = await pagosRegistrados(pedidoId);
 
             console.log('🔍 PAGOS ENCONTRADOS:', pagosList?.length || 0, pagosList);
 
