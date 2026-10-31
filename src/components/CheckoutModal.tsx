@@ -184,6 +184,7 @@ export default function CheckoutModal({
   const [localizando, setLocalizando] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState<'delivery' | 'review'>('delivery');
   const formRef = useRef<HTMLFormElement>(null);
+  const enviandoRef = useRef(false);
   const cedulaLookupRequest = useRef(0);
   const currentCedula = useRef('');
   const nombreClienteRef = useRef('');
@@ -531,6 +532,15 @@ export default function CheckoutModal({
     if (localDemo) return toast.info('Esta vista previa local no envía pedidos.');
     if (items.length === 0) return toast.error('Agrega al menos un producto antes de confirmar');
 
+    // Candado contra pedidos repetidos: antes de crear el pedido se consultan datos en internet
+    // (stock de cada perfume) y eso tarda unos segundos con datos móviles. El botón se bloquea
+    // desde el primer toque; los toques siguientes no hacen nada hasta que termine.
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    setLoading(true);
+    onSubmittingChange?.(true);
+    try {
+
     const lineas = items.map((it) => {
       const product: any = it.product;
       const formulaId = product?.formula?.id ?? product?.formula_id ?? product?.tamano?.id ?? product?.tamano_id;
@@ -700,8 +710,6 @@ export default function CheckoutModal({
     }
 
     try {
-      setLoading(true);
-      onSubmittingChange?.(true);
       const created = await createPedidoVentaPublic(payload);
       // comprobar cambios de precio
       try {
@@ -780,7 +788,9 @@ export default function CheckoutModal({
       }
 
       toast.error('Error al crear pedido');
+    }
     } finally {
+      enviandoRef.current = false;
       setLoading(false);
       onSubmittingChange?.(false);
     }
