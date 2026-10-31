@@ -8,6 +8,7 @@ import { useCart } from '@/hooks/use-cart';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito } from '@/lib/catalog';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
+import { useImagenMini } from '@/hooks/use-imagen-mini';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 
@@ -60,12 +61,14 @@ function formatPrice(product: Product, tasa: Tasa) {
 }
 
 function ProductImage({ product, className }: { product: Product; className?: string }) {
+  const { src, usandoMini, onMiniError } = useImagenMini(getImageUrl(product));
   return (
     <img
-      src={getImageUrl(product)}
+      src={src}
       alt={product.name}
       loading="lazy"
       onError={(e) => {
+        if (usandoMini) { onMiniError(); return; }
         const img = e.currentTarget as HTMLImageElement;
         img.onerror = null;
         img.src = FALLBACK_IMAGES[Math.floor(Math.random() * FALLBACK_IMAGES.length)];
