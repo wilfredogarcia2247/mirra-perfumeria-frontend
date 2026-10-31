@@ -1018,6 +1018,10 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   })();
 
   const remaining = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum - currentInputEquiv).toFixed(2))) : null;
+  // Para los botones de "Varios pagos": lo que falta según la lista (sin el monto que se está escribiendo)
+  const montoEscrito = Number(String(monto || '').replace(',', '.'));
+  const hayMontoEscrito = Number.isFinite(montoEscrito) && montoEscrito > 0;
+  const restanteSinEscrito = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum).toFixed(2))) : null;
   // monto bruto en la moneda de la tasa necesario para cubrir el restante (raw = remaining * tasa.monto)
   const amountToPayInCurrency = (tasa && typeof tasa.monto === 'number' && remaining !== null) ? Number((Number(tasa.monto) * Number(remaining)).toFixed(2)) : null;
 
@@ -2103,7 +2107,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
       <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-2 items-stretch z-20">
         <div className="flex-1 flex gap-2">
-          {paymentMode === 'multiple' && (remaining === null || remaining > 0.009) && (
+          {/* Varios pagos: "Añadir" sigue visible mientras haya un monto escrito (aunque complete el total);
+              "Completar" aparece cuando la lista ya cubre el total y no queda nada escrito sin añadir */}
+          {paymentMode === 'multiple' && (hayMontoEscrito || restanteSinEscrito === null || restanteSinEscrito > 0.009) && (
             <Button
               onClick={handleAddPayment}
               disabled={loading}
@@ -2115,7 +2121,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           )}
 
           {/* Quick flows */}
-          {paymentMode === 'multiple' && pedidoTotal !== null && remaining !== null && remaining <= 0.009 ? (
+          {paymentMode === 'multiple' && pedidoTotal !== null && restanteSinEscrito !== null && restanteSinEscrito <= 0.009 && !hayMontoEscrito ? (
             <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
               {loading ? 'Procesando...' : 'Completar pedido'}
             </Button>
