@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LabelList } from 'recharts';
 import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getReporteComparativo } from '@/integrations/api';
 
@@ -255,9 +256,9 @@ function Indicadores({ a, b, lb }: { a: Resumen; b: Resumen; lb: string }) {
           <div>
             <p className="text-xs text-muted-foreground">Ganancia estimada (ventas − costo)</p>
             {sinCostos ? (
-              <p className="mt-0.5 text-sm">Faltan los costos de las presentaciones. Cuando se carguen, aquí aparecerá la ganancia (también la de ventas pasadas).</p>
+              <p className="mt-0.5 text-sm">Faltan los costos de las presentaciones. Cuando se carguen, aquí aparecerá la ganancia (también la de ventas pasadas). <Link to="/costos-presentacion" className="font-medium underline">Cargar costos</Link></p>
             ) : (
-              <p className="mt-0.5 text-xs text-muted-foreground">Calculada sobre el {porc(a.cobertura_costo)} de las ventas que tiene costo cargado.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Calculada sobre el {porc(a.cobertura_costo)} de las ventas que tiene costo cargado. <Link to="/costos-presentacion" className="underline">Ver costos</Link></p>
             )}
           </div>
           {!sinCostos && (

@@ -487,7 +487,7 @@ export default function Pedidos() {
     let polling: any = null;
     polling = setInterval(async () => {
       try {
-        const res = await getPedidosPaginated(page, limit, undefined);
+        const res = await getPedidosPaginated(page, limit, undefined, conCupon);
         const fresh = Array.isArray(res) ? res : (res?.data || []);
 
         if (Array.isArray(fresh)) {
@@ -496,7 +496,7 @@ export default function Pedidos() {
           if (res && typeof res === 'object' && !Array.isArray(res)) {
             setTotalPages(res.totalPages || 1);
             setTotalOrders(res.total || fresh.length);
-            setPaginacionDe('|false');
+            setPaginacionDe(`|${conCupon}`);
           }
         }
 
@@ -509,7 +509,7 @@ export default function Pedidos() {
     return () => {
       if (polling) clearInterval(polling);
     };
-  }, [page, limit, selectedStatus, searchTerm]);
+  }, [page, limit, selectedStatus, searchTerm, conCupon]);
 
   const fmtCliente = (p: any) => p?.nombre_cliente || p?.cliente_nombre || p?.cliente?.nombre || 'Anónimo';
   const fmtFecha = (p: any) => {

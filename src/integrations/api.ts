@@ -672,6 +672,22 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
+// Costos por presentación: costo general por tamaño (ml) y costos especiales por perfume
+export interface CostosPresentacion {
+  tamanos: { ml: number; presentaciones: number; costo: number | null }[];
+  especiales: { ml: number; producto_id: number; nombre: string; costo: number }[];
+  perfumes: { producto_id: number; nombre: string; tamanos: number[] }[];
+}
+export async function getCostosPresentacion(): Promise<CostosPresentacion> {
+  return apiFetch('/costos-presentacion');
+}
+export async function guardarCostosPresentacion(body: {
+  tamanos: { ml: number; costo: number | string | null }[];
+  especiales: { ml: number; producto_id: number; costo: number | string | null }[];
+}): Promise<CostosPresentacion> {
+  return apiFetch('/costos-presentacion', { method: 'PUT', body: JSON.stringify(body) });
+}
+
 // Cashea: registra la inicial y la parte financiada de un pedido en un solo paso
 export async function registrarPagoCashea(pedidoId: number, body: { cashea: object; inicial: object | null; forma_cashea_id: number }) {
   return apiFetch(`/pedidos-venta/${pedidoId}/pagos-cashea`, { method: 'POST', body: JSON.stringify(body) });

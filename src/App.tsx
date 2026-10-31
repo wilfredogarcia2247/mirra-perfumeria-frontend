@@ -13,6 +13,7 @@ import Produccion from "./pages/Produccion";
 import Pedidos from "./pages/Pedidos";
 import Tamanos from "./pages/Tamanos";
 import TasasCambio from "./pages/TasasCambio";
+import CostosPresentacion from "./pages/CostosPresentacion";
 import Usuarios from "./pages/Usuarios";
 import Contactos from "./pages/Contactos";
 import Bancos from "./pages/Bancos";
@@ -106,6 +107,7 @@ const App = () => (
 
             <Route element={<ModuleProtectedRoute moduleKey="tasas_cambio" />}>
               <Route path="/tasas-cambio" element={<TasasCambio />} />
+              <Route path="/costos-presentacion" element={<CostosPresentacion />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
