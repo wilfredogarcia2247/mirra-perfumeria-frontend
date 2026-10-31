@@ -28,7 +28,7 @@ export function Layout({ children }: LayoutProps) {
               </Button>
             </div>
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="admin-main flex-1 overflow-auto">
             <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
               {children}
             </div>

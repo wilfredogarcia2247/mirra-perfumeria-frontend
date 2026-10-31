@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Menu, X, Truck } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { bajarAlCatalogo } from '@/lib/catalog';
@@ -12,6 +12,9 @@ interface HeaderProps {
 
 export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Menú "Productos" abierto con un toque (pantallas táctiles); con mouse se abre al pasar por encima
+  const [productosAbierto, setProductosAbierto] = useState(false);
+  const productosRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [announcementMessages, setAnnouncementMessages] = useState<CintilloMensaje[]>([]);
   const location = useLocation();
@@ -37,10 +40,21 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
     return () => { mounted = false; };
   }, []);
 
-  // Cerrar menú al cambiar de ruta
+  // Cerrar menús al cambiar de ruta
   useEffect(() => {
     setIsMenuOpen(false);
+    setProductosAbierto(false);
   }, [location]);
+
+  // Cerrar "Productos" al tocar fuera
+  useEffect(() => {
+    if (!productosAbierto) return;
+    const fuera = (e: PointerEvent) => {
+      if (!productosRef.current?.contains(e.target as Node)) setProductosAbierto(false);
+    };
+    document.addEventListener('pointerdown', fuera);
+    return () => document.removeEventListener('pointerdown', fuera);
+  }, [productosAbierto]);
 
   // Bloquear scroll del body cuando el menú está abierto
   useEffect(() => {
@@ -158,7 +172,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           {/* Logo y nombre */}
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3" aria-label="Mirra Perfumería · Inicio">
-              <div className="bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm overflow-hidden">
+              <div className="tablet:shrink-0 bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm overflow-hidden">
                 {/* isotipo.png: el emblema recortado y centrado de logoColor.png (que trae mucho margen blanco) */}
                 <img
                   src="/isotipo.png"
@@ -178,7 +192,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           </div>
 
           {/* Menú de navegación */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden md:flex tabletv:hidden items-center space-x-1">
             <Link
               to="/"
               className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
@@ -192,14 +206,19 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
               Nosotros
             </Link>
 
-            <div className="relative group">
-              <button className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
+            <div ref={productosRef} className="relative group">
+              <button
+                type="button"
+                aria-expanded={productosAbierto}
+                // Solo en pantallas táctiles; con mouse sigue abriéndose al pasar por encima
+                onClick={() => { if (!window.matchMedia('(hover: hover)').matches) setProductosAbierto((v) => !v); }}
+                className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
                 Productos
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+              <div className={`absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg py-2 z-50 transition-all duration-200 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:visible ${productosAbierto ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 {catsLoading ? (
                   <div className="px-4 py-2 text-gray-600">Cargando...</div>
                 ) : (
@@ -258,7 +277,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             {/* Botón de menú móvil */}
             <button
               onClick={toggleMenu}
-              className="md:hidden p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-colors"
+              className="md:hidden tabletv:block p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-colors"
               aria-label="Menú"
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -269,7 +288,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
 
       {/* Menú móvil */}
       <div
-        className={`md:hidden bg-white shadow-lg transition-all duration-300 ease-in-out overflow-y-auto ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-gray-200' : 'max-h-0 overflow-hidden'
+        className={`md:hidden tabletv:block bg-white shadow-lg transition-all duration-300 ease-in-out overflow-y-auto ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-gray-200' : 'max-h-0 overflow-hidden'
           }`}
       >
         <div className="px-4 py-3 space-y-1">
