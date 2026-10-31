@@ -129,7 +129,8 @@ export default function PortadaCinta({ products, selectedCategory }: PortadaCint
         {filas.map((fotos, fila) => (
           <div key={fila} className={`cinta-fila flex w-max gap-3 sm:gap-4 ${fila % 2 ? 'cinta-reversa' : ''}`}>
             {/* Se repite dos veces para que el movimiento no tenga cortes */}
-            {[...fotos, ...fotos].map((foto, i) => <Foto key={i} foto={foto} />)}
+            {/* La key incluye la foto: al llegar los productos cada lugar empieza de cero (miniatura primero) */}
+            {[...fotos, ...fotos].map((foto, i) => <Foto key={`${i}-${foto?.original ?? ''}`} foto={foto} />)}
           </div>
         ))}
       </div>
