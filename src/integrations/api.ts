@@ -672,6 +672,20 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
+// Cashea: registra la inicial y la parte financiada de un pedido en un solo paso
+export async function registrarPagoCashea(pedidoId: number, body: { cashea: object; inicial: object | null; forma_cashea_id: number }) {
+  return apiFetch(`/pedidos-venta/${pedidoId}/pagos-cashea`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+// Cashea en reportes: monto total, financiado, iniciales, comisión, cuotas (fechas AAAA-MM-DD)
+export async function getCasheaResumen(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/cashea-resumen${qs}`);
+}
+
 // Reporte "Cómo vamos": periodo A contra periodo B y evolución mes a mes (fechas AAAA-MM-DD)
 export async function getReporteComparativo(opts: { aInicio: string; aFin: string; bInicio: string; bFin: string; evInicio?: string; evFin?: string }) {
   const params = new URLSearchParams({ a_inicio: opts.aInicio, a_fin: opts.aFin, b_inicio: opts.bInicio, b_fin: opts.bFin });

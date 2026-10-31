@@ -22,6 +22,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import RecomprasReport from '@/components/RecomprasReport';
 import ComparativoReport from '@/components/ComparativoReport';
+import CasheaResumen from '@/components/CasheaResumen';
 
 type ReportSlug =
   | 'resumen-general'
@@ -910,6 +911,20 @@ export default function Reportes() {
                     ))}
                   </div>
 
+                  {close.cashea?.pedidos > 0 && (
+                    <Card className="border-amber-300">
+                      <CardHeader className="border-b border-border/60 pb-3">
+                        <CardTitle className="text-base font-medium">Cashea del día</CardTitle>
+                        <p className="text-xs text-muted-foreground">{close.cashea.pedidos} {close.cashea.pedidos === 1 ? 'pedido' : 'pedidos'} con Cashea</p>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3">
+                        <div><p className="text-xs text-muted-foreground">Monto total</p><p className="text-xl font-semibold tabular-nums">{formatCloseUsd(close.cashea.monto_total)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Monto financiado</p><p className="text-xl font-semibold tabular-nums">{formatCloseUsd(close.cashea.monto_financiado)}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Iniciales cobradas</p><p className="text-xl font-semibold tabular-nums">{formatCloseUsd(close.cashea.iniciales)}</p></div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {close.pedidos_sin_tasa > 0 && (
                     <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                       No se puede completar el total en bolívares: {close.pedidos_sin_tasa} pedido(s) completado(s) no tiene(n) una tasa guardada.
@@ -954,8 +969,14 @@ export default function Reportes() {
                               <p className="text-xs text-muted-foreground">Tasa del pedido: {pedido.tasa_cambio ? Number(pedido.tasa_cambio).toLocaleString('es-VE') : 'No registrada'}</p>
                             </div>
                             <div className="text-right text-sm font-semibold tabular-nums">
-                              <p>{formatCloseUsd(pedido.total_usd)}</p>
+                              <p>
+                                {close.cashea?.por_pedido?.[pedido.id] && <span className="mr-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-900">Cashea</span>}
+                                {formatCloseUsd(pedido.total_usd)}
+                              </p>
                               <p className="font-normal text-muted-foreground">{formatCloseBs(pedido.total_bs)}</p>
+                              {close.cashea?.por_pedido?.[pedido.id] && (
+                                <p className="text-xs font-normal text-muted-foreground">financiado {formatCloseUsd(close.cashea.por_pedido[pedido.id].monto_financiado)}</p>
+                              )}
                             </div>
                           </div>
                           <div className="mt-3 space-y-1 border-t pt-2 text-sm">
@@ -1093,6 +1114,8 @@ export default function Reportes() {
 
     if (selectedReport === 'ventas-metodo') {
       return (
+        <div className="space-y-4">
+        <CasheaResumen fechaInicio={fechaInicio} fechaFin={fechaFin} />
         <Card>
           <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-base font-medium">Ventas por método de pago</CardTitle></CardHeader>
           <CardContent className="space-y-4 pt-4">
@@ -1116,6 +1139,7 @@ export default function Reportes() {
             ))}
           </CardContent>
         </Card>
+        </div>
       );
     }
 

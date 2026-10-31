@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes } from '../integrations/api';
+import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, registrarPagoCashea } from '../integrations/api';
+import CasheaPanel, { type CompraCashea } from './CasheaPanel';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
 function extractMonedaFromDetalles(detalles: any) {
@@ -94,7 +95,8 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const [pedidoResumen, setPedidoResumen] = useState<{ base: number; descuentos: number; recargos: number; final: number } | null>(null);
   const [pedidoAjustes, setPedidoAjustes] = useState<PedidoAjuste[]>([]);
   const [pedidoData, setPedidoData] = useState<any | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'single' | 'multiple'>('single');
+  const [paymentMode, setPaymentMode] = useState<'single' | 'multiple' | 'cashea'>('single');
+  const enviandoCashea = React.useRef(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showAside, setShowAside] = useState<boolean>(true);
   const [showAllPayments, setShowAllPayments] = useState<boolean>(false);
@@ -1587,6 +1589,42 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     );
   }
 
+  // ---- Cashea ----
+  // Lo que falta por pagar (sin contar pagos nuevos sin guardar de "Varios pagos")
+  const pagadoGuardado = payments.filter((p) => p?.existing || p?.id).reduce((s, p) => s + deriveEquivalencia(p), 0);
+  const restanteParaCashea = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - pagadoGuardado).toFixed(2))) : null;
+  const formaCasheaId = globalFormas.find((f) => /cashea/i.test(String(f.nombre || '')))?.id ?? null;
+
+  // Registra la inicial y la parte de Cashea en un solo paso y completa el pedido
+  async function handleCashea(compra: CompraCashea) {
+    if (enviandoCashea.current || !formaCasheaId) return;
+    enviandoCashea.current = true;
+    setLoading(true);
+    setErrors(null);
+    try {
+      // Antes de registrar pagos: que no queden perfumes pendientes por producir
+      try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
+      await tryAutoCompleteOrdersForPedido(pedidoId);
+      if (await pedidoHasPendingProduction(pedidoId)) {
+        toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+        return;
+      }
+      await registrarPagoCashea(pedidoId, { ...compra, forma_cashea_id: formaCasheaId });
+      const data = await completarPedidoVenta(pedidoId);
+      if (onSuccess) onSuccess(data);
+      toast.success('Pago con Cashea registrado y pedido completado');
+      if (onClose) onClose();
+    } catch (e: any) {
+      console.error('Error registrando pago con Cashea', e);
+      const msg = e?.message ? String(e.message) : 'Error registrando el pago con Cashea';
+      setErrors(msg);
+      try { toast.error(msg); } catch (err) { /* noop */ }
+    } finally {
+      enviandoCashea.current = false;
+      setLoading(false);
+    }
+  }
+
   return (
     <div className={embedded
       ? "relative w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
@@ -1610,7 +1648,14 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
             >
               Varios pagos
             </button>
-            <div className="text-xs text-gray-500 ml-2">Modo: <strong className="text-gray-700">{paymentMode === 'single' ? 'Pago único' : 'Varios pagos'}</strong></div>
+            <button
+              type="button"
+              onClick={() => setPaymentMode('cashea')}
+              className={`text-sm px-2 py-1 rounded ${paymentMode === 'cashea' ? 'bg-amber-400 text-gray-900' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}
+            >
+              Cashea
+            </button>
+            <div className="text-xs text-gray-500 ml-2">Modo: <strong className="text-gray-700">{paymentMode === 'single' ? 'Pago único' : paymentMode === 'multiple' ? 'Varios pagos' : 'Cashea'}</strong></div>
           </div>
           <div className="text-sm text-gray-600">Registra uno o varios pagos para este pedido y complétalo. Los pagos se conservarán en el historial del pedido.</div>
         </div>
@@ -1631,6 +1676,18 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: formulario (ocupa 2 columnas en pantallas grandes) */}
+          {paymentMode === 'cashea' ? (
+            <div className="lg:col-span-2">
+              <CasheaPanel
+                montoSugerido={restanteParaCashea}
+                bancos={bancos as Array<Banco & { moneda?: string | null }>}
+                formas={globalFormas}
+                formaCasheaId={formaCasheaId}
+                loading={loading}
+                onConfirmar={handleCashea}
+              />
+            </div>
+          ) : (
           <div className="lg:col-span-2">
             <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1747,6 +1804,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
 
           </div>
+          )}
 
           {/* Right: resumen / lista de pagos */}
           <aside className={`${showAside ? 'block' : 'hidden'} lg:block lg:col-span-1`}>
