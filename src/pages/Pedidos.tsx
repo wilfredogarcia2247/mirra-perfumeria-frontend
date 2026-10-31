@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -173,10 +173,23 @@ const adaptAjusteFromApi = (aj: any): AjusteDraft => {
   };
 };
 
+// Página guardada de cada pestaña de Pedidos (dura mientras la pestaña del navegador esté abierta)
+const CLAVE_PAGINAS_PEDIDOS = 'mirra_pedidos_paginas';
+function leerPaginasPedidos(): Record<string, number> {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(CLAVE_PAGINAS_PEDIDOS) || '{}');
+    return d && typeof d === 'object' ? d : {};
+  } catch { return {}; }
+}
+
 export default function Pedidos() {
   const [pedidos, setPedidos] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
+  // Cada pestaña (Todos, Pendiente, ...) recuerda su propia página mientras el navegador siga abierto
+  const paginasPorPestana = useRef<Record<string, number>>(leerPaginasPedidos());
+  const [page, setPage] = useState(() => paginasPorPestana.current[''] || 1);
   const [totalPages, setTotalPages] = useState(1);
+  // A qué pestaña/filtro corresponde totalPages (para no usar el de la pestaña anterior)
+  const [paginacionDe, setPaginacionDe] = useState('');
   const [totalOrders, setTotalOrders] = useState(0);
   const [limit] = useState(12);
   const [loading, setLoading] = useState(true);
@@ -311,6 +324,7 @@ export default function Pedidos() {
         if (res && typeof res === 'object' && !Array.isArray(res)) {
           setTotalPages(res.totalPages || 1);
           setTotalOrders(res.total || list.length);
+          setPaginacionDe(`${selectedStatus}|${conCupon}`);
         }
 
         // Construir mapa de pagos
@@ -364,6 +378,7 @@ export default function Pedidos() {
           setPedidos(shownFinal);
           setTotalOrders(shownFinal.length);
           setTotalPages(1);
+          setPaginacionDe(`${selectedStatus}|${conCupon}`);
         } else {
           setSearchResults([]);
           // Si no hay búsqueda, usar la paginación normal
@@ -371,6 +386,7 @@ export default function Pedidos() {
           setPedidos(data);
           setTotalOrders(total);
           setTotalPages(Math.ceil(total / limit));
+          setPaginacionDe(`${selectedStatus}|${conCupon}`);
         }
       } catch (err) {
         console.error('Error fetching pedidos:', err);
@@ -393,11 +409,25 @@ export default function Pedidos() {
     return () => clearTimeout(debounceTimer);
   }, [page, limit, selectedStatus, searchTerm, conCupon]);
 
+  // Guardar la página de la pestaña actual
+  useEffect(() => {
+    paginasPorPestana.current[selectedStatus] = page;
+    try { sessionStorage.setItem(CLAVE_PAGINAS_PEDIDOS, JSON.stringify(paginasPorPestana.current)); } catch { /* sin almacenamiento */ }
+  }, [page, selectedStatus]);
+
+  // Cambiar de pestaña: la primera vez empieza en la página 1; si ya se visitó, vuelve a donde se dejó
+  const cambiarPestana = (estado: string) => {
+    paginasPorPestana.current[selectedStatus] = page;
+    setSelectedStatus(estado);
+    setPage(paginasPorPestana.current[estado] || 1);
+  };
+
   // Si la página actual quedó más allá de la última (p. ej. porque ahora hay menos pedidos),
   // ir a la última página que sí tiene pedidos en vez de mostrar la lista vacía
   useEffect(() => {
+    if (paginacionDe !== `${selectedStatus}|${conCupon}`) return; // aún no llegan los datos de esta pestaña
     if (!loading && totalPages >= 1 && page > totalPages) setPage(totalPages);
-  }, [loading, totalPages, page]);
+  }, [loading, totalPages, page, paginacionDe, selectedStatus, conCupon]);
 
   // Filtrado local ya no es necesario porque filtramos en servidor
   const visiblePedidos = pedidos;
@@ -465,6 +495,7 @@ export default function Pedidos() {
           if (res && typeof res === 'object' && !Array.isArray(res)) {
             setTotalPages(res.totalPages || 1);
             setTotalOrders(res.total || fresh.length);
+            setPaginacionDe('|false');
           }
         }
 
@@ -2006,7 +2037,7 @@ export default function Pedidos() {
           <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit min-w-max">
             <button
               className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => { setSelectedStatus(''); setPage(1); }}
+              onClick={() => cambiarPestana('')}
             >
               Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
             </button>
@@ -2014,7 +2045,7 @@ export default function Pedidos() {
               <button
                 key={s}
                 className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => { setSelectedStatus(selectedStatus === s ? '' : s); setPage(1); }}
+                onClick={() => cambiarPestana(selectedStatus === s ? '' : s)}
               >
                 <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
                 {s} <span className="text-xs opacity-60">{countFor(s)}</span>
