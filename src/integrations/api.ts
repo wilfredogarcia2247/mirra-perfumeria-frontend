@@ -672,7 +672,7 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
-export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string }) {
+export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string; inactividad?: 'todos' | 'hasta60' | '60-90' | '90+' }) {
   const params = new URLSearchParams({
     grupo: opts.grupo,
     page: String(opts.page || 1),
@@ -682,6 +682,7 @@ export async function getClientesGrupo(opts: { grupo: string; page?: number; pag
   if (opts.q) params.set('q', opts.q);
   if (opts.fechaInicio) params.set('fecha_inicio', opts.fechaInicio);
   if (opts.fechaFin) params.set('fecha_fin', opts.fechaFin);
+  if (opts.inactividad && opts.inactividad !== 'todos') params.set('inactividad', opts.inactividad);
   return apiFetch(`/pedidos-venta/clientes-grupo?${params.toString()}`);
 }
 

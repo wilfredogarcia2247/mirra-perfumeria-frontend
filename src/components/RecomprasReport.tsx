@@ -1,12 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, LabelList } from 'recharts';
-import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getClientesGrupo, getClientesRecompra } from '@/integrations/api';
 
-// Colores validados (contraste y daltonismo): azul = clientes nuevos, dorado = recompras
+// Colores validados (contraste y daltonismo): azul = clientes nuevos, dorado = recompras,
+// gris = clientes que no volvieron (se distingue por claridad, no solo por tono)
 const COLOR_NUEVOS = '#3b6fc4';
 const COLOR_RECOMPRA = '#b07a2e';
+const COLOR_NO_VOLVIERON = '#8b8f97';
+
+type Inactividad = 'todos' | 'hasta60' | '60-90' | '90+';
+const INACTIVIDADES: { id: Inactividad; texto: string }[] = [
+  { id: 'todos', texto: 'Todos' },
+  { id: 'hasta60', texto: 'Hasta 2 meses' },
+  { id: '60-90', texto: '2 a 3 meses' },
+  { id: '90+', texto: 'Más de 3 meses' },
+];
+
+// Enlace de WhatsApp con el teléfono en formato internacional de Venezuela (58...)
+function enlaceWhatsapp(telefono: string | null): string | null {
+  const d = String(telefono || '').replace(/\D/g, '');
+  if (d.length < 10) return null;
+  const numero = d.startsWith('58') ? d : d.length === 11 && d.startsWith('0') ? `58${d.slice(1)}` : d.length === 10 ? `58${d}` : d;
+  return `https://wa.me/${numero}`;
+}
+const haceDias = (n: number | null) => (n == null ? '—' : n === 0 ? 'hoy' : n === 1 ? 'hace 1 día' : `hace ${n} días`);
 
 const usd = (n: number) => `$${Number(n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const usdCorto = (n: number) => `$${Number(n || 0).toLocaleString('es-VE', { maximumFractionDigits: 0 })}`;
@@ -90,6 +109,9 @@ export default function RecomprasReport({ fechaInicio, fechaFin, onCambiarPeriod
 
       {r && (
         <div className={`space-y-4 transition-opacity ${cargando ? 'opacity-60' : ''}`}>
+          {/* Clientes del periodo en 3 grupos: nuevos, volvieron y no volvieron */}
+          {r.grupos_clientes && <GruposClientes g={r.grupos_clientes} fechaInicio={fechaInicio} fechaFin={fechaFin} />}
+
           {/* Titular: porcentaje de recompra */}
           <Card>
             <CardContent className="p-4 sm:p-5">
@@ -275,11 +297,76 @@ export default function RecomprasReport({ fechaInicio, fechaFin, onCambiarPeriod
           </Card>
 
           <p className="text-xs text-muted-foreground">
-            Solo cuentan pedidos completados (pagados). Un pedido es <b>recompra</b> si el cliente ya había comprado antes, en cualquier fecha. Al cliente se le reconoce por su cédula (con o sin "V"). Los montos restan descuentos y no incluyen delivery ni envío.
+            Solo cuentan pedidos completados (pagados). Un pedido es <b>recompra</b> si el cliente ya había comprado antes, en cualquier fecha. <b>No volvieron</b>: clientes que compraron antes del periodo y no compraron en él (con "Todo": los que compraron una sola vez). Al cliente se le reconoce por su cédula (con o sin "V"). Los montos restan descuentos y no incluyen delivery ni envío.
           </p>
         </div>
       )}
     </div>
+  );
+}
+
+interface GruposDatos { modo: 'periodo' | 'todo'; nuevos: number; volvieron: number; no_volvieron: number; porcentaje_volvieron: number }
+
+function GruposClientes({ g, fechaInicio, fechaFin }: { g: GruposDatos; fechaInicio: string; fechaFin: string }) {
+  const [verLista, setVerLista] = useState(false);
+  const todo = g.modo === 'todo';
+  const total = g.nuevos + g.volvieron + g.no_volvieron;
+  const partes = [
+    ...(todo ? [] : [{ id: 'nuevos', texto: 'Nuevos', valor: g.nuevos, color: COLOR_NUEVOS, detalle: 'Primera compra en el periodo' }]),
+    { id: 'volvieron', texto: 'Volvieron', valor: g.volvieron, color: COLOR_RECOMPRA, detalle: todo ? 'Compraron 2 veces o más' : 'Ya eran clientes y compraron otra vez' },
+    { id: 'no', texto: 'No volvieron', valor: g.no_volvieron, color: COLOR_NO_VOLVIERON, detalle: todo ? 'Compraron una sola vez' : 'Ya eran clientes y no compraron en el periodo' },
+  ];
+  const visibles = partes.filter((p) => p.valor > 0);
+
+  return (
+    <Card>
+      <CardContent className="p-4 sm:p-5">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{todo ? 'Tus clientes desde el inicio' : 'Tus clientes en este periodo'}</p>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
+          <p className="text-4xl font-semibold tabular-nums sm:text-5xl">{porc(g.porcentaje_volvieron)}</p>
+          <p className="text-sm text-muted-foreground">
+            {todo ? 'de tus clientes compró más de una vez' : 'de los clientes que ya tenías volvió a comprar'}
+          </p>
+        </div>
+        {total > 0 ? (
+          <>
+            <div className="mt-4 flex h-3.5 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={partes.map((p) => `${p.texto}: ${p.valor}`).join(', ')}>
+              {visibles.map((p, i) => (
+                <div key={p.id} style={{ width: `${(p.valor / total) * 100}%`, background: p.color }} className={`${i === 0 ? 'rounded-l-full' : ''} ${i === visibles.length - 1 ? 'rounded-r-full' : ''}`} />
+              ))}
+            </div>
+            <div className={`mt-3 grid gap-3 text-sm ${todo ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {partes.map((p) => (
+                <div key={p.id} className="min-w-0">
+                  <p className="text-xl font-semibold tabular-nums">{p.valor.toLocaleString('es-VE')}</p>
+                  <p className="flex items-start gap-1.5 font-medium leading-tight"><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: p.color }} />{p.texto}</p>
+                  <p className="text-xs leading-snug text-muted-foreground">{p.detalle}</p>
+                </div>
+              ))}
+            </div>
+            {g.no_volvieron > 0 && (
+              <button
+                type="button"
+                onClick={() => setVerLista((v) => !v)}
+                aria-expanded={verLista}
+                className="mt-4 flex min-h-10 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-medium hover:bg-muted/50"
+              >
+                Ver los {g.no_volvieron.toLocaleString('es-VE')} clientes que no volvieron
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition ${verLista ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+            {verLista && (
+              <div className="mt-2 rounded-lg border p-2 sm:p-3">
+                <p className="mb-2 px-1 text-xs text-muted-foreground">Ordenados por lo que han gastado. Toca un cliente para ver sus compras y escribirle por WhatsApp.</p>
+                <ListaClientes grupo="no_volvieron" fechaInicio={fechaInicio} fechaFin={fechaFin} />
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">Todavía no hay clientes con compras completadas.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -314,31 +401,48 @@ function ListaClientes({ grupo, fechaInicio, fechaFin }: { grupo: string; fechaI
   const [orden, setOrden] = useState<'monto' | 'compras' | 'reciente'>('monto');
   const [texto, setTexto] = useState('');
   const [busqueda, setBusqueda] = useState('');
+  const [inactividad, setInactividad] = useState<Inactividad>('todos');
   const [res, setRes] = useState<any | null>(null);
   const [cargando, setCargando] = useState(true);
+  const noVolvieron = grupo === 'no_volvieron';
 
   useEffect(() => {
     const t = window.setTimeout(() => { setBusqueda(texto.trim()); setPagina(1); }, 400);
     return () => window.clearTimeout(t);
   }, [texto]);
 
-  useEffect(() => { setPagina(1); }, [orden, fechaInicio, fechaFin]);
+  useEffect(() => { setPagina(1); }, [orden, inactividad, fechaInicio, fechaFin]);
 
   useEffect(() => {
     let cancelado = false;
     setCargando(true);
-    getClientesGrupo({ grupo, page: pagina, pageSize: 20, orden, q: busqueda, fechaInicio: fechaInicio || undefined, fechaFin: fechaFin || undefined })
+    getClientesGrupo({ grupo, page: pagina, pageSize: 20, orden, q: busqueda, inactividad, fechaInicio: fechaInicio || undefined, fechaFin: fechaFin || undefined })
       .then((r) => { if (!cancelado) setRes(r); })
       .catch(() => { if (!cancelado) setRes({ total: 0, data: [], paginas: 1 }); })
       .finally(() => { if (!cancelado) setCargando(false); });
     return () => { cancelado = true; };
-  }, [grupo, pagina, orden, busqueda, fechaInicio, fechaFin]);
+  }, [grupo, pagina, orden, busqueda, inactividad, fechaInicio, fechaFin]);
 
   const clientes: any[] = res?.data || [];
   const desde = res ? (pagina - 1) * 20 + 1 : 0;
 
   return (
     <div className="space-y-2">
+      {noVolvieron && (
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Tiempo sin comprar">
+          {INACTIVIDADES.map((op) => (
+            <button
+              key={op.id}
+              type="button"
+              onClick={() => setInactividad(op.id)}
+              aria-pressed={inactividad === op.id}
+              className={`h-9 shrink-0 rounded-full border px-3 text-xs font-medium transition ${inactividad === op.id ? 'border-foreground bg-foreground text-background' : 'bg-card text-foreground hover:bg-muted'}`}
+            >
+              {op.id === 'todos' ? op.texto : `Sin comprar: ${op.texto.toLowerCase()}`}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row">
         <label className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -371,8 +475,21 @@ function ListaClientes({ grupo, fechaInicio, fechaFin }: { grupo: string; fechaI
                   <p className="text-xs tabular-nums text-muted-foreground">{c.compras} compra{c.compras === 1 ? '' : 's'}</p>
                 </div>
               </div>
+              {noVolvieron && (
+                <p className="mt-1.5 text-xs font-medium tabular-nums">Última compra {haceDias(c.dias_sin_comprar)}</p>
+              )}
               <p className="mt-1.5 text-xs text-muted-foreground">Promedio {usd(c.ticket_promedio)} · Primera: {fecha(c.primera_compra)} · Última: {fecha(c.ultima_compra)}</p>
             </summary>
+            {noVolvieron && enlaceWhatsapp(c.telefono) && (
+              <a
+                href={enlaceWhatsapp(c.telefono) as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#18794a] px-3 sm:w-fit sm:px-5 text-sm font-medium text-white hover:bg-[#146a40]"
+              >
+                <MessageCircle className="h-4 w-4" /> Escribir por WhatsApp
+              </a>
+            )}
             <div className="mt-2 space-y-1 border-t pt-2">
               <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Últimas compras</p>
               {c.pedidos_resumen.map((p: any) => (
