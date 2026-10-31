@@ -6,6 +6,17 @@ import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico,
 import CasheaPanel, { type CompraCashea } from './CasheaPanel';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+
+// El servidor responde los errores como {"error":"..."}: mostrar solo el texto
+function textoError(e: any, porDefecto = 'Error registrando pago'): string {
+  const raw = e?.message ? String(e.message) : '';
+  if (!raw) return porDefecto;
+  try {
+    const j = JSON.parse(raw);
+    if (j && typeof j === 'object' && (j.error || j.message)) return String(j.error || j.message);
+  } catch { /* no era JSON */ }
+  return raw;
+}
 function extractMonedaFromDetalles(detalles: any) {
   try {
     console.log('PaymentByBank.extractMonedaFromDetalles', { detalles });
@@ -97,6 +108,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const [pedidoData, setPedidoData] = useState<any | null>(null);
   const [paymentMode, setPaymentMode] = useState<'single' | 'multiple' | 'cashea'>('single');
   const enviandoCashea = React.useRef(false);
+  // Motivos por los que no se pudo producir algún perfume (los da el servidor, con nombres)
+  const erroresProduccion = React.useRef<string[]>([]);
+  const avisoPendientes = () => (erroresProduccion.current.length > 0
+    ? erroresProduccion.current.join(' · ')
+    : 'Hay perfumes de este pedido sin producir. Revisa sus órdenes de producción antes de completar el pedido.');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showAside, setShowAside] = useState<boolean>(true);
   const [showAllPayments, setShowAllPayments] = useState<boolean>(false);
@@ -287,6 +303,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
   // Intentar completar automáticamente órdenes de producción asociadas a un pedido.
   async function tryAutoCompleteOrdersForPedido(id: number) {
+    erroresProduccion.current = [];
     try {
       try {
         console.log('PaymentByBank.tryAutoCompleteOrdersForPedido.start', { id });
@@ -331,6 +348,8 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                 console.log('✅ Orden de producción completada:', oid);
               } catch (eOrd: any) {
                 console.warn(`⚠️ No se pudo completar orden ${oid}:`, eOrd?.message || eOrd);
+                const motivo = textoError(eOrd, '');
+                if (motivo && !erroresProduccion.current.includes(motivo)) erroresProduccion.current.push(motivo);
               }
             } else {
               console.warn('⚠️ No se pudo determinar almacen_venta_id para orden:', oid);
@@ -1158,7 +1177,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
         try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
         if (await pedidoHasPendingProduction(pedidoId)) {
-          toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+          toast.error(avisoPendientes(), { duration: 10000 }); setErrors(avisoPendientes());
           setLoading(false);
           return;
         }
@@ -1183,9 +1202,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     } catch (e: any) {
       console.error('Error registrando pago', e);
       if (e?.status === 409) setErrors('Error de inventario: conflicto al consumir stock reservado');
-      else if (e?.message) setErrors(String(e.message));
+      else if (e?.message) setErrors(textoError(e));
       else setErrors('Error registrando pago');
-      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { /* noop */ }
+      try { toast.error(textoError(e)); } catch (err) { /* noop */ }
     } finally {
       setLoading(false);
     }
@@ -1443,15 +1462,15 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         }
       } catch (e: any) {
         console.error('Error en AddAndComplete', e);
-        setErrors(e?.message ?? 'Error registrando pago');
-        try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { }
+        setErrors(textoError(e));
+        try { toast.error(textoError(e)); } catch (err) { }
       } finally {
         setLoading(false);
       }
     } catch (e: any) {
       console.error('Error en AddAndComplete', e);
-      setErrors(e?.message ?? 'Error registrando pago');
-      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { }
+      setErrors(textoError(e));
+      try { toast.error(textoError(e)); } catch (err) { }
       setLoading(false);
     }
   }
@@ -1606,7 +1625,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
       await tryAutoCompleteOrdersForPedido(pedidoId);
       if (await pedidoHasPendingProduction(pedidoId)) {
-        toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+        toast.error(avisoPendientes(), { duration: 10000 }); setErrors(avisoPendientes());
         return;
       }
       await registrarPagoCashea(pedidoId, { ...compra, forma_cashea_id: formaCasheaId });
@@ -1616,7 +1635,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       if (onClose) onClose();
     } catch (e: any) {
       console.error('Error registrando pago con Cashea', e);
-      const msg = e?.message ? String(e.message) : 'Error registrando el pago con Cashea';
+      const msg = textoError(e, 'Error registrando el pago con Cashea');
       setErrors(msg);
       try { toast.error(msg); } catch (err) { /* noop */ }
     } finally {
