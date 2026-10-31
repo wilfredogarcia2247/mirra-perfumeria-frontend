@@ -1,19 +1,31 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { bajarAlCatalogo } from '@/lib/catalog';
 
-const MUESTRAS = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const FILAS = 3;
 const FOTOS_POR_FILA = 15;
 
-// Las fotos de la cinta se ven pequeñas: si están en Cloudinary se pide una versión liviana
-// (máx. 320px de ancho, calidad y formato automáticos) para no gastar datos en el celular.
-function versionPequena(url: string) {
-  return url.includes('res.cloudinary.com') && url.includes('/image/upload/')
-    ? url.replace('/image/upload/', '/image/upload/c_limit,w_320,q_auto,f_auto/')
-    : url;
+// Las fotos de la cinta se ven pequeñas, pero las originales pesan ~400 KB cada una.
+// Se pide una versión liviana (~8 KB, 320 px de ancho):
+// - Cloudinary la genera al vuelo con parámetros en la dirección.
+// - En MinIO el backend guarda una copia en products/mini/<nombre>.webp (services/miniaturas.js).
+//   Se pide directo por https para evitar la redirección desde http.
+// Si la miniatura no existe todavía, la cinta usa la foto original (ver Foto).
+function miniaturaDe(url: string): string | null {
+  if (url.includes('res.cloudinary.com') && url.includes('/image/upload/')) {
+    return url.replace('/image/upload/', '/image/upload/c_limit,w_320,q_auto,f_auto/');
+  }
+  const m = url.match(/^(https?):\/\/([^/]+)(\/(?:.*\/)?products\/)([^/?#]+)\.[^./?#]+$/i);
+  if (!m || m[4].length === 0) return null;
+  const protocolo = /(^|\.)mirraperfumeria\.com$/i.test(m[2]) ? 'https' : m[1];
+  return `${protocolo}://${m[2]}${m[3]}mini/${m[4]}.webp`;
+}
+
+interface FotoCinta {
+  mini: string | null;
+  original: string;
 }
 
 const TOTAL_FOTOS = FILAS * FOTOS_POR_FILA; // 45
@@ -34,8 +46,9 @@ function mezclar<T>(lista: T[]): T[] {
 // 2. Más pedidos al azar hasta completar la mitad de la cinta.
 // 3. El resto (hasta 45) con perfumes al azar del catálogo.
 // Al final se mezcla todo. No se usan agotados ni fotos repetidas.
-// Si hay menos de 6 fotos, se completan con las de muestra.
-function fotosDe(products: Product[]): string[] {
+// Un lugar sin foto (null) se muestra con el logo de Mirra: así se ve mientras cargan los
+// productos y si hay menos de 6 fotos se completa con logos.
+function fotosDe(products: Product[]): (FotoCinta | null)[] {
   const disponibles = products.filter((p) => p.image_url && !p.agotado);
   const recomendados = disponibles.filter((p) => p.featured);
   const masPedidos = mezclar(disponibles.filter((p) => p.mas_pedido && !p.featured));
@@ -52,26 +65,41 @@ function fotosDe(products: Product[]): string[] {
   for (const p of [...elegidos, ...relleno]) {
     if (urls.size >= TOTAL_FOTOS) break;
     const url = getImageUrl(p);
-    if (url) urls.add(versionPequena(url));
+    if (url) urls.add(url);
   }
-  const fotos = mezclar(Array.from(urls));
-  return fotos.length >= 6 ? fotos : [...fotos, ...MUESTRAS];
+  const fotos: FotoCinta[] = mezclar(Array.from(urls)).map((original) => ({ mini: miniaturaDe(original), original }));
+  return fotos.length >= 6 ? fotos : [...fotos, ...Array<null>(6 - fotos.length).fill(null)];
 }
 
-function Foto({ src, index }: { src: string; index: number }) {
+// Cada lugar de la cinta muestra el logo de Mirra sobre fondo crema; cuando la foto del
+// perfume termina de cargar aparece encima con un fundido. Primero se intenta la miniatura;
+// si no existe se usa la foto original, y si esa también falla queda el logo.
+function Foto({ foto }: { foto: FotoCinta | null }) {
+  const [lista, setLista] = useState(false);
+  const [usarOriginal, setUsarOriginal] = useState(!foto?.mini);
+  const [fallo, setFallo] = useState(false);
+  const src = foto && !fallo ? (usarOriginal ? foto.original : foto.mini) : null;
   return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      draggable={false}
-      onError={(e) => {
-        const img = e.currentTarget;
-        img.onerror = null;
-        img.src = MUESTRAS[index % MUESTRAS.length];
-      }}
-      className="h-28 w-24 shrink-0 rounded-2xl object-cover shadow-md sm:h-36 sm:w-32 lg:h-44 lg:w-40"
-    />
+    <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#f3e9dc] shadow-md sm:h-36 sm:w-32 lg:h-44 lg:w-40">
+      <img
+        src="/isotipo.png"
+        alt=""
+        draggable={false}
+        className={`absolute inset-0 m-auto h-12 w-12 mix-blend-multiply opacity-70 sm:h-14 sm:w-14 lg:h-16 lg:w-16 ${src && !lista ? 'animate-pulse' : ''}`}
+      />
+      {src && (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onLoad={() => setLista(true)}
+          onError={() => (usarOriginal ? setFallo(true) : setUsarOriginal(true))}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${lista ? 'opacity-100' : 'opacity-0'}`}
+        />
+      )}
+    </div>
   );
 }
 
@@ -101,7 +129,8 @@ export default function PortadaCinta({ products, selectedCategory }: PortadaCint
         {filas.map((fotos, fila) => (
           <div key={fila} className={`cinta-fila flex w-max gap-3 sm:gap-4 ${fila % 2 ? 'cinta-reversa' : ''}`}>
             {/* Se repite dos veces para que el movimiento no tenga cortes */}
-            {[...fotos, ...fotos].map((src, i) => <Foto key={i} src={src} index={i} />)}
+            {/* La key incluye la foto: al llegar los productos cada lugar empieza de cero (miniatura primero) */}
+            {[...fotos, ...fotos].map((foto, i) => <Foto key={`${i}-${foto?.original ?? ''}`} foto={foto} />)}
           </div>
         ))}
       </div>

@@ -145,10 +145,11 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
         onTouchEnd={onTouchEnd}
         className={`fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.2)] transition-transform duration-[350ms] ease-[cubic-bezier(.2,.8,.2,1)] sm:bottom-auto sm:top-1/2 sm:max-h-[90vh] sm:rounded-[22px] ${abierta ? 'translate-y-0 sm:-translate-y-1/2' : 'translate-y-full sm:translate-y-[60%]'}`}
       >
-        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
+        {/* En computadora la foto se achica sola para que nombre, tamaños y botón quepan sin scroll */}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain sm:flex sm:flex-col">
           <div
             ref={heroRef}
-            className="relative aspect-square max-h-[58dvh] w-full bg-[#f5eee6]"
+            className="relative aspect-square max-h-[58dvh] w-full bg-[#f5eee6] sm:max-h-none sm:min-h-[200px] sm:shrink"
           >
             <img
               ref={heroImgRef}
@@ -176,13 +177,13 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
               </div>
             )}
           </div>
-          <div className="px-4 pb-2 pt-3.5">
+          <div className="px-4 pb-2 pt-3.5 sm:shrink-0">
             <div className="flex flex-wrap items-center gap-1.5">
               {product.category && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{product.category}</span>}
               {product.mas_pedido && !product.agotado && <span className="rounded-full bg-[#e4572e] px-2.5 py-0.5 text-xs font-bold text-white">🔥 Más pedido</span>}
             </div>
             <h2 className="mt-1.5 font-bell-mt text-lg font-semibold leading-snug text-gray-900">{product.name}</h2>
-            {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600">{product.description}</p>}
+            {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:line-clamp-3">{product.description}</p>}
           </div>
         </div>
 
@@ -190,14 +191,14 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           {product.agotado ? (
             <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
           ) : presentaciones.length > 0 ? (
-            <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : presentaciones.length === 4 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {presentaciones.map((p, i) => (
                 <button
                   key={p.tamano?.id ?? i}
                   type="button"
                   onClick={() => setElegida(i)}
                   aria-pressed={i === elegida}
-                  className={`rounded-xl border-[1.5px] px-1 py-2 text-sm font-bold transition ${i === elegida ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
+                  className={`rounded-xl border-[1.5px] px-1 py-2 sm:py-1.5 text-sm font-bold transition ${i === elegida ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
                 >
                   {p.label || 'Presentación'}
                   <span className="mt-0.5 block text-[11px] font-semibold text-[#8b6439]">{formatPrecio(p.precio, tasa) ?? 'Consultar'}</span>

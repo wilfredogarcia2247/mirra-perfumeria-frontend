@@ -13,6 +13,14 @@ export default {
       },
     },
     extend: {
+      // Tablets (p. ej. Redmi Pad 2 en la tienda): pantalla táctil, ancha y alta. No aplica en PC (mouse)
+      // ni en celulares (angostos, o bajos cuando están acostados).
+      //   tablet:  vertical y horizontal · tabletv: solo vertical (~800 px) · tableth: solo horizontal (~1280 px)
+      screens: {
+        tablet: { raw: '(pointer: coarse) and (min-width: 700px) and (min-height: 600px)' },
+        tabletv: { raw: '(pointer: coarse) and (min-width: 700px) and (max-width: 1023px) and (min-height: 600px)' },
+        tableth: { raw: '(pointer: coarse) and (min-width: 1024px) and (min-height: 600px)' },
+      },
       fontFamily: {
         'bell-mt': ['Bell MT', 'serif'],
         'montserrat': ['Montserrat', 'sans-serif'],

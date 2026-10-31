@@ -2,6 +2,7 @@ import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, R
 import { useLocation } from 'react-router-dom';
 import React, { useEffect } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useIsTabletVertical } from '@/hooks/use-mobile';
 import {
   Sidebar,
   SidebarContent,
@@ -96,9 +97,16 @@ const activeItemClass = [
 const inactiveItemClass = "text-sidebar-foreground/60 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/90";
 
 export function AppSidebar() {
-  const { open } = useSidebar();
+  const { open, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
+  const esTabletVertical = useIsTabletVertical();
+
+  // Tablet vertical: el menú se cierra solo al elegir una sección (en celular sigue igual)
+  useEffect(() => {
+    if (esTabletVertical) setOpenMobile(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
     const { logout, token, userId, isInfluencer } = useAuth();
     const { clear: clearCart } = useCart();
     const { hasPermission, loadUserPermissions } = usePermissions();

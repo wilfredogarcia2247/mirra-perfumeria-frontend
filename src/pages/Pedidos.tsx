@@ -2118,13 +2118,13 @@ export default function Pedidos() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-b border-border">
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 w-16">ID</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 tabletv:pl-3 w-16">ID</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Entrega</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right tabletv:hidden">Prods.</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right tabletv:hidden">Tasa</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-center w-12"></TableHead>
                     </TableRow>
@@ -2135,7 +2135,7 @@ export default function Pedidos() {
                       const estado = fmtEstado(p);
                       return (
                         <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
-                          <TableCell className="text-xs tabular-nums text-muted-foreground pl-6">#{p.id ?? '-'}</TableCell>
+                          <TableCell className="text-xs tabular-nums text-muted-foreground pl-6 tabletv:pl-3">#{p.id ?? '-'}</TableCell>
                           <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
                           <TableCell>
@@ -2154,8 +2154,8 @@ export default function Pedidos() {
                             </div>
                           </TableCell>
                           <TableCell>{entregaInfo(p) ? <EntregaBadge pedido={p} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
-                          <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
-                          <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
+                          <TableCell className="text-sm tabular-nums text-right tabletv:hidden">{fmtProductosCount(p)}</TableCell>
+                          <TableCell className="text-xs tabular-nums text-muted-foreground text-right tabletv:hidden">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
                           <TableCell className="text-right">
                             <div className="text-sm font-medium tabular-nums">{totalParts.usd}</div>
                             {totalParts.bs && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{totalParts.bs}</div>}
@@ -2244,8 +2244,8 @@ export default function Pedidos() {
 
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto flex flex-col p-0 gap-0 bg-white shadow-2xl overflow-hidden rounded-none sm:rounded-xl transition-all duration-200">
-            <DialogHeader className="p-5 border-b shrink-0 bg-white z-10 space-y-2">
+          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-white shadow-2xl overflow-hidden rounded-none sm:rounded-xl transition-all duration-200">
+            <DialogHeader className="p-5 tableth:px-5 tableth:py-3 border-b shrink-0 bg-white z-10 space-y-2 tableth:space-y-1.5">
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
                 {selectedPedido && (
@@ -3097,7 +3097,7 @@ export default function Pedidos() {
             )}
 
             <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full">
-              <div className="w-full flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
+              <div className="w-full flex flex-col md:flex-row tabletv:flex-wrap items-stretch md:items-center justify-between gap-2">
                 <div className="grid grid-cols-1 gap-2 md:flex">
                   <Button size="lg" variant="default" onClick={() => {
                     if (ajustesDirty) {
