@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Search, Package, MapPin, User, Weight, Clock, CheckCircle2, Truck, Building2, ArrowRight, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -92,6 +92,23 @@ const STEP_CONFIG = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Rastreo() {
+  // Alto del menú fijo (cambia si hay mensajes en la franja de arriba): el bloque empieza justo debajo
+  const [altoMenu, setAltoMenu] = useState<number | null>(null);
+  useEffect(() => {
+    const header = document.querySelector("header");
+    if (!header) return;
+    // Solo se mide arriba de la página: al bajar, el menú cambia unos píxeles y la página saltaría
+    const medir = () => {
+      const alto = Math.round(header.getBoundingClientRect().height);
+      setAltoMenu((prev) => (prev == null || window.scrollY <= 10 ? alto : prev));
+    };
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
   const [guia, setGuia] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +155,11 @@ export default function Rastreo() {
       <Header cartItemsCount={0} cartPulseKey={0} onCartClick={() => {}} />
 
       {/* ── Hero banner ── */}
-      <section className="bg-gradient-to-br from-[#f5f0ea] to-[#ede8e1] pt-20 border-b border-[#e0d8cf]">
+      {/* El relleno superior iguala la altura del menú fijo: así el bloque queda centrado debajo de él */}
+      <section
+        className="bg-gradient-to-br from-[#f5f0ea] to-[#ede8e1] pt-24 sm:pt-28 border-b border-[#e0d8cf]"
+        style={altoMenu ? { paddingTop: altoMenu } : undefined}
+      >
         <div className="max-w-4xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center gap-8">
           {/* Text */}
           <div className="flex-1 text-center md:text-left space-y-3">
@@ -165,7 +186,7 @@ export default function Rastreo() {
                 value={guia}
                 onChange={(e) => setGuia(e.target.value)}
                 placeholder="Ej: 1234567890123"
-                className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-9 pr-4 text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-[#ca9e67]/40 focus:border-[#ca9e67] transition-colors"
+                className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-9 pr-4 text-base sm:text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-[#ca9e67]/40 focus:border-[#ca9e67] transition-colors"
                 disabled={loading}
                 minLength={5}
                 maxLength={45}

@@ -663,8 +663,30 @@ export async function getVentasPorMetodoMoneda(fechaInicio?: string, fechaFin?: 
   return apiFetch(`/pagos/resumen-metodo-moneda${qs}`);
 }
 
-export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string) {
-  const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit) });
+// Recompras: nuevos vs. recompras, por mes, y clientes agrupados por veces que compraron
+export async function getClientesRecompra(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
+}
+
+export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string }) {
+  const params = new URLSearchParams({
+    grupo: opts.grupo,
+    page: String(opts.page || 1),
+    page_size: String(opts.pageSize || 20),
+    orden: opts.orden || 'monto',
+  });
+  if (opts.q) params.set('q', opts.q);
+  if (opts.fechaInicio) params.set('fecha_inicio', opts.fechaInicio);
+  if (opts.fechaFin) params.set('fecha_fin', opts.fechaFin);
+  return apiFetch(`/pedidos-venta/clientes-grupo?${params.toString()}`);
+}
+
+export async function getClientesTopResumen(limit = 10, pedidosLimit = 5, fechaInicio?: string, fechaFin?: string, orden: 'monto' | 'pedidos' = 'monto') {
+  const params = new URLSearchParams({ limit: String(limit), pedidos_limit: String(pedidosLimit), orden });
   if (fechaInicio) params.set('fecha_inicio', fechaInicio);
   if (fechaFin) params.set('fecha_fin', fechaFin);
   return apiFetch(`/pedidos-venta/clientes-top-resumen?${params.toString()}`);
@@ -884,13 +906,12 @@ export async function getTasaActiva() {
     const resp = await fetch(publicUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
     if (resp.ok) {
       const body = await resp.json();
-      // Si el endpoint devuelve { active: null, message: ... } tratamos como no encontrada
-      if (body && body.active) {
-        const activa = body.active;
-        const monto = typeof activa.monto === 'number' ? activa.monto : (activa.monto ? Number(String(activa.monto).replace(',', '.')) : null);
-        return { ...activa, monto };
-      }
-      return null;
+      // Si el endpoint devuelve { active: null, message: ... } no hay tasa activa.
+      // Si hay, el backend devuelve la tasa directamente ({ id, monto, simbolo, ... }).
+      if (!body || body.active === null) return null;
+      const activa = body.active || body;
+      const monto = typeof activa.monto === 'number' ? activa.monto : (activa.monto ? Number(String(activa.monto).replace(',', '.')) : null);
+      return monto != null && Number.isFinite(monto) && monto > 0 ? { ...activa, monto } : null;
     }
   } catch (e) {
     // silent, fallback abajo
@@ -1472,6 +1493,38 @@ export async function deleteMensajeCintillo(id: number) {
   return apiFetch(`/cintillo/${id}`, { method: 'DELETE' });
 }
 
+// Descuento al mayor: reglas editables en el panel
+export interface NivelDescuentoMayor {
+  desde: number;
+  porcentaje: number;
+}
+
+export interface ConfigDescuentoMayor {
+  activo: boolean;
+  niveles: NivelDescuentoMayor[];
+  tamanos_ml: number[];
+  actualizado_en?: string | null;
+}
+
+export async function getDescuentoMayorPublic(): Promise<ConfigDescuentoMayor> {
+  const response = await fetch(`${API_URL}/descuento-mayor/activo`);
+  if (!response.ok) throw new Error('No se pudo cargar el descuento al mayor');
+  return response.json();
+}
+
+export async function getDescuentoMayorConfig(): Promise<ConfigDescuentoMayor> {
+  return apiFetch('/descuento-mayor');
+}
+
+export async function saveDescuentoMayorConfig(data: ConfigDescuentoMayor): Promise<ConfigDescuentoMayor> {
+  return apiFetch('/descuento-mayor', { method: 'PUT', body: JSON.stringify(data) });
+}
+
+// Quitar (aplicar=false) o volver a aplicar el descuento al mayor de un pedido, p. ej. pago con Cashea
+export async function setDescuentoMayorPedido(pedidoId: number, aplicar: boolean) {
+  return apiFetch(`/pedidos-venta/${pedidoId}/descuento-mayor`, { method: 'PUT', body: JSON.stringify({ aplicar }) });
+}
+
 // Image upload to MinIO/S3
 export async function uploadImage(file: File) {
   const formData = new FormData();
@@ -1728,4 +1781,13 @@ export async function login(email: string, password: string) {
     localStorage.setItem("jwt_token", data.token);
   }
   return data;
+}
+
+// Reporte de métodos de entrega y de dónde nos compran (estado/ciudad de envíos nacionales)
+export async function getReporteEntregas(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/reportes-entregas${qs}`);
 }

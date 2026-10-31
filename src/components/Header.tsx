@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Menu, X, Truck } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { bajarAlCatalogo } from '@/lib/catalog';
 import { getCatalogoPaginated, getMensajesCintilloActivos, type CintilloMensaje } from '@/integrations/api';
 
 interface HeaderProps {
@@ -14,6 +15,17 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
   const [scrolled, setScrolled] = useState(false);
   const [announcementMessages, setAnnouncementMessages] = useState<CintilloMensaje[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // "Comprar Ahora": baja a la lista de perfumes; desde otra página va al inicio y luego baja
+  const irAComprar = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsMenuOpen(false);
+    // Espera a que se cierre el menú del teléfono (bloquea el desplazamiento mientras está abierto)
+    window.setTimeout(() => {
+      if (!bajarAlCatalogo()) navigate('/', { state: { irAlCatalogo: true } });
+    }, 60);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -64,8 +76,10 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      if ((Header as any)._catsCache) {
-        setCatGroups((Header as any)._catsCache);
+      // Si ya se cargaron antes (al cambiar de página), se usan de la memoria
+      const cached = (Header as any)._catsCache;
+      if (Array.isArray(cached) && cached.length > 0) {
+        setCategoriesList(cached);
         return;
       }
       setCatsLoading(true);
@@ -90,8 +104,8 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
         cats.sort((a: any, b: any) => ((a.nombre || a.name || '') > (b.nombre || b.name || '') ? 1 : -1));
 
         if (!mounted) return;
-        // cache the flat list
-        (Header as any)._catsCache = cats;
+        // cache the flat list (solo si llegó algo, para reintentar si falló)
+        if (cats.length > 0) (Header as any)._catsCache = cats;
         setCategoriesList(cats);
         // also keep catGroups for backward compatibility (empty)
         setCatGroups({});
@@ -145,8 +159,9 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3" aria-label="Mirra Perfumería · Inicio">
               <div className="bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm overflow-hidden">
+                {/* isotipo.png: el emblema recortado y centrado de logoColor.png (que trae mucho margen blanco) */}
                 <img
-                  src="/logoColor.png"
+                  src="/isotipo.png"
                   alt="Logo de Mirra Perfumería, marca de fragancias selectas"
                   width={56}
                   height={56}
@@ -220,6 +235,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             </Link>
             <Link
               to="/"
+              onClick={irAComprar}
               className="hidden sm:inline-flex items-center justify-center bg-white/90 hover:bg-white text-[#CA9E67] px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 whitespace-nowrap text-sm md:text-base"
             >
               Comprar Ahora
@@ -269,13 +285,6 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           >
             Sobre Nosotros
           </Link>
-          <Link
-            to="/pedidos"
-            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-          >
-            Pedidos
-          </Link>
-
           {/* Sección Productos */}
           <div>
             <p className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -312,6 +321,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           </Link>
           <Link
             to="/"
+            onClick={irAComprar}
             className="block px-3 py-2.5 text-center bg-[#CA9E67] text-white rounded-lg font-medium hover:bg-[#b58a53] transition-colors"
           >
             Comprar Ahora

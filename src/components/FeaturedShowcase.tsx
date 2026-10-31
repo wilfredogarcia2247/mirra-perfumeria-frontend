@@ -32,7 +32,12 @@ function presentationsOf(product: Product): string[] {
   const labels = list
     .map((t) => presentationLabel(String((t as { nombre?: unknown })?.nombre ?? '')))
     .filter(Boolean);
-  return Array.from(new Set(labels));
+  // De menor a mayor: "7 ml · 30 ml · 50 ml · 100 ml"
+  const sizeOf = (label: string) => {
+    const n = parseFloat(label.replace(',', '.'));
+    return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+  };
+  return Array.from(new Set(labels)).sort((a, b) => sizeOf(a) - sizeOf(b));
 }
 
 // Los nombres de presentación repiten el nombre del producto
@@ -180,7 +185,7 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-8 px-4 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10 lg:px-8">
           <div className="text-center lg:text-left">
             <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a07746] sm:text-xs sm:tracking-[0.3em] lg:text-[11px] lg:tracking-[0.16em]">✦ Seleccionados por Mirra ✦</span>
-            <h2 className="mt-3 font-bell-mt text-3xl font-bold leading-tight text-gray-900 md:text-4xl lg:text-5xl">Nuestras recomendaciones</h2>
+            <h2 className="mt-3 font-bell-mt text-3xl font-bold leading-tight text-gray-900 md:text-4xl">Nuestras recomendaciones</h2>
             <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-[#CA9E67] to-transparent lg:mx-0 lg:from-[#CA9E67]" />
             <p className="mx-auto mt-4 max-w-md leading-relaxed text-[#6b5b4d] lg:mx-0">Fragancias que elegimos especialmente para ti.</p>
             <a href="#catalog" className="mt-6 hidden rounded-lg bg-[#CA9E67] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#b58a53] lg:inline-block">

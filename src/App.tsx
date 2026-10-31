@@ -23,6 +23,7 @@ import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
+import DescuentoMayor from "./pages/DescuentoMayor";
 import Sucursales from "./pages/Sucursales";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
@@ -37,6 +38,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ModuleProtectedRoute from "./components/ModuleProtectedRoute";
 import PublicSite from "./components/PublicSite";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           {/* Web pública. El panel y el login no cargan Google Ads. */}
           <Route element={<PublicSite />}>
@@ -115,6 +118,7 @@ const App = () => (
               <Route path="/admin/sucursales" element={<Sucursales />} />
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />
               <Route path="/admin/marketing/cupones" element={<Cupones />} />
+              <Route path="/admin/marketing/descuento-mayor" element={<DescuentoMayor />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="marcas" />}>

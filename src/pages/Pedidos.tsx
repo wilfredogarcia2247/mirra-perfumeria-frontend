@@ -3,10 +3,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike } from 'lucide-react';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -70,7 +70,65 @@ const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummar
   };
 };
 
+// Método de entrega con su propio color (sólido, para que resalte en la lista y en el detalle).
+// Colores distintos a los de los estados (ámbar, azul, verde, rojo) y al del cupón.
+type EntregaInfo = { etiqueta: string; Icono: typeof Store; etiquetaClase: string; cajaClase: string };
+const entregaInfo = (pedido: any): EntregaInfo | null => {
+  const type = String(pedido?.tipo_entrega || '');
+  if (!type) return null;
+  const details = pedido?.datos_entrega || {};
+  if (type === 'tienda') {
+    return { etiqueta: 'Retiro en tienda', Icono: Store, etiquetaClase: 'bg-violet-600 text-white', cajaClase: 'border-violet-300 bg-violet-50 text-violet-950' };
+  }
+  if (type === 'envio_nacional') {
+    const carrier = details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW';
+    return { etiqueta: `Envío nacional · ${carrier}`, Icono: Truck, etiquetaClase: 'bg-cyan-600 text-white', cajaClase: 'border-cyan-300 bg-cyan-50 text-cyan-950' };
+  }
+  if (type === 'delivery') {
+    return { etiqueta: 'Delivery', Icono: Bike, etiquetaClase: 'bg-pink-600 text-white', cajaClase: 'border-pink-300 bg-pink-50 text-pink-950' };
+  }
+  return { etiqueta: type, Icono: Truck, etiquetaClase: 'bg-gray-600 text-white', cajaClase: 'border-gray-300 bg-gray-50 text-gray-900' };
+};
+
+// Fidelización: cuántos pedidos completados lleva el cliente y cuánto ha comprado (con descuentos, sin delivery)
+function ClienteHistorialBadge({ historial }: { historial?: { pedidos_completados: number; monto_total: number } | null }) {
+  if (!historial) return null;
+  const n = Number(historial.pedidos_completados || 0);
+  if (n === 0) {
+    return <span className="whitespace-nowrap rounded-full bg-sky-100 px-2 py-[3px] text-[11px] font-semibold text-sky-800">Cliente nuevo</span>;
+  }
+  const monto = `$${Number(historial.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const frecuente = n >= 5;
+  return (
+    <span
+      title={`Ha comprado ${monto} en ${n} pedido${n === 1 ? '' : 's'} completado${n === 1 ? '' : 's'}`}
+      className={`whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold ${frecuente ? 'bg-[#CA9E67] text-white' : 'bg-amber-100 text-amber-900'}`}
+    >
+      {frecuente ? '★ ' : ''}{n} pedido{n === 1 ? '' : 's'} completado{n === 1 ? '' : 's'} · {monto}
+    </span>
+  );
+}
+
+function EntregaBadge({ pedido, className = '' }: { pedido: any; className?: string }) {
+  const info = entregaInfo(pedido);
+  if (!info) return null;
+  const { Icono } = info;
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold shadow-sm ${info.etiquetaClase} ${className}`}>
+      <Icono className="h-3 w-3 shrink-0" />
+      {info.etiqueta}
+    </span>
+  );
+}
+
 // Líneas del método de entrega para el mensaje de WhatsApp (mismos datos que el detalle del pedido)
+// Monto en $ con 2 decimales (acepta números o textos como "5.40"); "—" si no hay dato
+const fmtDinero = (valor: any): string => {
+  if (valor === null || valor === undefined || valor === '') return '—';
+  const n = Number(valor);
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : String(valor);
+};
+
 const buildDeliveryLines = (pedido: any): string[] => {
   const type = String(pedido?.tipo_entrega || '');
   if (!type) return [];
@@ -85,6 +143,7 @@ const buildDeliveryLines = (pedido: any): string[] => {
     const agencyCode = details.agencia_codigo || details.agencia_mrw_codigo;
     const agencyAddress = details.agencia_direccion || details.agencia_mrw_direccion;
     lines.push(`📦 Envío nacional por ${carrier}`);
+    if (details.estado) lines.push(`🏙️ ${details.ciudad ? `${details.ciudad}, ` : ""}${details.estado}`);
     if (agencyCode) lines.push(`Agencia: ${agencyCode}`);
     if (agencyAddress) lines.push(`📍 ${agencyAddress}`);
   } else if (type === 'delivery') {
@@ -433,6 +492,11 @@ export default function Pedidos() {
   // Etiqueta del cupón aplicado: "MIRRA10 · -$10.00"
   const fmtCupon = (p: any) => {
     const codigo = String(p?.cupon_codigo || '').trim();
+    const mayor = roundMoney(p?.descuento_mayor ?? 0);
+    if (!codigo && mayor > 0) {
+      const pct = Number(p?.descuento_mayor_porcentaje);
+      return `Mayor${Number.isFinite(pct) && pct > 0 ? ` ${pct}%` : ''} · -$${mayor.toFixed(2)}`;
+    }
     if (!codigo) return '';
     const descuento = roundMoney(p?.descuento_cupon ?? 0);
     if (descuento <= 0) return codigo;
@@ -657,10 +721,12 @@ export default function Pedidos() {
     const base = Number(selectedPedido?.total_base ?? 0);
     const summary = computeAjustesSummary(base, ajustesDraft);
     const descuentoCupon = roundMoney(selectedPedido?.descuento_cupon ?? 0);
+    const descuentoMayor = roundMoney(selectedPedido?.descuento_mayor ?? 0);
     return {
       ...summary,
       descuento_cupon: descuentoCupon,
-      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon)),
+      descuento_mayor: descuentoMayor,
+      total_final: Math.max(0, roundMoney(summary.total_final - descuentoCupon - descuentoMayor)),
     };
   }, [selectedPedido, ajustesDraft]);
 
@@ -789,8 +855,10 @@ export default function Pedidos() {
     if (!selectedPedido) return { base: 0, descuentos: 0, descuentosAjustes: 0, recargos: 0, final: 0 };
     const base = roundMoney(selectedPedido?.total_base ?? selectedPedido?.total ?? 0);
     const descuentos = roundMoney(selectedPedido?.total_descuentos ?? 0);
-    // total_descuentos del backend incluye el cupón; el cupón ya se muestra en su propia línea
-    const descuentosAjustes = Math.max(0, roundMoney(descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0)));
+    // total_descuentos del backend incluye el cupón y el descuento al mayor; esos ya tienen su propia línea
+    const descuentosAjustes = Math.max(0, roundMoney(
+      descuentos - roundMoney(selectedPedido?.descuento_cupon ?? 0) - roundMoney(selectedPedido?.descuento_mayor ?? 0),
+    ));
     const recargos = roundMoney(selectedPedido?.total_recargos ?? 0);
     const final = roundMoney(selectedPedido?.total_final ?? selectedPedido?.total ?? base);
     return { base, descuentos, descuentosAjustes, recargos, final };
@@ -826,13 +894,15 @@ export default function Pedidos() {
       return `• ${name}${Number.isFinite(quantity) && quantity > 1 ? ` × ${quantity}` : ''}`;
     });
     const exchangeRate = fmtTasa(selectedPedido);
-    const formatMoney = (amount: number) => roundMoney(exchangeRate ? amount * exchangeRate : amount)
-      .toLocaleString('es-VE', {
+    // Montos en $ y, si el pedido tiene tasa, también en Bs: "$29,10 (Bs 247,35)"
+    // (mismo formato que el mensaje de WhatsApp que envía el cliente desde la web)
+    const formatNumber = (amount: number) => roundMoney(amount).toLocaleString('es-VE', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    const currencyLabel = exchangeRate ? 'Bs' : '$';
-    const money = (amount: number) => `${currencyLabel} ${formatMoney(amount)}`;
+    const money = (amount: number) => (exchangeRate
+      ? `$${formatNumber(amount)} (Bs ${formatNumber(amount * exchangeRate)})`
+      : `$${formatNumber(amount)}`);
     const breakdown: string[] = [];
     const savedAdjustments = Array.isArray(selectedPedido.ajustes)
       ? selectedPedido.ajustes.map(adaptAjusteFromApi)
@@ -848,6 +918,12 @@ export default function Pedidos() {
       const couponCode = String(selectedPedido.cupon_codigo || '').trim();
       const couponPercent = fmtCuponPct(selectedPedido);
       breakdown.push(`🎟️ Cupón${couponCode ? ` ${couponCode}` : ''}${couponPercent ? ` (${couponPercent})` : ''}: - ${money(couponDiscount)}`);
+    }
+
+    const wholesaleDiscount = roundMoney(selectedPedido.descuento_mayor ?? 0);
+    if (wholesaleDiscount > 0) {
+      const pct = Number(selectedPedido.descuento_mayor_porcentaje);
+      breakdown.push(`🎁 Descuento al mayor${Number.isFinite(pct) && pct > 0 ? ` (${pct}%)` : ''}: - ${money(wholesaleDiscount)}`);
     }
 
     for (const adjustment of appliedAdjustments) {
@@ -903,6 +979,37 @@ export default function Pedidos() {
       descripcion: selectedPedido?.cupon_descripcion || null,
     };
   }, [selectedPedido]);
+
+  // Descuento al mayor del pedido abierto
+  // (quitado = se le quitó en el panel, por ejemplo porque paga con Cashea)
+  const mayorDetalle = React.useMemo(() => {
+    if (!selectedPedido) return null;
+    const descuento = roundMoney(selectedPedido?.descuento_mayor ?? 0);
+    const quitado = Boolean(selectedPedido?.descuento_mayor_quitado);
+    if (descuento <= 0 && !quitado) return null;
+    const pct = Number(selectedPedido?.descuento_mayor_porcentaje);
+    return { descuento, quitado, pct: Number.isFinite(pct) && pct > 0 ? `${pct}%` : null };
+  }, [selectedPedido]);
+
+  const [cambiandoMayor, setCambiandoMayor] = useState(false);
+  const cambiarDescuentoMayor = async (aplicar: boolean) => {
+    if (!selectedPedido || cambiandoMayor) return;
+    if (!aplicar && !window.confirm('¿Quitar el descuento al mayor de este pedido? El total sube al precio normal.')) return;
+    setCambiandoMayor(true);
+    try {
+      const id = Number(selectedPedido.id);
+      await setDescuentoMayorPedido(id, aplicar);
+      toast.success(aplicar ? 'Descuento al mayor aplicado de nuevo' : 'Descuento al mayor quitado');
+      // Total nuevo en el listado y detalle recargado completo (pagos y estado "Pagado" según el total nuevo)
+      const fresh = await getPedidoVenta(id);
+      setPedidos((list) => (Array.isArray(list) ? list.map((p: any) => (p.id === id ? { ...p, ...fresh } : p)) : list));
+      await openDetalle(id);
+    } catch (error) {
+      toast.error(parseApiError(error) || 'No se pudo cambiar el descuento al mayor');
+    } finally {
+      setCambiandoMayor(false);
+    }
+  };
 
   const tasaActual = fmtTasa(selectedPedido);
   const tasaSimbolo = selectedPedido?.tasa_simbolo || (selectedPedido?.tasa && selectedPedido.tasa.simbolo) || 'Bs';
@@ -1819,7 +1926,7 @@ export default function Pedidos() {
       if (resp) {
         try {
           // si resp parece ser el pedido actualizado
-          const updated = resp;
+          const updated = { ...resp, cliente_historial: resp.cliente_historial ?? selectedPedido.cliente_historial };
           setSelectedPedido(updated);
           // actualizar listado de pedidos también
           setPedidos((list) => (Array.isArray(list) ? list.map((p: any) => (p.id === updated.id ? updated : p)) : list));
@@ -1948,7 +2055,7 @@ export default function Pedidos() {
         )}
 
         {loading ? (
-          <TableSkeleton columns={8} rows={10} />
+          <TableSkeleton columns={9} rows={10} />
         ) : (
           <>
             {/* ── Móvil: tarjetas ── */}
@@ -1978,6 +2085,7 @@ export default function Pedidos() {
                             <span className="inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-200">Sin pago</span>
                           )
                         )}
+                        <EntregaBadge pedido={p} />
                         <span className="text-xs text-muted-foreground">{fmtProductosCount(p)} prod.</span>
                         {fmtCupon(p) && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-[2px] text-[10.5px] font-medium text-amber-800">
@@ -2014,6 +2122,7 @@ export default function Pedidos() {
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Entrega</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Prods.</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Tasa</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
@@ -2044,6 +2153,7 @@ export default function Pedidos() {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>{entregaInfo(p) ? <EntregaBadge pedido={p} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-sm tabular-nums text-right">{fmtProductosCount(p)}</TableCell>
                           <TableCell className="text-xs tabular-nums text-muted-foreground text-right">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
                           <TableCell className="text-right">
@@ -2147,7 +2257,10 @@ export default function Pedidos() {
               <DialogDescription className="text-sm text-gray-500 mt-1">
                 {selectedPedido ? (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
-                    <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                      <ClienteHistorialBadge historial={selectedPedido.cliente_historial} />
+                    </span>
                     <span className="hidden sm:inline text-gray-300">|</span>
                     <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
                     <span className="hidden sm:inline text-gray-300">|</span>
@@ -2160,7 +2273,11 @@ export default function Pedidos() {
                 )}
               </DialogDescription>
               {selectedPedido?.tipo_entrega && (
-                <div className="rounded-lg border border-copper-200 bg-copper-50 px-3 py-2 text-sm text-copper-900">
+                <div className={`rounded-lg border-2 px-3 py-2 text-sm ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
+                    <EntregaBadge pedido={selectedPedido} className="text-xs" />
+                  </div>
                   {(() => {
                     const details = selectedPedido.datos_entrega || {};
                     const type = String(selectedPedido.tipo_entrega);
@@ -2170,17 +2287,15 @@ export default function Pedidos() {
                         : null);
                     return (
                       <>
-                        <p className="font-semibold">
-                          {type === 'tienda' ? 'Retiro en tienda' : type === 'envio_nacional' ? `Envío nacional · ${details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}` : 'Delivery'}
-                        </p>
                         {type === 'tienda' && (
                           <>
-                            <p>{details.sucursal_nombre || 'Sucursal'}</p>
+                            <p className="font-semibold">{details.sucursal_nombre || 'Sucursal'}</p>
                             {details.sucursal_direccion && <p>{details.sucursal_direccion}</p>}
                           </>
                         )}
                         {type === 'envio_nacional' && (
                           <>
+                            {details.estado && <p className="font-semibold">Destino: {details.ciudad ? `${details.ciudad}, ` : ""}{details.estado}</p>}
                             <p>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</p>
                             {(details.agencia_codigo || details.agencia_mrw_codigo) && (
                               <p>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</p>
@@ -2205,6 +2320,31 @@ export default function Pedidos() {
                   {cuponDetalle.pct && <span>· {cuponDetalle.pct} de descuento</span>}
                   <span>· -{cuponDetalle.descuento.toFixed(2)}</span>
                   {cuponDetalle.colaborador && <span>· {cuponDetalle.colaborador}</span>}
+                </div>
+              )}
+              {mayorDetalle && (
+                <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${mayorDetalle.quitado ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <TicketPercent className="w-4 h-4 shrink-0" />
+                  {mayorDetalle.quitado ? (
+                    <span className="font-medium">Descuento al mayor quitado{mayorDetalle.pct ? ` (${mayorDetalle.pct})` : ''}</span>
+                  ) : (
+                    <>
+                      <span className="font-medium">Descuento al mayor aplicado</span>
+                      {mayorDetalle.pct && <span>· {mayorDetalle.pct}</span>}
+                      <span>· -{mayorDetalle.descuento.toFixed(2)}</span>
+                    </>
+                  )}
+                  {!/^complet/i.test(String(selectedPedido?.estado || '')) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto h-8 bg-white"
+                      disabled={cambiandoMayor}
+                      onClick={() => void cambiarDescuentoMayor(mayorDetalle.quitado)}
+                    >
+                      {cambiandoMayor ? 'Guardando...' : mayorDetalle.quitado ? 'Volver a aplicar' : 'Quitar (Cashea)'}
+                    </Button>
+                  )}
                 </div>
               )}
             </DialogHeader>
@@ -2236,14 +2376,15 @@ export default function Pedidos() {
                   <div className="overflow-auto">
                     <table className="w-full table-auto text-sm">
                       <thead>
-                        <tr className="text-left text-xs text-muted-foreground">
-                          <th className="hidden pb-2 md:table-cell">Imagen</th>
-                          <th className="pb-2">Nombre</th>
-                          <th className="pb-2">Precio</th>
-                          <th className="hidden pb-2 md:table-cell">Costo</th>
-                          <th className="pb-2 text-center"><span className="md:hidden">Cant.</span><span className="hidden md:inline">Cantidad</span></th>
-                          <th className="pb-2">Subtotal</th>
-                          <th className="hidden pb-2 md:table-cell">Producción</th>
+                        <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <th className="hidden pb-2 pr-3 md:table-cell">Imagen</th>
+                          <th className="pb-2 pr-2">Nombre</th>
+                          {/* Títulos abreviados; al pasar el ratón se ve el nombre completo */}
+                          <th className="px-3 pb-2 text-right" title="Precio">Prec.</th>
+                          <th className="hidden px-3 pb-2 text-right md:table-cell" title="Costo">Cost.</th>
+                          <th className="px-3 pb-2 text-center" title="Cantidad">Cant.</th>
+                          <th className="px-3 pb-2 text-right" title="Subtotal">Subt.</th>
+                          <th className="hidden pb-2 pl-3 text-center md:table-cell" title="Producción">Prod.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2342,11 +2483,11 @@ export default function Pedidos() {
                                 })()}
                               </div>
                             </td>
-                            <td className="py-2">{typeof it.precio_venta === 'number' ? `$${it.precio_venta.toFixed(2)}` : it.precio_venta}</td>
-                            <td className="hidden py-2 md:table-cell">{typeof it.costo === 'number' ? `${it.costo.toFixed(2)}` : it.costo}</td>
-                            <td className="py-2" style={{ textAlign: 'center' }}>{it.cantidad}</td>
-                            <td className="py-2">{typeof it.subtotal === 'number' ? `$${it.subtotal.toFixed(2)}` : it.subtotal}</td>
-                            <td className="hidden py-2 md:table-cell">
+                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
+                            <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground md:table-cell">{fmtDinero(it.costo)}</td>
+                            <td className="px-3 py-2 text-center tabular-nums">{it.cantidad}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
+                            <td className="hidden py-2 pl-3 text-center md:table-cell">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (
@@ -2446,6 +2587,7 @@ export default function Pedidos() {
                       <div className="mt-3 text-xs text-muted-foreground">
                         Vista previa: Subtotal ${ajustesPreview.total_base.toFixed(2)}
                         {ajustesPreview.descuento_cupon > 0 && ` - cupón $${ajustesPreview.descuento_cupon.toFixed(2)}`}
+                        {ajustesPreview.descuento_mayor > 0 && ` - al mayor $${ajustesPreview.descuento_mayor.toFixed(2)}`}
                         {ajustesPreview.total_descuentos > 0 && ` - $${ajustesPreview.total_descuentos.toFixed(2)}`}
                         {ajustesPreview.total_recargos > 0 && ` + $${ajustesPreview.total_recargos.toFixed(2)}`}
                         {' = '}
@@ -2460,6 +2602,11 @@ export default function Pedidos() {
                         {cuponDetalle && (
                           <div className="text-sm text-amber-700">
                             - Cupón {cuponDetalle.codigo}{cuponDetalle.pct ? ` (${cuponDetalle.pct})` : ''}: ${cuponDetalle.descuento.toFixed(2)}
+                          </div>
+                        )}
+                        {mayorDetalle && !mayorDetalle.quitado && (
+                          <div className="text-sm text-amber-700">
+                            - Descuento al mayor{mayorDetalle.pct ? ` (${mayorDetalle.pct})` : ''}: ${mayorDetalle.descuento.toFixed(2)}
                           </div>
                         )}
                         {persistedTotals.descuentosAjustes > 0 && (

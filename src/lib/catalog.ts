@@ -38,6 +38,40 @@ export function presentacionesDe(product: Product): Presentacion[] {
     .sort((a, b) => (a.precio ?? Number.POSITIVE_INFINITY) - (b.precio ?? Number.POSITIVE_INFINITY));
 }
 
+// Baja hasta la lista de perfumes (#catalog) dejando el título visible bajo el menú fijo.
+// Devuelve false si la lista no está en esta página.
+// Mientras baja, la página puede terminar de cargar fotos y secciones y la lista se corre:
+// por eso revisa dónde quedó y corrige unas veces hasta que esté en su lugar.
+export function bajarAlCatalogo(): boolean {
+  const catalogo = document.getElementById('catalog');
+  if (!catalogo) return false;
+  const distancia = () => {
+    const finMenu = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+    return catalogo.getBoundingClientRect().top - finMenu;
+  };
+  const ir = (suave: boolean) => window.scrollTo({
+    top: Math.max(0, window.scrollY + distancia()),
+    behavior: suave && !prefiereMenosMovimiento() ? 'smooth' : 'auto',
+  });
+  ir(true);
+  // Si el cliente empieza a desplazarse por su cuenta, se dejan de hacer correcciones
+  let tocó = false;
+  const eventos = ['wheel', 'touchstart', 'keydown', 'mousedown'] as const;
+  const alTocar = () => { tocó = true; };
+  eventos.forEach((ev) => window.addEventListener(ev, alTocar, { passive: true, once: true }));
+  const terminar = () => eventos.forEach((ev) => window.removeEventListener(ev, alTocar));
+  let intentos = 0;
+  const revisar = () => {
+    intentos += 1;
+    if (tocó || !document.body.contains(catalogo)) return terminar();
+    if (Math.abs(distancia()) > 12) ir(intentos === 1);
+    if (intentos < 4) window.setTimeout(revisar, 450);
+    else terminar();
+  };
+  window.setTimeout(revisar, 700);
+  return true;
+}
+
 export function prefiereMenosMovimiento() {
   try {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;

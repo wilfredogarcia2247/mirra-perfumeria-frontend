@@ -379,3 +379,17 @@
   stroke-dashoffset: 22;
   animation: drawCheck 420ms ease-out forwards;
 }
+/* Portada: cinta de perfumes que se desliza (PortadaCinta) */
+@keyframes cinta-deslizar {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.cinta-fila {
+  animation: cinta-deslizar 90s linear infinite;
+}
+.cinta-fila.cinta-reversa {
+  animation-direction: reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cinta-fila { animation: none; }
+}
