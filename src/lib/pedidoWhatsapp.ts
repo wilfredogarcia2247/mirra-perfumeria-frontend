@@ -100,7 +100,8 @@ export function mensajePedidoWhatsapp(pedido: any): string {
     '💰 *Resumen*',
     ...resumen,
     `*Total de productos: ${dinero(total)}*`,
-    '_El costo de delivery o envío me lo confirman por aquí._',
+    // Con retiro en tienda no hay costo de envío que confirmar
+    ...(pedido?.tipo_entrega === 'tienda' ? [] : ['_El costo de delivery o envío me lo confirman por aquí._']),
     ...(entrega.length > 0 ? ['', ...entrega] : []),
     '',
     'Quedo atento(a) a la confirmación ✅',

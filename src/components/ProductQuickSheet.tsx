@@ -191,14 +191,14 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           {product.agotado ? (
             <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
           ) : presentaciones.length > 0 ? (
-            <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : presentaciones.length === 4 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {presentaciones.map((p, i) => (
                 <button
                   key={p.tamano?.id ?? i}
                   type="button"
                   onClick={() => setElegida(i)}
                   aria-pressed={i === elegida}
-                  className={`rounded-xl border-[1.5px] px-1 py-2 text-sm font-bold transition ${i === elegida ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
+                  className={`rounded-xl border-[1.5px] px-1 py-2 sm:py-1.5 text-sm font-bold transition ${i === elegida ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
                 >
                   {p.label || 'Presentación'}
                   <span className="mt-0.5 block text-[11px] font-semibold text-[#8b6439]">{formatPrecio(p.precio, tasa) ?? 'Consultar'}</span>
