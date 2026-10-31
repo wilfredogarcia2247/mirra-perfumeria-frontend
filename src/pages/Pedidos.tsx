@@ -450,7 +450,8 @@ export default function Pedidos() {
     return 'secondary';
   };
 
-  const allStatuses = ['Pendiente', 'Enviado', 'Completado', 'Cancelado'];
+  // "Enviado" no se usa en la tienda (ningún botón lo marca); se quitó de las pestañas
+  const allStatuses = ['Pendiente', 'Completado', 'Cancelado'];
   const searchStats = useMemo(() => {
     const counts = { todos: 0, pendiente: 0, enviado: 0, completado: 0, cancelado: 0 };
     for (const p of searchResults) {
