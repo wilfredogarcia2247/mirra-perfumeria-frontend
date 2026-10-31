@@ -17,10 +17,11 @@ import {
   getReporteEntregas,
 } from '@/integrations/api';
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, TicketPercent } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import RecomprasReport from '@/components/RecomprasReport';
+import ComparativoReport from '@/components/ComparativoReport';
 
 type ReportSlug =
   | 'resumen-general'
@@ -42,7 +43,7 @@ type ReportSlug =
 type DataKey = 'pedidos' | 'productos' | 'pedidosTodos' | 'categorias' | 'formulasAll' | 'produccionResumen' | 'ventasMetodo' | 'clientesResumen' | 'presentaciones' | 'cierre';
 
 const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[] = [
-  { slug: 'resumen-general', title: 'Resumen general', description: 'KPIs principales de operacion y ventas' },
+  { slug: 'resumen-general', title: 'Cómo vamos', description: 'Este mes contra el anterior (o los meses que elijas): ventas, perfumes, presentaciones y crecimiento' },
   { slug: 'ventas-periodo', title: 'Ventas por periodo', description: 'Comparativo de ventas por mes' },
   { slug: 'ventas-metodo', title: 'Ventas por metodo', description: 'Distribucion por forma de pago' },
   { slug: 'ventas-presentacion', title: 'Ventas por presentacion', description: 'Unidades vendidas por ml reportado' },
@@ -62,7 +63,7 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
 
 const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
-  'resumen-general': ['pedidos', 'productos'],
+  'resumen-general': [],
   'ventas-periodo': ['pedidos'],
   'ventas-metodo': ['ventasMetodo'],
    'ventas-presentacion': ['presentaciones'],
@@ -93,7 +94,6 @@ const DATA_LABELS: Record<DataKey, string> = {
 };
 
 const DATE_FILTER_REPORTS = new Set<ReportSlug>([
-  'resumen-general',
   'ventas-periodo',
   'ventas-metodo',
   'ventas-presentacion',
@@ -1004,39 +1004,7 @@ export default function Reportes() {
     }
 
     if (selectedReport === 'resumen-general') {
-      return (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ventas hoy</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.dailySales.toFixed(2)}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{fechaInicio || fechaFin ? 'Ventas del período' : 'Ventas del mes'}</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.monthSales.toFixed(2)}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{fechaInicio || fechaFin ? 'Pedidos completados' : 'Pedidos completados (mes)'}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.monthCompletedOrders}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado del negocio</p><p className="mt-2 text-xl font-semibold">{metrics.businessStatus}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.businessReason}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Producto más vendido</p><p className="mt-2 text-sm font-medium">{metrics.topProduct ? `${metrics.topProduct.nombre} (${metrics.topProduct.cantidad} uds)` : 'Sin datos'}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Presentación más vendida</p><p className="mt-2 text-sm font-medium">{metrics.topPresentation ? `${metrics.topPresentation.presentacion} (${metrics.topPresentation.cantidad} uds)` : 'Sin datos'}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tasa de cancelación</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.cancelRate.toFixed(1)}%</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Riesgo de inventario</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metrics.stockRiskRate.toFixed(1)}%</p></CardContent></Card>
-          <Card className={metrics.pedidosConCupon > 0 ? 'border-amber-200 bg-amber-50/40' : undefined}>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Descuentos aplicados</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-700">${metrics.descuentosTotal.toFixed(2)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {metrics.pedidosConCupon > 0
-                  ? `en ${metrics.pedidosConCupon} ${metrics.pedidosConCupon === 1 ? 'pedido' : 'pedidos'} con cupón`
-                  : 'Sin cupones aplicados'}
-              </p>
-              {Object.keys(metrics.descuentosPorCodigo).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {Object.entries(metrics.descuentosPorCodigo).map(([codigo, data]) => (
-                    <span key={codigo} className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10.5px] font-medium text-amber-800">
-                      <TicketPercent className="w-3 h-3" />
-                      {codigo} · -${data.descuento.toFixed(2)}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      );
+      return <ComparativoReport />;
     }
 
     if (selectedReport === 'ventas-periodo') {

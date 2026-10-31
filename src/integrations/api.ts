@@ -672,6 +672,13 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
+// Reporte "Cómo vamos": periodo A contra periodo B y evolución mes a mes (fechas AAAA-MM-DD)
+export async function getReporteComparativo(opts: { aInicio: string; aFin: string; bInicio: string; bFin: string; evInicio?: string; evFin?: string }) {
+  const params = new URLSearchParams({ a_inicio: opts.aInicio, a_fin: opts.aFin, b_inicio: opts.bInicio, b_fin: opts.bFin });
+  if (opts.evInicio && opts.evFin) { params.set('ev_inicio', opts.evInicio); params.set('ev_fin', opts.evFin); }
+  return apiFetch(`/pedidos-venta/reporte-comparativo?${params.toString()}`);
+}
+
 export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string; inactividad?: 'todos' | 'hasta60' | '60-90' | '90+' }) {
   const params = new URLSearchParams({
     grupo: opts.grupo,
