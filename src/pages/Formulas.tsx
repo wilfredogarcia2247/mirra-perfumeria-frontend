@@ -135,6 +135,27 @@ export default function Formulas() {
     return () => { mounted = false; };
   }, [page, debouncedQuery]);
 
+  // Recargar la página actual de la lista respetando la búsqueda escrita (después de guardar,
+  // eliminar, producir o hacer cambios masivos). Antes recargaba todas las fórmulas e ignoraba la búsqueda.
+  async function recargarLista() {
+    const q = searchTerm.trim();
+    let fres: any;
+    if (q) {
+      // @ts-ignore
+      const { searchFormulas } = await import('@/integrations/api');
+      fres = await searchFormulas(q, page);
+    } else {
+      fres = await getFormulas(page);
+    }
+    const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
+    const meta = fres?.meta;
+    if (meta) {
+      setTotal(Number(meta.total ?? 0));
+      setTotalPages(Number(meta.total_pages ?? Math.ceil((meta.total ?? 0) / (meta.per_page ?? 12))));
+    }
+    await enrichAndSetFormulas(data);
+  }
+
   // Nota: no cargamos tamaños por producto aquí; las presentaciones ahora se modelan como fórmulas.
 
   const componentesEndRef = useRef<HTMLDivElement>(null);
@@ -262,9 +283,7 @@ export default function Formulas() {
         toast.success('Fórmula creada');
       }
       // refresh current page from server
-      const fres: any = await getFormulas(page);
-      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
-      await enrichAndSetFormulas(data);
+      await recargarLista();
       setIsOpen(false);
       // reset form (incluye costo/precio)
       resetForm();
@@ -326,9 +345,7 @@ export default function Formulas() {
     try {
       await deleteFormula(id);
       toast.success('Fórmula eliminada');
-      const fres: any = await getFormulas(page);
-      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
-      await enrichAndSetFormulas(data);
+      await recargarLista();
     } catch (err) {
       console.error('Error eliminando fórmula', err);
       const msg = parseApiError(err) || 'Error al eliminar fórmula';
@@ -406,9 +423,7 @@ export default function Formulas() {
       const resp = await createProduccion(Number(produceFormula.id), { cantidad: qty, almacen_venta_id: Number(produceAlmacenId) });
       toast.success('Producción ejecutada correctamente');
       // refresh current page (por si la API actualiza algo)
-      const fres: any = await getFormulas(page);
-      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
-      await enrichAndSetFormulas(data);
+      await recargarLista();
       setProduceOpen(false);
     } catch (err: any) {
       console.error('Error ejecutando producción', err);
@@ -557,9 +572,7 @@ export default function Formulas() {
       const res: any = await updateFormulasByLike(bulkQuery, price);
       toast.success(`Se actualizaron ${res?.updated_count ?? 0} fórmulas a $${price.toFixed(2)}`);
       // Refresh formula list
-      const fres: any = await getFormulas(page);
-      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
-      await enrichAndSetFormulas(data);
+      await recargarLista();
       // Reset and close
       setBulkPriceOpen(false);
       setBulkStep('search');
@@ -608,9 +621,7 @@ export default function Formulas() {
     try {
       const res: any = await setActiveFormulasByLike(bulkDeactivateQuery, activar);
       toast.success(`Se ${activar ? 'activaron' : 'inactivaron'} ${res?.updated_count ?? 0} fórmulas`);
-      const fres: any = await getFormulas(page);
-      const data = Array.isArray(fres) ? fres : (fres?.data ?? []);
-      await enrichAndSetFormulas(data);
+      await recargarLista();
       setBulkDeactivateOpen(false);
       resetBulkDeactivateModal();
     } catch (err: any) {
