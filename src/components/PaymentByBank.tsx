@@ -3,9 +3,25 @@ import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, registrarPagoCashea } from '../integrations/api';
-import CasheaPanel, { type CompraCashea } from './CasheaPanel';
+import CasheaPanel, { type CompraCashea, type BorradorCashea } from './CasheaPanel';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+
+// Borradores de pago guardados en el dispositivo (uno por pedido); se descartan a los 2 días
+const PREFIJO_BORRADOR = 'mirra_borrador_pago_';
+const VIGENCIA_BORRADOR_MS = 2 * 24 * 60 * 60 * 1000;
+function limpiarBorradoresViejos() {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(PREFIJO_BORRADOR)) continue;
+      try {
+        const d = JSON.parse(localStorage.getItem(k) || 'null');
+        if (!d || Date.now() - Number(d.guardado) > VIGENCIA_BORRADOR_MS) localStorage.removeItem(k);
+      } catch { localStorage.removeItem(k); }
+    }
+  } catch { /* sin almacenamiento */ }
+}
 
 // El servidor responde los errores como {"error":"..."}: mostrar solo el texto
 function textoError(e: any, porDefecto = 'Error registrando pago'): string {
@@ -110,6 +126,18 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const enviandoCashea = React.useRef(false);
   // Motivos por los que no se pudo producir algún perfume (los da el servidor, con nombres)
   const erroresProduccion = React.useRef<string[]>([]);
+  // ---- Borrador: lo escrito se guarda en este dispositivo y se recupera al volver a este pedido ----
+  const CLAVE_BORRADOR = `${PREFIJO_BORRADOR}${pedidoId}`;
+  const [borradorRecuperado, setBorradorRecuperado] = useState(false);
+  const [casheaBorrador, setCasheaBorrador] = useState<BorradorCashea | null>(null);
+  const [casheaKey, setCasheaKey] = useState(0);
+  const [casheaVersion, setCasheaVersion] = useState(0);
+  const casheaEstado = React.useRef<BorradorCashea | null>(null);
+  const formaPendiente = React.useRef<number | null>(null);
+  const pagoTerminado = React.useRef(false);
+  const borrarBorrador = () => { try { localStorage.removeItem(CLAVE_BORRADOR); } catch { /* sin almacenamiento */ } };
+  // Al registrar el pago con éxito se borra el borrador
+  const exito = (d: any) => { pagoTerminado.current = true; borrarBorrador(); if (onSuccess) onSuccess(d); };
   const avisoPendientes = () => (erroresProduccion.current.length > 0
     ? erroresProduccion.current.join(' · ')
     : 'Hay perfumes de este pedido sin producir. Revisa sus órdenes de producción antes de completar el pedido.');
@@ -433,6 +461,65 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       setConverted(null);
     }
   }, [selectedBancoId, bancos, globalFormas]);
+
+  // Borrador: recuperar lo que se había escrito para este pedido
+  useEffect(() => {
+    limpiarBorradoresViejos();
+    try {
+      const d = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || 'null');
+      if (!d || d.v !== 1) return;
+      if (d.modo === 'single' || d.modo === 'multiple' || d.modo === 'cashea') setPaymentMode(d.modo);
+      if (d.bancoId != null) setSelectedBancoId(Number(d.bancoId));
+      formaPendiente.current = d.formaId != null ? Number(d.formaId) : null;
+      setMonto(d.monto || '');
+      setReferencia(d.referencia || '');
+      setFecha(d.fecha || '');
+      if (Array.isArray(d.pagosNuevos) && d.pagosNuevos.length > 0) setPayments((cur) => [...cur, ...d.pagosNuevos]);
+      if (d.cashea) { casheaEstado.current = d.cashea; setCasheaBorrador(d.cashea); }
+      setBorradorRecuperado(true);
+    } catch { /* borrador dañado o sin almacenamiento */ }
+  }, [pedidoId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // La forma de pago del borrador se aplica cuando el banco ya cargó sus formas
+  useEffect(() => {
+    const id = formaPendiente.current;
+    if (id != null && availableFormas.some((f) => Number(f.id) === id)) {
+      setSelectedFormaId(id);
+      formaPendiente.current = null;
+    }
+  }, [availableFormas]);
+
+  // Borrador: guardar lo que se escribe (medio segundo después del último cambio)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (pagoTerminado.current) return;
+      try {
+        const pagosNuevos = payments.filter((p) => !p?.existing && !p?.id);
+        const cashea = casheaEstado.current;
+        const vacio = paymentMode === 'single' && !selectedBancoId && !monto && !referencia && !fecha && pagosNuevos.length === 0 && !cashea?.tocado;
+        if (vacio) { borrarBorrador(); return; }
+        localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
+          v: 1, guardado: Date.now(), modo: paymentMode, bancoId: selectedBancoId, formaId: selectedFormaId,
+          monto, referencia, fecha, pagosNuevos, cashea,
+        }));
+      } catch { /* sin almacenamiento */ }
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [paymentMode, selectedBancoId, selectedFormaId, monto, referencia, fecha, payments, casheaVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function descartarBorrador() {
+    borrarBorrador();
+    setBorradorRecuperado(false);
+    setPaymentMode('single');
+    setSelectedBancoId(null);
+    setMonto('');
+    setReferencia('');
+    setFecha('');
+    setPayments((cur) => cur.filter((p) => p?.existing || p?.id));
+    casheaEstado.current = null;
+    setCasheaBorrador(null);
+    setCasheaKey((k) => k + 1);
+  }
 
   useEffect(() => {
     // Cuando cambia banco/forma (su moneda), obtener la tasa. NO depende de monto.
@@ -1080,7 +1167,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           if (createdCount > 0 && pagosList.length === 0) {
             setErrors('Pedido completado pero no se detectaron pagos asociados. Revisa la respuesta del servidor.');
             toast.error('Pedido completado pero no se detectaron pagos asociados');
-            if (onSuccess) onSuccess(fresh || data);
+            exito(fresh || data);
             if (onClose) onClose();
             setLoading(false);
             return;
@@ -1088,7 +1175,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         } catch (e) {
           console.warn('No se pudo verificar pagos tras completar', e);
         }
-        if (onSuccess) onSuccess(data);
+        exito(data);
         toast.success('Pagos registrados y pedido completado correctamente');
         if (onClose) onClose();
       } else {
@@ -1187,7 +1274,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           const fresh = await getPedidoVenta(pedidoId);
           const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
           if (!pagosList || pagosList.length === 0) {
-            if (onSuccess) onSuccess(fresh);
+            exito(fresh);
             if (onClose) onClose();
             setLoading(false);
             return;
@@ -1195,7 +1282,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         } catch (e) {
           console.warn('No se pudo verificar pago tras completar', e);
         }
-        if (onSuccess) onSuccess(data);
+        exito(data);
         toast.success('Pago registrado y pedido completado correctamente');
         if (onClose) onClose();
       }
@@ -1443,7 +1530,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
             // Si el backend reportó éxito y devolvió un pago, lo consideramos válido aun si el "fresh" falla
             if (pagosList.length === 0 && !data?.pago) {
-              if (onSuccess) onSuccess(fresh || data);
+              exito(fresh || data);
               if (onClose) onClose();
               setLoading(false);
               return;
@@ -1451,7 +1538,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           } catch (e) {
             console.warn('No se pudo verificar pago tras completar (addAndComplete)', e);
           }
-          if (onSuccess) onSuccess(data);
+          exito(data);
           setShowSuccess(true);
           setTimeout(() => setShowSuccess(false), 1600);
           toast.success('Pago registrado y pedido completado');
@@ -1630,7 +1717,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       }
       await registrarPagoCashea(pedidoId, { ...compra, forma_cashea_id: formaCasheaId });
       const data = await completarPedidoVenta(pedidoId);
-      if (onSuccess) onSuccess(data);
+      exito(data);
       toast.success('Pago con Cashea registrado y pedido completado');
       if (onClose) onClose();
     } catch (e: any) {
@@ -1691,6 +1778,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       </div>
 
       <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
+        {borradorRecuperado && (
+          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <span>Recuperamos lo que habías escrito para este pedido.</span>
+            <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-sky-300 bg-white px-3 text-xs font-medium hover:bg-sky-100">Borrar y empezar de nuevo</button>
+          </div>
+        )}
         {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1698,6 +1791,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           {paymentMode === 'cashea' ? (
             <div className="lg:col-span-2">
               <CasheaPanel
+                key={casheaKey}
+                borrador={casheaBorrador}
+                onCambio={(b) => { casheaEstado.current = b; setCasheaVersion((v) => v + 1); }}
                 montoSugerido={restanteParaCashea}
                 bancos={bancos as Array<Banco & { moneda?: string | null }>}
                 formas={globalFormas}
