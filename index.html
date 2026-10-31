@@ -51,9 +51,69 @@
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="apple-touch-icon" href="/logo.png" />
   <link rel="shortcut icon" href="/logo.png" />
+  <!-- Pantalla de entrada: logo de Mirra mientras carga la tienda (solo en la portada, una vez por visita) -->
+  <link rel="preload" as="image" href="/isotipo.png" />
+  <style>
+    #mirra-entrada { position: fixed; inset: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+      background: radial-gradient(120% 90% at 50% 35%, #fbf6ef 0%, #f5eee6 55%, #ead9c3 100%);
+      transition: transform .85s cubic-bezier(.76,0,.24,1); }
+    #mirra-entrada.listo { transform: translateY(-100%); }
+    #mirra-entrada .marca { position: relative; width: 168px; height: 168px; }
+    #mirra-entrada .marca img { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: multiply; opacity: 0; transform: scale(.94);
+      animation: me-aparece 1s .25s ease forwards; }
+    #mirra-entrada .marca svg { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); transform: rotate(-90deg); }
+    #mirra-entrada .marca circle { fill: none; stroke: #b8973a; stroke-width: 1.2; stroke-linecap: round; stroke-dasharray: 302; stroke-dashoffset: 302;
+      animation: me-dibuja 1.6s ease forwards; }
+    #mirra-entrada .nombre { font-family: 'Playfair Display', Georgia, serif; letter-spacing: .35em; color: #8a6a2f; font-size: 15px; padding-left: .35em; white-space: nowrap;
+      text-align: center; opacity: 0; animation: me-aparece .9s .7s ease forwards; }
+    #mirra-entrada .pct { position: absolute; right: 20px; bottom: 16px; font-family: 'Playfair Display', Georgia, serif; font-size: 64px; line-height: 1;
+      color: rgba(160,119,70,.35); font-variant-numeric: tabular-nums; }
+    #mirra-entrada .pct small { font-size: .5em; margin-left: 2px; }
+    @keyframes me-dibuja { to { stroke-dashoffset: 0; } }
+    @keyframes me-aparece { to { opacity: 1; transform: none; } }
+    @media (min-width: 640px) { #mirra-entrada .marca { width: 220px; height: 220px; } #mirra-entrada .pct { font-size: 96px; right: 32px; bottom: 24px; } }
+    @media (prefers-reduced-motion: reduce) { #mirra-entrada, #mirra-entrada * { animation: none !important; transition: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; } }
+  </style>
 </head>
 
 <body>
+  <div id="mirra-entrada" aria-hidden="true" style="display:none">
+    <div class="marca">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" /></svg>
+      <img src="/isotipo.png" alt="" />
+    </div>
+    <div class="nombre">MIRRA PERFUMERÍA</div>
+    <div class="pct"><span>0</span><small>%</small></div>
+  </div>
+  <script>
+    // Se muestra solo en la portada de la tienda y una vez por visita.
+    // El contador sube solo hasta 90 %; llega a 100 % cuando la tienda avisa que cargó los productos
+    // (window.mirraEntradaLista). Si algo tarda demasiado, se quita sola a los 8 segundos.
+    (function () {
+      var el = document.getElementById('mirra-entrada');
+      var vista = false;
+      try { vista = sessionStorage.getItem('mirra_entrada_vista') === '1'; } catch (e) {}
+      if (location.pathname !== '/' || vista) { el.remove(); window.mirraEntradaLista = function () {}; return; }
+      el.style.display = '';
+      document.documentElement.style.overflow = 'hidden';
+      var pct = el.querySelector('.pct span'), inicio = Date.now(), lista = false, fin = 0, MIN = 1600;
+      window.mirraEntradaLista = function () { lista = true; };
+      setTimeout(function () { lista = true; }, 8000);
+      function paso() {
+        var t = Date.now() - inicio, v = Math.round(90 * (1 - Math.pow(1 - Math.min(t / MIN, 1), 2)));
+        if (lista && t >= MIN) { if (!fin) fin = Date.now(); v = Math.round(90 + 10 * Math.min((Date.now() - fin) / 500, 1)); }
+        pct.textContent = v;
+        if (v < 100) return requestAnimationFrame(paso);
+        setTimeout(function () {
+          el.classList.add('listo');
+          document.documentElement.style.overflow = '';
+          try { sessionStorage.setItem('mirra_entrada_vista', '1'); } catch (e) {}
+          setTimeout(function () { el.remove(); }, 900);
+        }, 250);
+      }
+      requestAnimationFrame(paso);
+    })();
+  </script>
   <div id="root"></div>
   <!-- Inline fallback to ensure _jsxDEV exists before any bundle code runs -->
   <script>

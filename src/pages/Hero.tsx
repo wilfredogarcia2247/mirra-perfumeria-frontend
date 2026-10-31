@@ -221,6 +221,8 @@ export default function Hero() {
         }
       } finally {
         if (mounted) setLoading(false);
+        // Avisa a la pantalla de entrada (index.html) que ya puede irse
+        (window as Window & { mirraEntradaLista?: () => void }).mirraEntradaLista?.();
       }
     };
     load();
