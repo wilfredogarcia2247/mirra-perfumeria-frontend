@@ -23,6 +23,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import RecomprasReport from '@/components/RecomprasReport';
 import ComparativoReport from '@/components/ComparativoReport';
 import CasheaResumen from '@/components/CasheaResumen';
+import RentabilidadReport from '@/components/RentabilidadReport';
 
 type ReportSlug =
   | 'resumen-general'
@@ -75,7 +76,7 @@ const REPORT_REQUIREMENTS: Record<ReportSlug, DataKey[]> = {
   'pedidos-estado': ['pedidos'],
   clientes: [],
   compras: ['pedidos', 'productos'],
-  rentabilidad: ['pedidos', 'productos'],
+  rentabilidad: [],
   'ticket-promedio': ['pedidos'],
   'cierre-diario': ['cierre'],
   entregas: [],
@@ -1690,14 +1691,7 @@ export default function Reportes() {
     }
 
     if (selectedReport === 'rentabilidad') {
-      const margen = metrics.salesTotal > 0 ? (metrics.utilidadEstimada / metrics.salesTotal) * 100 : 0;
-      return (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ingresos estimados</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.salesTotal.toFixed(2)}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Costos estimados</p><p className="mt-2 text-2xl font-semibold tabular-nums">${metrics.totalCostoEstimado.toFixed(2)}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Margen estimado</p><p className="mt-2 text-2xl font-semibold tabular-nums">{margen.toFixed(1)}%</p></CardContent></Card>
-        </div>
-      );
+      return <RentabilidadReport fechaInicio={fechaInicio} fechaFin={fechaFin} />;
     }
 
     if (selectedReport === 'ticket-promedio') {

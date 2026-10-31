@@ -672,6 +672,15 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
+// Rentabilidad del periodo: ventas, costos y ganancia, total y por tamaño (fechas AAAA-MM-DD)
+export async function getRentabilidad(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/rentabilidad${qs}`);
+}
+
 // Costos por presentación: costo general por tamaño (ml) y costos especiales por perfume
 export interface CostosPresentacion {
   tamanos: { ml: number; presentaciones: number; costo: number | null }[];
