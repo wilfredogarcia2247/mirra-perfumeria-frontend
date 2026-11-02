@@ -22,7 +22,6 @@ import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
-import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
 import DescuentoMayor from "./pages/DescuentoMayor";
 import Sucursales from "./pages/Sucursales";
@@ -115,7 +114,7 @@ const App = () => (
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
-              <Route path="/admin/whatsapp" element={<WhatsappAdmin />} />
+              {/* /admin/whatsapp quitado: WhatsApp (WAHA) desactivado */}
               <Route path="/admin/cintillo" element={<CintilloMensajes />} />
               <Route path="/admin/sucursales" element={<Sucursales />} />
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />

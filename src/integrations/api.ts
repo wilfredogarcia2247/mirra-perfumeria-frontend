@@ -1448,8 +1448,6 @@ export async function deleteSucursal(id: number): Promise<{ success: boolean }> 
 // src/integrations/api.ts
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-const WAHA_URL = (import.meta.env.VITE_WHATSAPP_API_URL || '').replace(/\/$/, '');
-const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '';
 
 function getToken() {
   return localStorage.getItem("jwt_token");
@@ -1589,124 +1587,16 @@ export async function uploadImage(file: File) {
 
 export { apiFetch, API_URL, getToken };
 
-function wahaConfigError(context: string) {
-  const host = typeof window !== 'undefined' ? window.location.host : 'unknown-host';
-  const mode = import.meta.env.MODE || 'unknown-mode';
-  return new Error(
-    `[${context}] VITE_WHATSAPP_API_URL no configurado. WAHA_URL="${WAHA_URL}" MODE="${mode}" HOST="${host}"`,
-  );
-}
-
-async function wahaFetch(path: string, options: RequestInit = {}) {
-  if (!WAHA_URL) throw wahaConfigError('wahaFetch');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {}),
-    ...(options.headers || {}),
-  };
-  const res = await fetch(`${WAHA_URL}${path}`, {
-    ...options,
-    headers,
-  });
-  const raw = await res.text();
-  let body: any = null;
-  try {
-    body = raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    body = null;
-  }
-
-  if (!res.ok) {
-    const detail = {
-      url: `${WAHA_URL}${path}`,
-      method: options.method || 'GET',
-      status: res.status,
-      statusText: res.statusText,
-      requestHeaders: headers,
-      requestBody: typeof options.body === 'string' ? options.body : '[non-string body]',
-      responseBodyParsed: body,
-      responseBodyRaw: raw,
-    };
-
-    try {
-      // eslint-disable-next-line no-console
-      console.error('[WAHA] request failed', detail);
-    } catch (error) {
-      // ignore console serialization errors
-    }
-
-    throw new Error(
-      body?.message ||
-      body?.error ||
-      `WAHA error ${res.status} ${res.statusText} on ${options.method || 'GET'} ${path}`,
-    );
-  }
-  return body;
-}
-
-function mapWahaSessionStatus(sessionData: any, qrData: any, sessionName: string) {
-  return {
-    ready: sessionData?.status === 'WORKING',
-    hasQr: Boolean(qrData?.data || qrData?.qr),
-    qrImage: qrData?.data ? `data:image/png;base64,${qrData.data}` : null,
-    qrRaw: qrData?.qr || null,
-    session: sessionName,
-    device: {
-      wid: sessionData?.me?.id || null,
-      phone: sessionData?.me?.id ? String(sessionData.me.id).replace('@c.us', '') : null,
-      pushname: sessionData?.me?.pushName || null,
-      platform: sessionData?.engine?.engine || null,
-    },
-    statusCode: (sessionData?.status || 'STOPPED').toLowerCase(),
-    statusMessage: `Estado de sesion: ${sessionData?.status || 'STOPPED'}`,
-    events: {
-      lastReadyAt: null,
-      lastDisconnectedAt: null,
-      lastAuthFailureAt: null,
-      lastAuthFailureMessage: null,
-    },
-    lastSendAttempt: null,
-  };
-}
+// WhatsApp: la página ya NO habla directo con WAHA ni lleva su clave (quedaba a la vista
+// de cualquiera). Todo pasa por nuestro servidor, que exige sesión y tiene el interruptor WAHA_ACTIVO.
 
 export async function getWhatsAppSessionStatus(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    let sessionData: any = null;
-    try {
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    } catch (error: any) {
-      if (!String(error?.message || '').toLowerCase().includes('not found')) throw error;
-      await wahaFetch('/api/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ name: sessionName }),
-      });
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    }
-
-    if (sessionData?.status === 'STOPPED' || sessionData?.status === 'FAILED') {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    }
-
-    let qrData = null;
-    if (sessionData?.status === 'SCAN_QR_CODE') {
-      qrData = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/auth/qr`);
-    }
-    return mapWahaSessionStatus(sessionData, qrData, sessionName);
-  }
-
   const query = session ? `?session=${encodeURIComponent(session)}` : '';
   const body = await apiFetch(`/whatsapp/session/status${query}`);
   return body?.data || body;
 }
 
 export async function disconnectWhatsAppSession(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    return wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/logout`, { method: 'POST' });
-  }
   const body = await apiFetch('/whatsapp/session/disconnect', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1715,19 +1605,6 @@ export async function disconnectWhatsAppSession(session?: string) {
 }
 
 export async function resetWhatsAppSessionStorage(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    try {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
-    } catch (error) {
-      // ignore if not found
-    }
-    await wahaFetch('/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ name: sessionName }),
-    });
-    return wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-  }
   const body = await apiFetch('/whatsapp/session/reset-storage', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1741,24 +1618,6 @@ export async function recoverWhatsAppProfileLock() {
 }
 
 export async function generateWhatsAppNewQr(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    try {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/logout`, { method: 'POST' });
-    } catch (error) {
-      // ignore if not found
-    }
-    try {
-      await wahaFetch('/api/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ name: sessionName }),
-      });
-    } catch (error) {
-      // ignore if already exists
-    }
-    await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-    return getWhatsAppSessionStatus(sessionName);
-  }
   const body = await apiFetch('/whatsapp/session/new-qr', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1767,9 +1626,6 @@ export async function generateWhatsAppNewQr(session?: string) {
 }
 
 export async function getIncomingWhatsAppMessages() {
-  if (WAHA_URL) {
-    return [];
-  }
   const body = await apiFetch('/whatsapp/messages/incoming');
   return body?.data || [];
 }
@@ -1779,31 +1635,22 @@ export async function getOutboundOrderWhatsAppMessages() {
   return body?.data || [];
 }
 
-export async function listWahaChats(session?: string) {
-  if (!WAHA_URL) return [];
-  const sessionName = (session || 'default').trim() || 'default';
-  const body = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/chats`);
-  return Array.isArray(body) ? body : body?.data || [];
+// La lista de chats solo existía hablando directo con WAHA; ya no está disponible.
+export async function listWahaChats(_session?: string) {
+  return [];
 }
 
-export async function listWahaMessages(session?: string, chatId?: string) {
-  if (!WAHA_URL) return [];
-  const sessionName = (session || 'default').trim() || 'default';
-  if (!chatId) return [];
-  const body = await wahaFetch(
-    `/api/${encodeURIComponent(sessionName)}/chats/${encodeURIComponent(chatId)}/messages`,
-  );
-  return Array.isArray(body) ? body : body?.data || [];
+export async function listWahaMessages(_session?: string, _chatId?: string) {
+  return [];
 }
 
 export async function sendWahaTextMessage(session: string, to: string, text: string) {
-  if (!WAHA_URL) throw wahaConfigError('sendWahaTextMessage');
-  const cleanSession = (session || 'default').trim() || 'default';
-  const chatId = to.includes('@') ? to : `${to.replace(/\D/g, '')}@c.us`;
-  return wahaFetch('/api/sendText', {
+  const body = await apiFetch('/whatsapp/send', {
     method: 'POST',
-    body: JSON.stringify({ session: cleanSession, chatId, text }),
+    body: JSON.stringify({ session, to, text }),
   });
+  if (body?.data?.skipped) throw new Error('WhatsApp está desactivado');
+  return body?.data || body;
 }
 
 export async function login(email: string, password: string) {

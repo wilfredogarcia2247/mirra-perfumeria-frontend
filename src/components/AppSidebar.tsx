@@ -1,4 +1,4 @@
-import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, Receipt, LogOut, Layers, Award, MessageCircle, BarChart3, Megaphone, Star, TicketPercent, Store, Percent, Calculator } from "lucide-react";
+import { Home, Package, Users, Warehouse, FlaskConical, Building2, CreditCard, Receipt, LogOut, Layers, Award, BarChart3, Megaphone, Star, TicketPercent, Store, Percent, Calculator } from "lucide-react";
 import { useLocation } from 'react-router-dom';
 import React, { useEffect } from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -80,7 +80,7 @@ const menuGroups: MenuGroup[] = [
     label: "Sistema",
     items: [
       { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' },
-      { title: "WhatsApp", url: "/admin/whatsapp", icon: MessageCircle, module: 'usuarios' },
+      // WhatsApp (WAHA) desactivado: se quitó del menú. Para volver: WAHA_ACTIVO=true en el servidor y re-agregar.
       { title: "Cintillo", url: "/admin/cintillo", icon: Megaphone, module: 'usuarios' },
       { title: "Sucursales", url: "/admin/sucursales", icon: Store, module: 'usuarios' },
     ],
