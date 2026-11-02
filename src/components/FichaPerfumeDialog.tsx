@@ -114,7 +114,7 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
           <div className="space-y-1"><p className="font-medium">Para quién</p><Opciones lista={PARA} valor={f.para} onCambio={cambiar('para')} /></div>
           <div className="space-y-1"><p className="font-medium">Momento</p><Opciones lista={MOMENTO} valor={f.momento} onCambio={cambiar('momento')} /></div>
           <div className="space-y-1"><p className="font-medium">Familia <span className="font-normal text-muted-foreground">(puedes marcar varias)</span></p><Opciones lista={FAMILIAS} valor={f.familias} onCambio={cambiar('familias')} varias /></div>
-          <div className="space-y-1"><p className="font-medium">Duración <span className="font-normal text-muted-foreground">(la del perfume original)</span></p><Opciones lista={DURACION} valor={f.duracion} onCambio={cambiar('duracion')} /></div>
+          <div className="space-y-1"><p className="font-medium">Duración</p><Opciones lista={DURACION} valor={f.duracion} onCambio={cambiar('duracion')} /></div>
           <div className="space-y-1"><p className="font-medium">Temporada</p><Opciones lista={TEMPORADAS} valor={f.temporadas} onCambio={cambiar('temporadas')} varias /></div>
 
           <label className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${f.revisada ? 'border-green-300 bg-green-50' : 'bg-muted/40'}`}>
