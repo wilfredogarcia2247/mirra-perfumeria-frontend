@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { getImageUrl } from '@/lib/utils';
 import { Layout } from "@/components/Layout";
-import { getProductos, deleteProducto, getProducto, adjustInventario, getAlmacenes, addProductoAlmacen } from "@/integrations/api";
+import { getProductos, deleteProducto, getProducto, adjustInventario, getAlmacenes, addProductoAlmacen, getAlertaEsencias, type AlertaEsencias, type EsenciaBaja } from "@/integrations/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -77,6 +77,22 @@ function leerOrdenGuardado(): Orden {
   } catch {
     return null;
   }
+}
+
+// Etiqueta de estado de la esencia: baja (alta o baja rotación) o agotado
+type EstadoProducto = { tipo: 'esencia_baja'; esencia: EsenciaBaja } | { tipo: 'agotado' };
+function EtiquetaEstado({ estado }: { estado?: EstadoProducto }) {
+  if (!estado) return null;
+  if (estado.tipo === 'agotado') {
+    return <span className="shrink-0 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado</span>;
+  }
+  const e = estado.esencia;
+  const detalle = `Quedan ${e.disponible_g} g de esencia: alcanza para ${e.frascos_grandes} frasco${e.frascos_grandes === 1 ? '' : 's'}${e.tamano_grande ? ` de ${e.tamano_grande}` : ''}. ${e.vendidos_periodo} vendido${e.vendidos_periodo === 1 ? '' : 's'} en 30 días.`;
+  return e.rotacion === 'alta' ? (
+    <span title={detalle} className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800">⚠️ Esencia baja · alta rotación</span>
+  ) : (
+    <span title={detalle} className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">Esencia baja · baja rotación</span>
+  );
 }
 
 // Encabezado de columna tocable: 1er toque ↑ (menor a mayor / A-Z), 2do ↓, 3ro vuelve al orden normal
@@ -236,6 +252,28 @@ export default function Productos() {
   // y luego la que viene en el objeto del producto (normalizada con getImageUrl).
   const currentImage = imageUrl ?? (editingProduct ? getImageUrl(editingProduct) ?? null : null);
 
+  // Alertas de esencia baja / agotados (si fallan, la lista funciona igual sin etiquetas)
+  const [alertas, setAlertas] = useState<AlertaEsencias | null>(null);
+  useEffect(() => {
+    getAlertaEsencias().then(setAlertas).catch(() => setAlertas(null));
+  }, []);
+  const estadoPorProducto = React.useMemo(() => {
+    const mapa = new Map<number, EstadoProducto>();
+    if (!alertas) return mapa;
+    for (const id of alertas.perfumes_agotados || []) mapa.set(Number(id), { tipo: 'agotado' });
+    for (const e of alertas.esencias || []) {
+      mapa.set(Number(e.id), { tipo: 'esencia_baja', esencia: e });
+      for (const pid of e.perfume_ids || []) {
+        if (!mapa.has(Number(pid))) mapa.set(Number(pid), { tipo: 'esencia_baja', esencia: e });
+      }
+    }
+    return mapa;
+  }, [alertas]);
+
+  const [filtroEstado, setFiltroEstado] = useState<'' | 'esencia_baja' | 'agotado' | 'disponible'>('');
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('');
+  const [filtroMarca, setFiltroMarca] = useState<string>('');
+
   const [orden, setOrden] = useState<Orden>(() => leerOrdenGuardado());
   const guardarOrden = (o: Orden) => {
     setOrden(o);
@@ -247,8 +285,14 @@ export default function Productos() {
     return guardarOrden(null);
   };
 
-  const filteredProducts = productos.filter((product) => {
+  const filteredProducts = productos.filter((product: any) => {
     const term = searchTerm.toLowerCase();
+    const estado = estadoPorProducto.get(Number(product.id));
+    if (filtroEstado === 'esencia_baja' && estado?.tipo !== 'esencia_baja') return false;
+    if (filtroEstado === 'agotado' && estado?.tipo !== 'agotado') return false;
+    if (filtroEstado === 'disponible' && estado?.tipo === 'agotado') return false;
+    if (filtroCategoria && !categoriaIdsDe(product).includes(Number(filtroCategoria))) return false;
+    if (filtroMarca && String(product.marca_id ?? '') !== filtroMarca) return false;
     return (
       (product.nombre || "").toLowerCase().includes(term) ||
       false
@@ -845,6 +889,48 @@ export default function Productos() {
           />
         </div>
 
+        {/* Filtros: estado de la esencia, categoría y marca */}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value as any)}
+            aria-label="Filtrar por estado"
+            className="col-span-2 h-11 rounded-md border bg-background px-3 text-base sm:col-span-1 sm:h-9 sm:w-56 sm:text-sm"
+          >
+            <option value="">Estado: todos</option>
+            <option value="esencia_baja">⚠️ Esencia baja{alertas ? ` (${alertas.esencias.length})` : ''}</option>
+            <option value="agotado">Agotados{alertas ? ` (${alertas.perfumes_agotados.length})` : ''}</option>
+            <option value="disponible">Disponibles</option>
+          </select>
+          <select
+            value={filtroCategoria}
+            onChange={(e) => setFiltroCategoria(e.target.value)}
+            aria-label="Filtrar por categoría"
+            className="h-11 min-w-0 rounded-md border bg-background px-3 text-base sm:h-9 sm:w-44 sm:text-sm"
+          >
+            <option value="">Categoría</option>
+            {categorias.map((c: any) => <option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+          </select>
+          <select
+            value={filtroMarca}
+            onChange={(e) => setFiltroMarca(e.target.value)}
+            aria-label="Filtrar por marca"
+            className="h-11 min-w-0 rounded-md border bg-background px-3 text-base sm:h-9 sm:w-44 sm:text-sm"
+          >
+            <option value="">Marca</option>
+            {marcas.map((m: any) => <option key={m.id} value={String(m.id)}>{m.nombre}</option>)}
+          </select>
+          {(filtroEstado || filtroCategoria || filtroMarca) && (
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado(''); setFiltroCategoria(''); setFiltroMarca(''); }}
+              className="col-span-2 h-9 text-sm font-medium text-muted-foreground underline underline-offset-2 sm:col-span-1 sm:px-2"
+            >
+              Quitar filtros
+            </button>
+          )}
+        </div>
+
         {/* Ordenar (solo teléfono: en la tabla se ordena tocando los títulos) */}
         <label className="flex items-center gap-2 sm:hidden">
           <span className="shrink-0 text-sm text-muted-foreground">Ordenar:</span>
@@ -932,6 +1018,7 @@ export default function Productos() {
                             {product.visible_en_catalogo === false && (
                               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">Oculto</span>
                             )}
+                            <EtiquetaEstado estado={estadoPorProducto.get(Number(product.id))} />
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {nombresCategorias(product, categoriasMap) || '—'} · {product.marca_nombre ?? marcasMap[product.marca_id] ?? '—'}
@@ -1013,6 +1100,7 @@ export default function Productos() {
                             {product.visible_en_catalogo === false ? (
                               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Oculto</span>
                             ) : null}
+                            <EtiquetaEstado estado={estadoPorProducto.get(Number(product.id))} />
                           </div>
                         </TableCell>
                         <TableCell>{product.unidad}</TableCell>

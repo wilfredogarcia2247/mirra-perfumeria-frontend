@@ -3,6 +3,29 @@ export async function getDashboardStats() {
   return apiFetch("/dashboard/stats");
 }
 
+// Esencias por acabarse (con rotación) y perfumes agotados
+export interface EsenciaBaja {
+  id: number;
+  nombre: string;
+  disponible_g: number;        // esencia que queda, en gramos
+  g_por_frasco_grande: number; // gramos de esencia por frasco del tamaño más grande
+  tamano_grande: string | null; // ej. "60 ml"
+  frascos_grandes: number;
+  vendidos_periodo: number;
+  dias_estimados: number | null;
+  rotacion: 'alta' | 'baja';
+  perfumes: { id: number; nombre: string }[];
+  perfume_ids: number[];
+}
+export interface AlertaEsencias {
+  criterio: { umbral_frascos: number; dias_rotacion: number; ventas_alta_rotacion: number };
+  esencias: EsenciaBaja[];
+  perfumes_agotados: number[];
+}
+export async function getAlertaEsencias(): Promise<AlertaEsencias> {
+  return apiFetch("/alertas/esencias");
+}
+
 // --- Servicios para entidades ---
 
 // Productos
@@ -1448,6 +1471,39 @@ export async function deleteSucursal(id: number): Promise<{ success: boolean }> 
 // src/integrations/api.ts
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+
+// "Avísame cuando llegue" (tienda, sin sesión)
+export async function crearAvisoLlegada(productoId: number, nombre: string, telefono: string) {
+  const res = await fetch(`${API_URL}/avisos-llegada`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ producto_id: productoId, nombre, telefono }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || 'No pudimos guardar tu aviso. Inténtalo de nuevo.');
+  return body;
+}
+
+// Panel: clientes esperando un perfume
+export interface AvisoLlegada {
+  id: number;
+  producto_id: number;
+  producto_nombre: string;
+  image_url?: string | null;
+  nombre: string;
+  telefono: string;
+  estado: 'esperando' | 'avisado' | 'descartado';
+  creado_en: string;
+  avisado_en: string | null;
+  disponible: boolean;
+}
+export interface RankingAviso { producto_id: number; producto_nombre: string; esperando: number; desde: string; disponible: boolean }
+export async function getAvisosLlegada(estado: 'esperando' | 'avisado' | 'descartado' = 'esperando'): Promise<{ avisos: AvisoLlegada[]; ranking: RankingAviso[] }> {
+  return apiFetch(`/avisos-llegada?estado=${estado}`);
+}
+export async function setEstadoAvisoLlegada(id: number, estado: 'esperando' | 'avisado' | 'descartado') {
+  return apiFetch(`/avisos-llegada/${id}`, { method: 'PATCH', body: JSON.stringify({ estado }) });
+}
 
 function getToken() {
   return localStorage.getItem("jwt_token");

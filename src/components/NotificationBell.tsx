@@ -1,4 +1,4 @@
-import { Bell, Package, MessageCircle, CheckCheck } from 'lucide-react';
+import { Bell, Package, MessageCircle, CheckCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
@@ -13,6 +13,7 @@ function timeAgo(date: Date): string {
 
 function NotifIcon({ type }: { type: AppNotification['type'] }) {
   if (type === 'pedido') return <Package className="h-3.5 w-3.5 text-primary" />;
+  if (type === 'esencia') return <AlertTriangle className="h-3.5 w-3.5 text-red-600" />;
   return <MessageCircle className="h-3.5 w-3.5 text-green-500" />;
 }
 
