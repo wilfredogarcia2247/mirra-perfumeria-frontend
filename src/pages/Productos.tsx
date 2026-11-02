@@ -914,8 +914,8 @@ export default function Productos() {
             className="col-span-2 h-11 rounded-md border bg-background px-3 text-base sm:col-span-1 sm:h-9 sm:w-56 sm:text-sm"
           >
             <option value="">Estado: todos</option>
-            <option value="esencia_baja">⚠️ Esencia baja{alertas ? ` (${alertas.esencias.length})` : ''}</option>
-            <option value="agotado">Agotados{alertas ? ` (${alertas.perfumes_agotados.length})` : ''}</option>
+            <option value="esencia_baja">⚠️ Esencia baja{Array.isArray(alertas?.esencias) ? ` (${alertas!.esencias.length})` : ''}</option>
+            <option value="agotado">Agotados{Array.isArray(alertas?.perfumes_agotados) ? ` (${alertas!.perfumes_agotados.length})` : ''}</option>
             <option value="disponible">Disponibles</option>
             <option value="sin_ficha">Sin ficha del perfume</option>
             <option value="ficha_por_revisar">Ficha por revisar</option>
@@ -1140,7 +1140,7 @@ export default function Productos() {
                         <TableCell>{product.costo ?? '-'}</TableCell>
                         <TableCell>{product.precio_venta ?? '-'}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-0.5">
                             <Button variant="ghost" size="icon" onClick={() => {
                               setEditingProduct(product);
                               form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
