@@ -6,6 +6,7 @@ import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito, bajarAlCatalogo } from '@/lib/catalog';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
+import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
 import useCart, { CartItem } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
@@ -346,6 +347,7 @@ export default function Hero() {
       toast('El carrito está vacío');
       return;
     }
+    if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
     setIsCheckoutOpen(true);
   }
 
@@ -368,6 +370,11 @@ export default function Hero() {
     })),
     configMayor,
   );
+  // Mínimo de 4 perfumes de 7 ml cuando no hay ninguno de 30 ml o más
+  const faltan7ml = faltanSieteMl(cartItems.map((it) => ({
+    nombre: (it.product as any)?.tamano?.nombre ?? (it.product as any)?.formula?.nombre,
+    cantidad: Number(it.qty || 0),
+  })));
   const descuentoElegido = elegirDescuento(descuentoCuponPosible, mayor.descuento);
   const descuentoCupon = descuentoElegido === 'cupon' ? descuentoCuponPosible : 0;
   const descuentoMayor = descuentoElegido === 'mayor' ? mayor.descuento : 0;
@@ -1252,6 +1259,12 @@ export default function Hero() {
                   </div>
                 )}
 
+                {!isCheckoutOpen && faltan7ml > 0 && (
+                  <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    {avisoSieteMl(faltan7ml)}
+                  </p>
+                )}
+
                 {!isCheckoutOpen ? (
                   <div className="flex gap-3">
                     <button
@@ -1263,14 +1276,15 @@ export default function Hero() {
                     </button>
                     <button
                       onClick={() => {
+                        if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
                         if (deliveryReview) {
                           setConfirmOrderRequest((request) => request + 1);
                         } else {
                           setIsCheckoutOpen(true);
                         }
                       }}
-                      disabled={checkoutSubmitting}
-                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60"
+                      disabled={checkoutSubmitting || faltan7ml > 0}
+                      className={`flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
                     >
                       <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}

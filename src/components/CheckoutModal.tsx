@@ -5,6 +5,7 @@ import { CartItem } from '@/hooks/use-cart';
 import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
 import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 import { enlaceWhatsappPedido } from '@/lib/pedidoWhatsapp';
+import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 
 type FulfillmentType = 'tienda' | 'envio_nacional' | 'delivery';
 const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '');
@@ -531,6 +532,11 @@ export default function CheckoutModal({
     }
     if (localDemo) return toast.info('Esta vista previa local no envía pedidos.');
     if (items.length === 0) return toast.error('Agrega al menos un producto antes de confirmar');
+    const faltan7ml = faltanSieteMl(items.map((it) => {
+      const pr = it.product as any;
+      return { nombre: pr?.formula?.nombre ?? pr?.formula_nombre ?? pr?.tamano?.nombre ?? pr?.tamano_nombre, cantidad: Number(it.qty || 0) };
+    }));
+    if (faltan7ml > 0) return toast.error(avisoSieteMl(faltan7ml));
 
     // Candado contra pedidos repetidos: antes de crear el pedido se consultan datos en internet
     // (stock de cada perfume) y eso tarda unos segundos con datos móviles. El botón se bloquea
