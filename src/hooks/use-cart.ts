@@ -9,6 +9,12 @@ export interface CartItem {
 }
 
 const STORAGE_KEY = 'cart_items_v1';
+// Fecha del último cambio: un carrito olvidado más de 7 días se vacía al volver
+const STORAGE_FECHA = 'cart_updated_at';
+const CADUCA_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Cambios encontrados al comparar el carrito guardado con el catálogo actual
+export interface CambiosCarrito { precios: string[]; agotados: string[] }
 
 function makeKey(product: Product) {
   const pid = product?.id ?? '';
@@ -35,6 +41,12 @@ const EMPTY_ITEMS: CartItem[] = [];
 
 function readStorage(): CartItem[] {
   try {
+    const fecha = Number(localStorage.getItem(STORAGE_FECHA) || 0);
+    if (fecha && Date.now() - fecha > CADUCA_MS) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_FECHA);
+      return [];
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
@@ -55,6 +67,7 @@ function setItems(next: CartItem[]) {
   items = next;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(STORAGE_FECHA, String(Date.now()));
   } catch (e) {
     // noop: si localStorage falla se mantiene solo en memoria
   }
@@ -118,8 +131,10 @@ export function useCart() {
   // El carrito queda guardado en el teléfono con el precio del día en que se agregó cada perfume.
   // Al cargar el catálogo se actualiza cada producto con sus datos actuales (precio del tamaño
   // elegido y si está agotado), para que el cliente vea el mismo precio que se guardará en el pedido.
-  const syncWithCatalog = useCallback((catalog: Product[]) => {
-    if (!Array.isArray(catalog) || catalog.length === 0) return;
+  // Devuelve qué cambió (nombres) para avisarle al cliente.
+  const syncWithCatalog = useCallback((catalog: Product[]): CambiosCarrito => {
+    const cambios: CambiosCarrito = { precios: [], agotados: [] };
+    if (!Array.isArray(catalog) || catalog.length === 0) return cambios;
     const porId = new Map(catalog.map((p) => [String(p.id), p]));
     let cambio = false;
     const next = items.map((it) => {
@@ -129,12 +144,24 @@ export function useCart() {
       const tamanoId = viejo?.tamano?.id ?? viejo?.formula?.id ?? viejo?.formula_id ?? viejo?.tamano_id;
       if (tamanoId == null) return it;
       const presentacion = presentacionesDe(actual).find((pr) => String(pr.tamano?.id) === String(tamanoId));
-      if (!presentacion || presentacion.precio == null) return it;
-      if (Number(viejo.precio_snapshot) === presentacion.precio && Boolean(viejo.agotado) === Boolean(actual.agotado)) return it;
+      const nombre = `${actual.name || viejo.name || 'Un perfume'}${viejo?.tamano?.nombre ? ` (${viejo.tamano.nombre})` : ''}`;
+      // El tamaño ya no se vende: queda como agotado para que el cliente lo quite
+      if (!presentacion || presentacion.precio == null) {
+        if (viejo.agotado) return it;
+        cambio = true;
+        cambios.agotados.push(nombre);
+        return { ...it, product: { ...viejo, agotado: true } as Product };
+      }
+      const cambioPrecio = viejo.precio_snapshot != null && Number(viejo.precio_snapshot) !== presentacion.precio;
+      const seAgoto = Boolean(actual.agotado) && !viejo.agotado;
+      if (!cambioPrecio && Boolean(viejo.agotado) === Boolean(actual.agotado) && viejo.precio_snapshot != null) return it;
+      if (cambioPrecio) cambios.precios.push(nombre);
+      if (seAgoto) cambios.agotados.push(nombre);
       cambio = true;
       return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio } as Product };
     });
     if (cambio) setItems(next);
+    return cambios;
   }, []);
 
   const count = cartItems.reduce((s, it) => s + it.qty, 0);

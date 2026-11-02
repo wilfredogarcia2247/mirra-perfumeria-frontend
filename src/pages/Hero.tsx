@@ -109,9 +109,16 @@ export default function Hero() {
     return () => { activo = false; };
   }, []);
 
-  // Al cargar el catálogo, el carrito guardado toma los precios actuales
+  // Al cargar el catálogo, el carrito guardado toma los precios actuales y avisa lo que cambió
   useEffect(() => {
-    syncWithCatalog(catalogProducts);
+    const cambios = syncWithCatalog(catalogProducts);
+    const lista = (nombres: string[]) => (nombres.length <= 2 ? nombres.join(' y ') : `${nombres.slice(0, 2).join(', ')} y ${nombres.length - 2} más`);
+    if (cambios.agotados.length > 0) {
+      toast.warning(`Se agotó ${lista(cambios.agotados)}`, { description: 'Quítalo de tu carrito para poder enviar el pedido.', duration: 7000 });
+    }
+    if (cambios.precios.length > 0) {
+      toast(`Actualizamos el precio de ${lista(cambios.precios)}`, { description: 'Tu carrito ya muestra el precio de hoy.', duration: 6000 });
+    }
   }, [catalogProducts, syncWithCatalog]);
 
   useEffect(() => {
@@ -342,12 +349,20 @@ export default function Hero() {
     toast.success(`${product.name} agregado al carrito`);
   }
 
+  // Perfumes agotados en el carrito: no se puede enviar hasta quitarlos
+  function hayAgotadosEnCarrito() {
+    if (!cartItems.some((it) => (it.product as any)?.agotado)) return false;
+    toast.error('Hay perfumes agotados en tu carrito', { description: 'Quítalos (✕) para poder enviar el pedido.' });
+    return true;
+  }
+
   function handleCheckout() {
     if (cartItems.length === 0) {
       toast('El carrito está vacío');
       return;
     }
     if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
+    if (hayAgotadosEnCarrito()) return;
     setIsCheckoutOpen(true);
   }
 
@@ -869,6 +884,9 @@ export default function Hero() {
                                 </button>
                               </div>
                               {displayTamano && <p className="text-xs text-gray-500 mt-0.5">{displayTamano}</p>}
+                              {(it.product as any)?.agotado && (
+                                <p className="mt-1 inline-block rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado · quítalo</p>
+                              )}
                             </div>
 
                             <div className="flex items-end justify-between mt-2">
@@ -920,6 +938,7 @@ export default function Hero() {
                       <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
+                        if (hayAgotadosEnCarrito()) return;
                         if (!cedulaCliente.trim()) { toast.error('Ingrese el documento de identificación'); return; }
 
                         const documentoCompleto = `${tipoDocumento}-${cedulaCliente.trim()}`;
@@ -1277,6 +1296,7 @@ export default function Hero() {
                     <button
                       onClick={() => {
                         if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
+                        if (hayAgotadosEnCarrito()) return;
                         if (deliveryReview) {
                           setConfirmOrderRequest((request) => request + 1);
                         } else {
