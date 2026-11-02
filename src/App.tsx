@@ -25,6 +25,7 @@ import Categorias from "./pages/Categorias";
 import CintilloMensajes from "./pages/CintilloMensajes";
 import DescuentoMayor from "./pages/DescuentoMayor";
 import AvisosLlegada from "./pages/AvisosLlegada";
+import AbrirPerfume from "./pages/AbrirPerfume";
 import Sucursales from "./pages/Sucursales";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/rastreo" element={<Rastreo />} />
           </Route>
           <Route path="/login" element={<Login />} />
+          <Route path="/p/:slug" element={<AbrirPerfume />} />
 
           {import.meta.env.DEV && <Route path="/influencer-preview" element={<InfluencerDashboard preview />} />}
           {import.meta.env.DEV && <Route path="/influencer-admin-preview" element={<InfluencerAdminPreview />} />}

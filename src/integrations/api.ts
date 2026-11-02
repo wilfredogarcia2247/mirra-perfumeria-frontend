@@ -22,6 +22,11 @@ export interface AlertaEsencias {
   esencias: EsenciaBaja[];
   perfumes_agotados: number[];
 }
+// Ficha del perfume (panel)
+export async function guardarFichaProducto(id: number, ficha: any) {
+  return apiFetch(`/productos/${id}/ficha`, { method: 'PUT', body: JSON.stringify(ficha) });
+}
+
 export async function getAlertaEsencias(): Promise<AlertaEsencias> {
   return apiFetch("/alertas/esencias");
 }

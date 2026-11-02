@@ -21,6 +21,8 @@ export interface Product {
   inventario?: Array<any>;
   categoria_obj?: any;
   marca_obj?: any;
+  // Ficha del perfume (notas, para quién...), solo si está revisada
+  ficha?: import('./fichaPerfume').FichaPerfume | null;
 }
 
 export type ProductListResponse =

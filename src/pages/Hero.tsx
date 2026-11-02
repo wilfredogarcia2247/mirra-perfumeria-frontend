@@ -109,6 +109,20 @@ export default function Hero() {
     return () => { activo = false; };
   }, []);
 
+  // Enlace compartido (/p/... -> /?producto=33): al cargar el catálogo abre ese perfume
+  useEffect(() => {
+    if (catalogProducts.length === 0) return;
+    const params = new URLSearchParams(location.search);
+    const id = Number(params.get('producto'));
+    if (!Number.isInteger(id) || id <= 0) return;
+    const encontrado = catalogProducts.find((p) => Number(p.id) === id);
+    if (encontrado) setSheetProduct({ product: encontrado, foto: null });
+    params.delete('producto');
+    const resto = params.toString();
+    navigate(`${location.pathname}${resto ? `?${resto}` : ''}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts]);
+
   // Al cargar el catálogo, el carrito guardado toma los precios actuales y avisa lo que cambió
   useEffect(() => {
     const cambios = syncWithCatalog(catalogProducts);
@@ -213,6 +227,7 @@ export default function Hero() {
           // attach raw inventory and full objects for detail views
           inventario: item.inventario ?? item.inventario_detalle ?? item.inventory ?? undefined,
           categoria_obj: item.categoria ?? null,
+          ficha: item.ficha ?? null,
           marca_obj: item.marca ?? null,
         } as Product));
 

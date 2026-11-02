@@ -18,7 +18,9 @@ import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star, ArrowUp, ArrowDown, ArrowUpDown, Sparkles } from "lucide-react";
+import FichaPerfumeDialog from "@/components/FichaPerfumeDialog";
+import { fichaTieneDatos, normalizarFicha } from "@/lib/fichaPerfume";
 import {
   Table,
   TableBody,
@@ -270,7 +272,13 @@ export default function Productos() {
     return mapa;
   }, [alertas]);
 
-  const [filtroEstado, setFiltroEstado] = useState<'' | 'esencia_baja' | 'agotado' | 'disponible'>('');
+  const [filtroEstado, setFiltroEstado] = useState<'' | 'esencia_baja' | 'agotado' | 'disponible' | 'sin_ficha' | 'ficha_por_revisar'>('');
+  const [fichaProducto, setFichaProducto] = useState<any | null>(null);
+  const estadoFicha = (p: any): 'revisada' | 'por_revisar' | 'sin_ficha' => {
+    const f = p?.ficha ? normalizarFicha(p.ficha) : null;
+    if (!fichaTieneDatos(f)) return 'sin_ficha';
+    return f!.revisada ? 'revisada' : 'por_revisar';
+  };
   const [filtroCategoria, setFiltroCategoria] = useState<string>('');
   const [filtroMarca, setFiltroMarca] = useState<string>('');
 
@@ -291,6 +299,8 @@ export default function Productos() {
     if (filtroEstado === 'esencia_baja' && estado?.tipo !== 'esencia_baja') return false;
     if (filtroEstado === 'agotado' && estado?.tipo !== 'agotado') return false;
     if (filtroEstado === 'disponible' && estado?.tipo === 'agotado') return false;
+    if (filtroEstado === 'sin_ficha' && estadoFicha(product) !== 'sin_ficha') return false;
+    if (filtroEstado === 'ficha_por_revisar' && estadoFicha(product) !== 'por_revisar') return false;
     if (filtroCategoria && !categoriaIdsDe(product).includes(Number(filtroCategoria))) return false;
     if (filtroMarca && String(product.marca_id ?? '') !== filtroMarca) return false;
     return (
@@ -889,6 +899,12 @@ export default function Productos() {
           />
         </div>
 
+        <FichaPerfumeDialog
+          producto={fichaProducto}
+          onCerrar={() => setFichaProducto(null)}
+          onGuardado={(id, ficha) => setProductos((prev: any[]) => prev.map((p) => (Number(p.id) === id ? { ...p, ficha } : p)))}
+        />
+
         {/* Filtros: estado de la esencia, categoría y marca */}
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <select
@@ -901,6 +917,8 @@ export default function Productos() {
             <option value="esencia_baja">⚠️ Esencia baja{alertas ? ` (${alertas.esencias.length})` : ''}</option>
             <option value="agotado">Agotados{alertas ? ` (${alertas.perfumes_agotados.length})` : ''}</option>
             <option value="disponible">Disponibles</option>
+            <option value="sin_ficha">Sin ficha del perfume</option>
+            <option value="ficha_por_revisar">Ficha por revisar</option>
           </select>
           <select
             value={filtroCategoria}
@@ -1039,6 +1057,9 @@ export default function Productos() {
                         <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={openStock}>
                           <Warehouse className="h-4 w-4" /> Stock
                         </button>
+                        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={() => setFichaProducto(product)}>
+                          <Sparkles className="h-4 w-4" /> Ficha
+                        </button>
                         <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors min-h-[44px]" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}>
                           <Trash2 className="h-4 w-4" /> Borrar
                         </button>
@@ -1142,6 +1163,7 @@ export default function Productos() {
                               setViewStockDetalle(null);
                               getProducto(product.id).then((d) => setViewStockDetalle(d)).catch((e) => { console.error('Error cargando existencias:', e); toast.error('No se pudo cargar existencias'); }).finally(() => setViewStockLoading(false));
                             }}><Warehouse className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" title="Ficha del perfume y enlace" onClick={() => setFichaProducto(product)}><Sparkles className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                           </div>
                         </TableCell>
