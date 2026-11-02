@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, Check, MapPin, Minus, Navigation, Pencil, Plus, Trash2, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
-import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
+import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, getToken, lookupClienteByCedula, Sucursal } from '@/integrations/api';
 import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 import { enlaceWhatsappPedido } from '@/lib/pedidoWhatsapp';
 import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
@@ -559,10 +559,19 @@ export default function CheckoutModal({
       };
     });
 
-    // Obtener datos frescos de productos
+    // Las consultas de inventario detallado y fórmulas son del panel y piden sesión.
+    // Un cliente de la tienda no tiene sesión: usamos los datos que ya cargó la tienda
+    // (antes esas llamadas fallaban y lo mandaban al login en /categoria/...).
+    const hayPersonal = !!getToken();
+
+    // Obtener datos frescos de productos (solo personal logueado, p. ej. tablets de la tienda)
     const prodMap = new Map<number, any>();
     await Promise.all(items.map(async (it) => {
       const pid = Number(it.product.id);
+      if (!hayPersonal) {
+        prodMap.set(pid, it.product);
+        return;
+      }
       try {
         const fresh = await getProducto(pid);
         prodMap.set(pid, fresh || it.product);
@@ -593,6 +602,11 @@ export default function CheckoutModal({
 
     // Si hay faltantes, intentar validar producción via fórmulas
     if (faltantesItems.length > 0) {
+      if (!hayPersonal) {
+        // Mismo resultado que antes para el cliente: sin sesión no se pueden revisar fórmulas
+        toast.error('No hay stock suficiente para agregar al pedido');
+        return;
+      }
       try {
         const fRaw = await getFormulas();
         const formulas = fRaw && Array.isArray((fRaw as any).data) ? (fRaw as any).data : (Array.isArray(fRaw) ? fRaw : []);

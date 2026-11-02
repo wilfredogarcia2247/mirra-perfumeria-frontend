@@ -1472,14 +1472,18 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     (err as any).status = res.status;
     if (res.status === 401) {
       try { localStorage.removeItem('jwt_token'); } catch (e) { }
-      // Si la 401 ocurre y NO estamos en la página pública (hero -> '/'),
-      // redirigimos al login para forzar re-autenticación. Si estamos en
-      // el landing público, no forzamos navegación (permitir vista pública).
+      // Si la 401 ocurre en el panel, redirigimos al login para re-autenticar.
+      // En la tienda pública (inicio, categorías, nosotros, rastreo) NUNCA
+      // mandamos al cliente al login: antes pasaba en /categoria/... al enviar el pedido.
       try {
         if (typeof window !== 'undefined') {
           const path = window.location.pathname || '/';
-          const isHero = path === '/';
-          if (!isHero) {
+          const isTiendaPublica = path === '/'
+            || path.startsWith('/categoria/')
+            || path === '/about'
+            || path === '/rastreo'
+            || path === '/login';
+          if (!isTiendaPublica) {
             // Reemplazar la entrada de navegación para evitar volver atrás
             window.location.replace('/login');
             // no continuar, lanzamos el error para que el caller también lo maneje
