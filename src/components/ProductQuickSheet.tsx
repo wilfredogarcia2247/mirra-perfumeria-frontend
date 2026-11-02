@@ -194,22 +194,22 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
               )}
               {conFicha && ficha?.momento && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{MOMENTO.find((x) => x.v === ficha.momento)?.i} {etiqueta(MOMENTO, ficha.momento)}</span>}
               {product.mas_pedido && !product.agotado && <span className="rounded-full bg-[#e4572e] px-2.5 py-0.5 text-xs font-bold text-white">🔥 Más pedido</span>}
-            </div>
-            <div className="mt-1.5 flex items-start justify-between gap-3">
-              <h2 className="min-w-0 font-bell-mt text-lg font-semibold leading-snug text-gray-900">{product.name}</h2>
+              {/* Compartir va en la línea de las etiquetas, pegado a la derecha */}
               <button
                 type="button"
                 onClick={() => compartirPerfume(product, product.name)}
-                className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#fbf4ea] px-3 py-1.5 text-[13px] font-bold text-[#8b6439] transition active:scale-95"
+                className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#fbf4ea] px-3 py-1.5 text-[13px] font-bold text-[#8b6439] transition active:scale-95"
               >
                 <Share2 className="h-4 w-4" /> Compartir
               </button>
             </div>
+            <h2 className="mt-1.5 font-bell-mt text-lg font-semibold leading-snug text-gray-900">{product.name}</h2>
             {ficha?.inspirado_en && <p className="mt-0.5 text-[13px] text-gray-500">Inspirado en {ficha.inspirado_en}</p>}
             {conFicha && ficha && hayDetalles && (
               <dl className="mt-2.5 space-y-1 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-[13px]">
-                {ficha.familias.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
-                {(ficha.casa || ficha.anio) && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Casa</dt><dd className="text-right text-gray-600">{[ficha.casa, ficha.anio].filter(Boolean).join(' · ')}</dd></div>}
+                {/* Título y valor juntos, pegados a la derecha; títulos en mayúsculas pequeñas color café */}
+                {ficha.familias.length > 0 && <div className="flex items-baseline justify-end gap-2.5"><dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#8b6439]">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
+                {(ficha.casa || ficha.anio) && <div className="flex items-baseline justify-end gap-2.5"><dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#8b6439]">Casa</dt><dd className="text-right text-gray-600">{[ficha.casa, ficha.anio].filter(Boolean).join(' · ')}</dd></div>}
               </dl>
             )}
             {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:line-clamp-3">{product.description}</p>}
