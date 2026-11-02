@@ -86,14 +86,14 @@ type EstadoProducto = { tipo: 'esencia_baja'; esencia: EsenciaBaja } | { tipo: '
 function EtiquetaEstado({ estado }: { estado?: EstadoProducto }) {
   if (!estado) return null;
   if (estado.tipo === 'agotado') {
-    return <span className="shrink-0 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado</span>;
+    return <span className="shrink-0 whitespace-nowrap rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado</span>;
   }
   const e = estado.esencia;
   const detalle = `Quedan ${e.disponible_g} g de esencia: alcanza para ${e.frascos_grandes} frasco${e.frascos_grandes === 1 ? '' : 's'}${e.tamano_grande ? ` de ${e.tamano_grande}` : ''}. ${e.vendidos_periodo} vendido${e.vendidos_periodo === 1 ? '' : 's'} en 30 días.`;
   return e.rotacion === 'alta' ? (
-    <span title={detalle} className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800">⚠️ Esencia baja · alta rotación</span>
+    <span title={detalle} className="shrink-0 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800">⚠️ Esencia baja · alta rotación</span>
   ) : (
-    <span title={detalle} className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">Esencia baja · baja rotación</span>
+    <span title={detalle} className="shrink-0 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">Esencia baja · baja rotación</span>
   );
 }
 
@@ -1111,7 +1111,8 @@ export default function Productos() {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
+                          {/* Las etiquetas bajan de línea si no caben, para no montarse sobre la columna vecina */}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span>{product.nombre}</span>
                             {product.destacado && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
