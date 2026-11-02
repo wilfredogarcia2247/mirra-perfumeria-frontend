@@ -18,7 +18,7 @@ import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -54,6 +54,52 @@ function categoriaIdsDe(product: any): number[] {
 function nombresCategorias(product: any, mapa: Record<number, string>): string {
   if (product?.categorias_nombres) return product.categorias_nombres;
   return categoriaIdsDe(product).map((id) => mapa[id]).filter(Boolean).join(', ') || product?.categoria_nombre || '';
+}
+
+// Stock disponible del producto (suma de almacenes, o el campo stock si no hay detalle)
+function stockDe(product: any): number {
+  const inv = product?.inventario || [];
+  return Array.isArray(inv) && inv.length > 0
+    ? inv.reduce((s: number, it: any) => s + Number(it.stock_disponible || 0), 0)
+    : Number(product?.stock || 0);
+}
+
+// Orden de la lista de productos (flechitas de la tabla y selector en el teléfono)
+type CampoOrden = 'id' | 'nombre' | 'unidad' | 'categoria' | 'marca' | 'stock' | 'costo' | 'precio';
+type Orden = { campo: CampoOrden; dir: 'asc' | 'desc' } | null;
+const CAMPOS_TEXTO: CampoOrden[] = ['nombre', 'unidad', 'categoria', 'marca'];
+const CLAVE_ORDEN = 'productos_orden';
+
+function leerOrdenGuardado(): Orden {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_ORDEN) || 'null');
+    return v && v.campo && (v.dir === 'asc' || v.dir === 'desc') ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// Encabezado de columna tocable: 1er toque ↑ (menor a mayor / A-Z), 2do ↓, 3ro vuelve al orden normal
+function EncabezadoOrden({ campo, titulo, orden, onOrden }: { campo: CampoOrden; titulo: string; orden: Orden; onOrden: (c: CampoOrden) => void }) {
+  const activo = orden?.campo === campo;
+  const Icono = !activo ? ArrowUpDown : orden!.dir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <TableHead
+      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3"
+      aria-sort={activo ? (orden!.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onOrden(campo)}
+        className={`relative inline-flex items-center uppercase tracking-wider hover:text-foreground transition-colors ${activo ? 'text-foreground font-semibold' : ''}`}
+        title="Ordenar"
+      >
+        {titulo}
+        {/* La flecha usa el margen de la columna (16px), así no ensancha la tabla */}
+        <Icono className={`absolute left-full top-1/2 ml-0.5 h-3 w-3 -translate-y-1/2 ${activo ? 'opacity-100' : 'opacity-40'}`} />
+      </button>
+    </TableHead>
+  );
 }
 
 export default function Productos() {
@@ -190,12 +236,48 @@ export default function Productos() {
   // y luego la que viene en el objeto del producto (normalizada con getImageUrl).
   const currentImage = imageUrl ?? (editingProduct ? getImageUrl(editingProduct) ?? null : null);
 
+  const [orden, setOrden] = useState<Orden>(() => leerOrdenGuardado());
+  const guardarOrden = (o: Orden) => {
+    setOrden(o);
+    try { localStorage.setItem(CLAVE_ORDEN, JSON.stringify(o)); } catch { /* sin guardado */ }
+  };
+  const alternarOrden = (campo: CampoOrden) => {
+    if (orden?.campo !== campo) return guardarOrden({ campo, dir: 'asc' });
+    if (orden.dir === 'asc') return guardarOrden({ campo, dir: 'desc' });
+    return guardarOrden(null);
+  };
+
   const filteredProducts = productos.filter((product) => {
     const term = searchTerm.toLowerCase();
     return (
       (product.nombre || "").toLowerCase().includes(term) ||
       false
     );
+  });
+
+  const valorOrden = (p: any, campo: CampoOrden): string | number | null => {
+    switch (campo) {
+      case 'id': return Number(p.id);
+      case 'nombre': return p.nombre || '';
+      case 'unidad': return p.unidad || '';
+      case 'categoria': return nombresCategorias(p, categoriasMap) || '';
+      case 'marca': return p.marca_nombre ?? marcasMap[p.marca_id] ?? '';
+      case 'stock': return stockDe(p);
+      case 'costo': return p.costo == null || p.costo === '' ? null : Number(p.costo);
+      case 'precio': return p.precio_venta == null || p.precio_venta === '' ? null : Number(p.precio_venta);
+    }
+  };
+  const sortedProducts = !orden ? filteredProducts : [...filteredProducts].sort((a: any, b: any) => {
+    const va = valorOrden(a, orden.campo);
+    const vb = valorOrden(b, orden.campo);
+    // Los vacíos siempre al final, en cualquier dirección
+    const vacioA = va === null || va === '' || (typeof va === 'number' && Number.isNaN(va));
+    const vacioB = vb === null || vb === '' || (typeof vb === 'number' && Number.isNaN(vb));
+    if (vacioA || vacioB) return vacioA === vacioB ? 0 : vacioA ? 1 : -1;
+    const cmp = CAMPOS_TEXTO.includes(orden.campo)
+      ? String(va).localeCompare(String(vb), 'es', { numeric: true, sensitivity: 'base' })
+      : Number(va) - Number(vb);
+    return orden.dir === 'asc' ? cmp : -cmp;
   });
 
   async function onSubmit(values: any) {
@@ -763,13 +845,40 @@ export default function Productos() {
           />
         </div>
 
+        {/* Ordenar (solo teléfono: en la tabla se ordena tocando los títulos) */}
+        <label className="flex items-center gap-2 sm:hidden">
+          <span className="shrink-0 text-sm text-muted-foreground">Ordenar:</span>
+          <select
+            value={orden ? `${orden.campo}:${orden.dir}` : ''}
+            onChange={(e) => {
+              const [campo, dir] = e.target.value.split(':');
+              guardarOrden(campo ? { campo: campo as CampoOrden, dir: dir as 'asc' | 'desc' } : null);
+            }}
+            className="h-11 w-full rounded-md border bg-background px-3 text-base"
+          >
+            <option value="">Orden normal</option>
+            <option value="nombre:asc">Nombre: A → Z</option>
+            <option value="nombre:desc">Nombre: Z → A</option>
+            <option value="stock:asc">Stock: menor a mayor ↑</option>
+            <option value="stock:desc">Stock: mayor a menor ↓</option>
+            <option value="precio:asc">Precio: menor a mayor ↑</option>
+            <option value="precio:desc">Precio: mayor a menor ↓</option>
+            <option value="costo:asc">Costo: menor a mayor ↑</option>
+            <option value="costo:desc">Costo: mayor a menor ↓</option>
+            <option value="categoria:asc">Categoría: A → Z</option>
+            <option value="marca:asc">Marca: A → Z</option>
+            <option value="id:desc">Más nuevos primero</option>
+            <option value="id:asc">Más antiguos primero</option>
+          </select>
+        </label>
+
         {loading ? (
           <TableSkeleton columns={10} />
         ) : (
           <>
             {/* ── Móvil: tarjetas ── */}
             <div className="flex flex-col gap-3 sm:hidden">
-              {filteredProducts.map((product: any) => {
+              {sortedProducts.map((product: any) => {
                 const inv = product?.inventario || [];
                 const totalStock = Array.isArray(inv) && inv.length > 0
                   ? inv.reduce((s: number, it: any) => s + Number(it.stock_disponible || 0), 0)
@@ -862,20 +971,20 @@ export default function Productos() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                      <EncabezadoOrden campo="id" titulo="ID" orden={orden} onOrden={alternarOrden} />
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Imagen</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Unidad</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Categoría</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Marca</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Stock</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Costo</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Precio</TableHead>
+                      <EncabezadoOrden campo="nombre" titulo="Nombre" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="unidad" titulo="Unidad" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="categoria" titulo="Categoría" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="marca" titulo="Marca" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="stock" titulo="Stock" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="costo" titulo="Costo" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="precio" titulo="Precio" orden={orden} onOrden={alternarOrden} />
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((product: any) => (
+                    {sortedProducts.map((product: any) => (
                       <TableRow key={product.id} className="hover:bg-muted/40 transition-colors duration-150">
                         <TableCell className="text-xs tabular-nums text-muted-foreground">#{product.id}</TableCell>
                         <TableCell>
