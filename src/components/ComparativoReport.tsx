@@ -67,8 +67,7 @@ interface Resumen {
   costo: number; ganancia: number; ventas_con_costo: number; cobertura_costo: number;
 }
 interface Fila { id?: string; ml?: string; producto_id?: number; nombre?: string; unidades?: number; monto?: number; pedidos?: number; descuento?: number }
-interface Cashea { pedidos: number; monto_total: number; iniciales: number; monto_financiado: number; comision: number }
-interface Periodo { resumen: Resumen; presentaciones: Fila[]; productos: Fila[]; entregas: Fila[]; estados: Fila[]; pagos: Fila[]; cupones: Fila[]; cashea?: Cashea }
+interface Periodo { resumen: Resumen; presentaciones: Fila[]; productos: Fila[]; entregas: Fila[]; estados: Fila[]; pagos: Fila[]; cupones: Fila[] }
 interface Mes { mes: string; ventas: number; pedidos: number; unidades: number; ticket_promedio: number; clientes: number; clientes_nuevos: number; porcentaje_recompra: number; por_presentacion: Record<string, number> }
 interface Datos { a: Periodo; b: Periodo; evolucion: Mes[] }
 
@@ -547,44 +546,8 @@ function OtrosCortes({ a, b, la, lb }: { a: Periodo; b: Periodo; la: string; lb:
   ];
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {(a.cashea?.pedidos || b.cashea?.pedidos) ? <CorteCashea a={a.cashea!} b={b.cashea!} la={la} lb={lb} /> : null}
       {bloques.map((bl) => <Corte key={bl.titulo} {...bl} la={la} lb={lb} />)}
     </div>
-  );
-}
-
-// Cashea comparado: monto total, monto financiado y comisión (4 % del financiado)
-function CorteCashea({ a, b, la, lb }: { a: Cashea; b: Cashea; la: string; lb: string }) {
-  const vacio: Cashea = { pedidos: 0, monto_total: 0, iniciales: 0, monto_financiado: 0, comision: 0 };
-  const ca = a || vacio;
-  const cb = b || vacio;
-  const filas: { texto: string; va: number; vb: number; dinero: boolean; tono?: 'neutro' }[] = [
-    { texto: 'Pedidos', va: ca.pedidos, vb: cb.pedidos, dinero: false },
-    { texto: 'Monto total', va: ca.monto_total, vb: cb.monto_total, dinero: true },
-    { texto: 'Monto financiado', va: ca.monto_financiado, vb: cb.monto_financiado, dinero: true },
-    { texto: 'Comisión Cashea (4%)', va: ca.comision, vb: cb.comision, dinero: true, tono: 'neutro' },
-  ];
-  return (
-    <Card className="border-amber-300">
-      <CardHeader className="border-b border-border/60 pb-3"><CardTitle className="text-sm font-medium">Cashea</CardTitle></CardHeader>
-      <CardContent className="p-2 sm:p-3">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-muted-foreground">
-            <tr className="border-b"><th className="py-1.5 pr-2 font-medium" /><th className="px-2 text-right font-medium">{lb}</th><th className="px-2 text-right font-medium">{la}</th><th className="pl-2 text-right font-medium">Cambio</th></tr>
-          </thead>
-          <tbody className="tabular-nums">
-            {filas.map((f) => (
-              <tr key={f.texto} className="border-b last:border-0">
-                <td className="py-1.5 pr-2">{f.texto}</td>
-                <td className="px-2 text-right">{f.dinero ? usdCorto(f.vb) : f.vb}</td>
-                <td className="px-2 text-right">{f.dinero ? usdCorto(f.va) : f.va}</td>
-                <td className="pl-2 text-right"><Cambio a={f.va} b={f.vb} tono={f.tono} compacto /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
   );
 }
 

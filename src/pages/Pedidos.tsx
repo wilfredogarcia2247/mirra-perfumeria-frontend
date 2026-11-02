@@ -2675,26 +2675,6 @@ export default function Pedidos() {
                         <div className="font-medium">Pagos ({((selectedPedido.pagos || selectedPedido.pagos_venta || selectedPedido.payments) || []).length})</div>
                         <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowPaymentsView(false)}>Cerrar</button>
                       </div>
-                      {/* Compras con Cashea: monto total y monto financiado (la comisión solo va en reportes) */}
-                      {(((selectedPedido.pagos || []) as any[]).filter((p: any) => p?.cashea)).map((p: any) => {
-                        const c = p.cashea;
-                        const inicialPago = ((selectedPedido.pagos || []) as any[]).find((x: any) => c.pago_inicial_id != null && Number(x.id) === Number(c.pago_inicial_id));
-                        const usd = (n: number) => `$${Number(n || 0).toFixed(2)}`;
-                        return (
-                          <div key={`cashea-${c.id}`} className="mb-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm">
-                            <p className="font-semibold">Pagado con Cashea</p>
-                            <div className="mt-2 grid grid-cols-2 gap-2">
-                              <div className="rounded border bg-white p-2"><p className="text-xs text-gray-500">Monto total</p><p className="text-lg font-semibold tabular-nums">{usd(c.monto_total)}</p></div>
-                              <div className="rounded border bg-white p-2"><p className="text-xs text-gray-500">Monto financiado</p><p className="text-lg font-semibold tabular-nums">{usd(c.monto_financiado)}</p></div>
-                            </div>
-                            <p className="mt-2 text-gray-700">
-                              Inicial {Number(c.inicial_porcentaje).toLocaleString('es-VE', { maximumFractionDigits: 2 })}%: <b>{usd(c.inicial_monto)}</b>
-                              {inicialPago ? ` por ${inicialPago?.forma_pago?.nombre ?? 'otro método'}${inicialPago?.banco?.nombre ? ` (${inicialPago.banco.nombre}${inicialPago.referencia ? ` · ref. ${inicialPago.referencia}` : ''})` : ''}` : ''}
-                            </p>
-                            <p className="text-gray-700">{c.cuotas} cuotas de <b>{usd(c.monto_cuota)}</b></p>
-                          </div>
-                        );
-                      })}
                       <div className="space-y-2">
                         {(((selectedPedido.pagos || selectedPedido.pagos_venta || selectedPedido.payments) || []) as any[]).map((pay: any, idx: number) => {
                           const monto = Number(pay?.monto ?? pay?.amount ?? 0);
@@ -2712,8 +2692,6 @@ export default function Pedidos() {
                                 <div>
                                   <div className="font-medium">{montoStr}</div>
                                   <div className="text-xs text-gray-500">{forma} {banco ? `— ${banco}` : ''}</div>
-                                  {pay?.cashea && <div className="text-xs text-amber-800">Financiado · {pay.cashea.cuotas} cuotas</div>}
-                                  {pay?.cashea_inicial && <div className="text-xs text-amber-800">Inicial Cashea</div>}
                                 </div>
                                 <div className="text-right">
                                   {/* Equivalencia: preferir campo explícito, si no existe calcular como monto / tasa */}

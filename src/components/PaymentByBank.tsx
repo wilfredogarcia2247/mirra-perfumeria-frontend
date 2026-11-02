@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, registrarPagoCashea, getPagosByPedido } from '../integrations/api';
-import CasheaPanel, { type CompraCashea, type BorradorCashea } from './CasheaPanel';
+import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, getPagosByPedido } from '../integrations/api';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
 
@@ -130,17 +129,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const [pedidoResumen, setPedidoResumen] = useState<{ base: number; descuentos: number; recargos: number; final: number } | null>(null);
   const [pedidoAjustes, setPedidoAjustes] = useState<PedidoAjuste[]>([]);
   const [pedidoData, setPedidoData] = useState<any | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'single' | 'multiple' | 'cashea'>('single');
-  const enviandoCashea = React.useRef(false);
+  const [paymentMode, setPaymentMode] = useState<'single' | 'multiple'>('single');
   // Motivos por los que no se pudo producir algún perfume (los da el servidor, con nombres)
   const erroresProduccion = React.useRef<string[]>([]);
   // ---- Borrador: lo escrito se guarda en este dispositivo y se recupera al volver a este pedido ----
   const CLAVE_BORRADOR = `${PREFIJO_BORRADOR}${pedidoId}`;
   const [borradorRecuperado, setBorradorRecuperado] = useState(false);
-  const [casheaBorrador, setCasheaBorrador] = useState<BorradorCashea | null>(null);
-  const [casheaKey, setCasheaKey] = useState(0);
-  const [casheaVersion, setCasheaVersion] = useState(0);
-  const casheaEstado = React.useRef<BorradorCashea | null>(null);
   const formaPendiente = React.useRef<number | null>(null);
   const pagoTerminado = React.useRef(false);
   const borrarBorrador = () => { try { localStorage.removeItem(CLAVE_BORRADOR); } catch { /* sin almacenamiento */ } };
@@ -476,14 +470,13 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     try {
       const d = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || 'null');
       if (!d || d.v !== 1) return;
-      if (d.modo === 'single' || d.modo === 'multiple' || d.modo === 'cashea') setPaymentMode(d.modo);
+      if (d.modo === 'single' || d.modo === 'multiple') setPaymentMode(d.modo);
       if (d.bancoId != null) setSelectedBancoId(Number(d.bancoId));
       formaPendiente.current = d.formaId != null ? Number(d.formaId) : null;
       setMonto(d.monto || '');
       setReferencia(d.referencia || '');
       setFecha(d.fecha || '');
       if (Array.isArray(d.pagosNuevos) && d.pagosNuevos.length > 0) setPayments((cur) => [...cur, ...d.pagosNuevos]);
-      if (d.cashea) { casheaEstado.current = d.cashea; setCasheaBorrador(d.cashea); }
       setBorradorRecuperado(true);
     } catch { /* borrador dañado o sin almacenamiento */ }
   }, [pedidoId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -503,17 +496,16 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       if (pagoTerminado.current) return;
       try {
         const pagosNuevos = payments.filter((p) => !p?.existing && !p?.id);
-        const cashea = casheaEstado.current;
-        const vacio = paymentMode === 'single' && !selectedBancoId && !monto && !referencia && !fecha && pagosNuevos.length === 0 && !cashea?.tocado;
+        const vacio = paymentMode === 'single' && !selectedBancoId && !monto && !referencia && !fecha && pagosNuevos.length === 0;
         if (vacio) { borrarBorrador(); return; }
         localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
           v: 1, guardado: Date.now(), modo: paymentMode, bancoId: selectedBancoId, formaId: selectedFormaId,
-          monto, referencia, fecha, pagosNuevos, cashea,
+          monto, referencia, fecha, pagosNuevos,
         }));
       } catch { /* sin almacenamiento */ }
     }, 500);
     return () => window.clearTimeout(t);
-  }, [paymentMode, selectedBancoId, selectedFormaId, monto, referencia, fecha, payments, casheaVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [paymentMode, selectedBancoId, selectedFormaId, monto, referencia, fecha, payments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function descartarBorrador() {
     borrarBorrador();
@@ -524,9 +516,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     setReferencia('');
     setFecha('');
     setPayments((cur) => cur.filter((p) => p?.existing || p?.id));
-    casheaEstado.current = null;
-    setCasheaBorrador(null);
-    setCasheaKey((k) => k + 1);
   }
 
   useEffect(() => {
@@ -1699,42 +1688,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     );
   }
 
-  // ---- Cashea ----
-  // Lo que falta por pagar (sin contar pagos nuevos sin guardar de "Varios pagos")
-  const pagadoGuardado = payments.filter((p) => p?.existing || p?.id).reduce((s, p) => s + deriveEquivalencia(p), 0);
-  const restanteParaCashea = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - pagadoGuardado).toFixed(2))) : null;
-  const formaCasheaId = globalFormas.find((f) => /cashea/i.test(String(f.nombre || '')))?.id ?? null;
-
-  // Registra la inicial y la parte de Cashea en un solo paso y completa el pedido
-  async function handleCashea(compra: CompraCashea) {
-    if (enviandoCashea.current || !formaCasheaId) return;
-    enviandoCashea.current = true;
-    setLoading(true);
-    setErrors(null);
-    try {
-      // Antes de registrar pagos: que no queden perfumes pendientes por producir
-      try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
-      await tryAutoCompleteOrdersForPedido(pedidoId);
-      if (await pedidoHasPendingProduction(pedidoId)) {
-        toast.error(avisoPendientes(), { duration: 10000 }); setErrors(avisoPendientes());
-        return;
-      }
-      await registrarPagoCashea(pedidoId, { ...compra, forma_cashea_id: formaCasheaId });
-      const data = await completarPedidoVenta(pedidoId);
-      exito(data);
-      toast.success('Pago con Cashea registrado y pedido completado');
-      if (onClose) onClose();
-    } catch (e: any) {
-      console.error('Error registrando pago con Cashea', e);
-      const msg = textoError(e, 'Error registrando el pago con Cashea');
-      setErrors(msg);
-      try { toast.error(msg); } catch (err) { /* noop */ }
-    } finally {
-      enviandoCashea.current = false;
-      setLoading(false);
-    }
-  }
-
   return (
     <div className={embedded
       ? "relative w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
@@ -1758,14 +1711,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
             >
               Varios pagos
             </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMode('cashea')}
-              className={`text-sm px-2 py-1 rounded ${paymentMode === 'cashea' ? 'bg-amber-400 text-gray-900' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}
-            >
-              Cashea
-            </button>
-            <div className="text-xs text-gray-500 ml-2">Modo: <strong className="text-gray-700">{paymentMode === 'single' ? 'Pago único' : paymentMode === 'multiple' ? 'Varios pagos' : 'Cashea'}</strong></div>
+            <div className="text-xs text-gray-500 ml-2">Modo: <strong className="text-gray-700">{paymentMode === 'single' ? 'Pago único' : 'Varios pagos'}</strong></div>
           </div>
           <div className="text-sm text-gray-600">Registra uno o varios pagos para este pedido y complétalo. Los pagos se conservarán en el historial del pedido.</div>
         </div>
@@ -1792,21 +1738,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: formulario (ocupa 2 columnas en pantallas grandes) */}
-          {paymentMode === 'cashea' ? (
-            <div className="lg:col-span-2">
-              <CasheaPanel
-                key={casheaKey}
-                borrador={casheaBorrador}
-                onCambio={(b) => { casheaEstado.current = b; setCasheaVersion((v) => v + 1); }}
-                montoSugerido={restanteParaCashea}
-                bancos={bancos as Array<Banco & { moneda?: string | null }>}
-                formas={globalFormas}
-                formaCasheaId={formaCasheaId}
-                loading={loading}
-                onConfirmar={handleCashea}
-              />
-            </div>
-          ) : (
           <div className="lg:col-span-2">
             <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1923,7 +1854,6 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
 
           </div>
-          )}
 
           {/* Right: resumen / lista de pagos */}
           <aside className={`${showAside ? 'block' : 'hidden'} lg:block lg:col-span-1`}>
