@@ -1,6 +1,8 @@
 // Ficha del perfume (la carga el personal en Productos; la tienda la muestra si está revisada)
 export interface FichaPerfume {
   inspirado_en: string | null;
+  casa: string | null; // casa (marca) del perfume original
+  anio: number | null; // año de lanzamiento del original
   notas: { salida: string[]; corazon: string[]; fondo: string[] };
   para: 'mujer' | 'hombre' | 'unisex' | null;
   momento: 'dia' | 'noche' | 'ambos' | null;
@@ -13,6 +15,8 @@ export interface FichaPerfume {
 
 export const FICHA_VACIA: FichaPerfume = {
   inspirado_en: null,
+  casa: null,
+  anio: null,
   notas: { salida: [], corazon: [], fondo: [] },
   para: null,
   momento: null,
@@ -85,7 +89,7 @@ export function normalizarFicha(f: any): FichaPerfume {
 export function fichaTieneDatos(f: FichaPerfume | null | undefined): boolean {
   if (!f) return false;
   return Boolean(
-    f.inspirado_en || f.para || f.momento || f.duracion || f.estela
+    f.inspirado_en || f.casa || f.anio || f.para || f.momento || f.duracion || f.estela
     || f.familias.length || f.temporadas.length
     || f.notas.salida.length || f.notas.corazon.length || f.notas.fondo.length,
   );

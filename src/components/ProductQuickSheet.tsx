@@ -6,7 +6,7 @@ import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
 import AvisameForm from '@/components/AvisameForm';
 import { compartirPerfume } from '@/lib/compartir';
-import { DURACION as DURACION_FICHA, FAMILIAS, MOMENTO, PARA, TEMPORADAS, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
+import { FAMILIAS, MOMENTO, PARA, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const DURACION = 350;
@@ -26,11 +26,11 @@ interface Props {
 export default function ProductQuickSheet({ product, tasa, origen, onClose, onAdd }: Props) {
   const presentaciones = presentacionesDe(product);
   const [elegida, setElegida] = useState(0);
-  // Ficha del perfume: datos rápidos arriba y detalles (familia, temporada).
+  // Ficha del perfume: datos rápidos arriba y detalles (familia, casa y año del original).
   // Las notas no se muestran porque ya salen en la foto de cada perfume.
   const ficha = product.ficha ? normalizarFicha(product.ficha) : null;
   const conFicha = fichaTieneDatos(ficha);
-  const hayDetalles = Boolean(ficha && (ficha.familias.length || ficha.temporadas.length));
+  const hayDetalles = Boolean(ficha && (ficha.familias.length || ficha.casa || ficha.anio));
   const [abierta, setAbierta] = useState(false);
   const [fotoLista, setFotoLista] = useState(!origen);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -193,7 +193,6 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
                 product.category && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{product.category}</span>
               )}
               {conFicha && ficha?.momento && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{MOMENTO.find((x) => x.v === ficha.momento)?.i} {etiqueta(MOMENTO, ficha.momento)}</span>}
-              {conFicha && ficha?.duracion && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">⏳ Duración {etiqueta(DURACION_FICHA, ficha.duracion).toLowerCase()}</span>}
               {product.mas_pedido && !product.agotado && <span className="rounded-full bg-[#e4572e] px-2.5 py-0.5 text-xs font-bold text-white">🔥 Más pedido</span>}
             </div>
             <div className="mt-1.5 flex items-start justify-between gap-3">
@@ -210,7 +209,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
             {conFicha && ficha && hayDetalles && (
               <dl className="mt-2.5 space-y-1 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-[13px]">
                 {ficha.familias.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
-                {ficha.temporadas.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Temporada</dt><dd className="text-right text-gray-600">{ficha.temporadas.map((t) => `${TEMPORADAS.find((x) => x.v === t)?.i ?? ''} ${etiqueta(TEMPORADAS, t)}`).join(' · ')}</dd></div>}
+                {(ficha.casa || ficha.anio) && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Casa</dt><dd className="text-right text-gray-600">{[ficha.casa, ficha.anio].filter(Boolean).join(' · ')}</dd></div>}
               </dl>
             )}
             {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:line-clamp-3">{product.description}</p>}

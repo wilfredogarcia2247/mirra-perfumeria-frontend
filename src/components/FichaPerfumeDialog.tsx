@@ -70,6 +70,8 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
     const ficha: FichaPerfume = {
       ...f,
       inspirado_en: (f.inspirado_en || '').trim() || null,
+      casa: (f.casa || '').trim() || null,
+      anio: f.anio && Number.isInteger(f.anio) ? f.anio : null,
       notas: { salida: aLista(notas.salida), corazon: aLista(notas.corazon), fondo: aLista(notas.fondo) },
     };
     try {
@@ -97,6 +99,17 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
             <span className="font-medium">Inspirado en</span>
             <input id="ficha-inspirado" value={f.inspirado_en || ''} onChange={(e) => cambiar('inspirado_en')(e.target.value)} placeholder="Ej. Carolina Herrera Good Girl" className="h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm" />
           </label>
+
+          <div className="flex gap-3">
+            <label className="block min-w-0 flex-1 space-y-1">
+              <span className="font-medium">Casa</span>
+              <input id="ficha-casa" value={f.casa || ''} onChange={(e) => cambiar('casa')(e.target.value)} placeholder="Ej. Carolina Herrera" className="h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm" />
+            </label>
+            <label className="block w-24 shrink-0 space-y-1">
+              <span className="font-medium">Año</span>
+              <input id="ficha-anio" type="number" inputMode="numeric" min={1800} max={2100} value={f.anio ?? ''} onChange={(e) => cambiar('anio')(e.target.value ? Number(e.target.value) : null)} placeholder="2016" className="h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm" />
+            </label>
+          </div>
 
           {(['salida', 'corazon', 'fondo'] as const).map((nivel) => (
             <label key={nivel} className="block space-y-1">
