@@ -113,7 +113,7 @@ function EncabezadoOrden({ campo, titulo, orden, onOrden }: { campo: CampoOrden;
         title="Ordenar"
       >
         {titulo}
-        {/* La flecha usa el margen de la columna (16px), así no ensancha la tabla */}
+        {/* La flecha va en el margen derecho de la columna (12px), así no ensancha la tabla */}
         <Icono className={`absolute left-full top-1/2 ml-0.5 h-3 w-3 -translate-y-1/2 ${activo ? 'opacity-100' : 'opacity-40'}`} />
       </button>
     </TableHead>
@@ -1076,7 +1076,8 @@ export default function Productos() {
             {/* ── Desktop: tabla ── */}
             <Card className="hidden sm:block">
               <CardContent className="p-0">
-                <Table>
+                {/* Márgenes de columna de 12px (en vez de 16px) para que la tabla quepa a 1280px con el menú abierto */}
+                <Table className="[&_td]:px-3 [&_th]:px-3">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <EncabezadoOrden campo="id" titulo="ID" orden={orden} onOrden={alternarOrden} />
