@@ -1617,6 +1617,22 @@ export async function saveDescuentoMayorConfig(data: ConfigDescuentoMayor): Prom
 }
 
 // Quitar (aplicar=false) o volver a aplicar el descuento al mayor de un pedido, p. ej. pago con Cashea
+// Corregir el método de entrega de un pedido (tienda / envío nacional / delivery). No cambia montos.
+export interface EntregaPedidoInput {
+  tipo: 'tienda' | 'envio_nacional' | 'delivery';
+  sucursal_id?: number;
+  estado?: string;
+  ciudad?: string;
+  transportista?: 'MRW' | 'ZOOM' | 'OTRA';
+  transportista_otro?: string;
+  agencia_codigo?: string;
+  agencia_direccion?: string;
+  ubicacion_link?: string;
+}
+export async function setEntregaPedido(pedidoId: number, data: EntregaPedidoInput): Promise<{ id: number; tipo_entrega: string; datos_entrega: any }> {
+  return apiFetch(`/pedidos-venta/${pedidoId}/entrega`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
 export async function setDescuentoMayorPedido(pedidoId: number, aplicar: boolean) {
   return apiFetch(`/pedidos-venta/${pedidoId}/descuento-mayor`, { method: 'PUT', body: JSON.stringify({ aplicar }) });
 }

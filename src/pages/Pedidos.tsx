@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike, Pencil } from 'lucide-react';
+import EditarEntregaDialog from '@/components/EditarEntregaDialog';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -727,6 +728,13 @@ export default function Pedidos() {
     }
   };
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
+  const [editandoEntrega, setEditandoEntrega] = useState(false);
+  // Al corregir la entrega se actualiza el detalle abierto y la fila de la lista
+  const entregaGuardada = (r: { tipo_entrega: string; datos_entrega: any }) => {
+    const id = selectedPedido?.id;
+    setSelectedPedido((prev: any) => (prev ? { ...prev, ...r } : prev));
+    setPedidos((list: any) => (Array.isArray(list) ? list.map((p: any) => (p.id === id ? { ...p, ...r } : p)) : list));
+  };
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -2310,11 +2318,22 @@ export default function Pedidos() {
                   <span>Cargando...</span>
                 )}
               </DialogDescription>
+              {selectedPedido && !selectedPedido.tipo_entrega && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-2 text-sm text-muted-foreground">
+                  <span>Este pedido no tiene método de entrega.</span>
+                  <Button size="sm" variant="outline" className="ml-auto h-8 bg-white" onClick={() => setEditandoEntrega(true)}>
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" /> Agregar entrega
+                  </Button>
+                </div>
+              )}
               {selectedPedido?.tipo_entrega && (
                 <div className={`rounded-lg border-2 px-3 py-2 text-sm ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
                   <div className="mb-1.5 flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
                     <EntregaBadge pedido={selectedPedido} className="text-xs" />
+                    <Button size="sm" variant="outline" className="ml-auto h-7 bg-white/80 px-2.5 text-xs" onClick={() => setEditandoEntrega(true)}>
+                      <Pencil className="mr-1 h-3 w-3" /> Editar
+                    </Button>
                   </div>
                   {(() => {
                     const details = selectedPedido.datos_entrega || {};
@@ -2351,6 +2370,12 @@ export default function Pedidos() {
                   })()}
                 </div>
               )}
+              <EditarEntregaDialog
+                pedido={selectedPedido}
+                abierto={editandoEntrega && Boolean(selectedPedido)}
+                onCerrar={() => setEditandoEntrega(false)}
+                onGuardado={entregaGuardada}
+              />
               {cuponDetalle && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   <TicketPercent className="w-4 h-4 shrink-0" />
