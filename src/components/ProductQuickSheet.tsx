@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
+import AvisameForm from '@/components/AvisameForm';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const DURACION = 350;
@@ -189,7 +190,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
 
         <div className="border-t border-[#f0e8de] bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
           {product.agotado ? (
-            <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
+            <AvisameForm productoId={product.id} productoNombre={product.name} />
           ) : presentaciones.length > 0 ? (
             <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : presentaciones.length === 4 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {presentaciones.map((p, i) => (
@@ -208,14 +209,16 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           ) : (
             <p className="mb-3 text-center text-sm text-gray-500">Este producto no tiene presentaciones disponibles.</p>
           )}
+          {!product.agotado && (
           <button
             type="button"
             onClick={agregar}
             disabled={!puedeAgregar}
             className={`w-full rounded-xl py-3.5 text-[15px] font-bold transition active:scale-[0.98] ${puedeAgregar ? 'bg-[#CA9E67] text-white hover:bg-[#b58a53]' : 'cursor-not-allowed bg-gray-200 text-gray-500'}`}
           >
-            {product.agotado ? 'Agotado' : puedeAgregar ? `Agregar ${actual.label} · ${precio}` : 'No disponible'}
+            {puedeAgregar ? `Agregar ${actual.label} · ${precio}` : 'No disponible'}
           </button>
+          )}
         </div>
       </div>
     </>,
