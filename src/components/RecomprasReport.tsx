@@ -18,12 +18,19 @@ const INACTIVIDADES: { id: Inactividad; texto: string }[] = [
   { id: '90+', texto: 'Más de 3 meses' },
 ];
 
-// Enlace de WhatsApp con el teléfono en formato internacional de Venezuela (58...)
-function enlaceWhatsapp(telefono: string | null): string | null {
+// Enlace de WhatsApp con el teléfono en formato internacional de Venezuela (58...) y mensaje opcional
+function enlaceWhatsapp(telefono: string | null, texto?: string): string | null {
   const d = String(telefono || '').replace(/\D/g, '');
   if (d.length < 10) return null;
   const numero = d.startsWith('58') ? d : d.length === 11 && d.startsWith('0') ? `58${d.slice(1)}` : d.length === 10 ? `58${d}` : d;
-  return `https://wa.me/${numero}`;
+  return `https://wa.me/${numero}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`;
+}
+
+// Mensaje de "te extrañamos" para clientes que no han vuelto (sin cupón)
+function mensajeRecompra(nombre: string): string {
+  const primer = String(nombre || '').trim().split(/\s+/)[0] || '';
+  const tienda = typeof window !== 'undefined' ? window.location.origin : 'https://mirraperfumeria.com';
+  return `¡Hola${primer ? ` ${primer}` : ''}! 👋 Te extrañamos en Mirra Perfumería. Tenemos perfumes nuevos que te pueden encantar 💛\n\nMíralos aquí: ${tienda}`;
 }
 const haceDias = (n: number | null) => (n == null ? '—' : n === 0 ? 'hoy' : n === 1 ? 'hace 1 día' : `hace ${n} días`);
 
@@ -482,7 +489,7 @@ function ListaClientes({ grupo, fechaInicio, fechaFin }: { grupo: string; fechaI
             </summary>
             {noVolvieron && enlaceWhatsapp(c.telefono) && (
               <a
-                href={enlaceWhatsapp(c.telefono) as string}
+                href={enlaceWhatsapp(c.telefono, mensajeRecompra(c.nombre)) as string}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#18794a] px-3 sm:w-fit sm:px-5 text-sm font-medium text-white hover:bg-[#146a40]"
