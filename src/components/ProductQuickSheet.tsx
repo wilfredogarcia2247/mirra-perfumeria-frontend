@@ -6,7 +6,7 @@ import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
 import AvisameForm from '@/components/AvisameForm';
 import { compartirPerfume } from '@/lib/compartir';
-import { DURACION as DURACION_FICHA, ESTELA, FAMILIAS, MOMENTO, PARA, TEMPORADAS, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
+import { DURACION as DURACION_FICHA, FAMILIAS, MOMENTO, PARA, TEMPORADAS, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const DURACION = 350;
@@ -26,13 +26,11 @@ interface Props {
 export default function ProductQuickSheet({ product, tasa, origen, onClose, onAdd }: Props) {
   const presentaciones = presentacionesDe(product);
   const [elegida, setElegida] = useState(0);
-  // Ficha del perfume (opción B: datos rápidos arriba, notas y detalles en pestañas)
+  // Ficha del perfume: datos rápidos arriba y detalles (familia, temporada).
+  // Las notas no se muestran porque ya salen en la foto de cada perfume.
   const ficha = product.ficha ? normalizarFicha(product.ficha) : null;
   const conFicha = fichaTieneDatos(ficha);
-  const hayNotas = Boolean(ficha && (ficha.notas.salida.length || ficha.notas.corazon.length || ficha.notas.fondo.length));
-  const hayDetalles = Boolean(ficha && (ficha.familias.length || ficha.estela || ficha.temporadas.length || ficha.duracion));
-  const [pestana, setPestana] = useState<'notas' | 'detalles'>('notas');
-  const pestanaVisible = hayNotas ? pestana : 'detalles';
+  const hayDetalles = Boolean(ficha && (ficha.familias.length || ficha.temporadas.length));
   const [abierta, setAbierta] = useState(false);
   const [fotoLista, setFotoLista] = useState(!origen);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -209,39 +207,11 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
               </button>
             </div>
             {ficha?.inspirado_en && <p className="mt-0.5 text-[13px] text-gray-500">Inspirado en {ficha.inspirado_en}</p>}
-            {conFicha && ficha && (hayNotas || hayDetalles) && (
-              <div className="mt-3">
-                {hayNotas && hayDetalles && (
-                  <div className="grid grid-cols-2 rounded-[10px] bg-[#f4ede4] p-[3px]" role="tablist">
-                    {(['notas', 'detalles'] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        role="tab"
-                        aria-selected={pestanaVisible === p}
-                        onClick={() => setPestana(p)}
-                        className={`rounded-lg py-1.5 text-[13px] font-semibold transition ${pestanaVisible === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-                      >
-                        {p === 'notas' ? 'Notas' : 'Detalles'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {pestanaVisible === 'notas' ? (
-                  <div className="mt-2.5 space-y-0.5 text-[13px] leading-relaxed text-gray-800">
-                    {ficha.notas.salida.length > 0 && <p><b className="text-[#8b6439]">Salida:</b> {ficha.notas.salida.join(', ')}</p>}
-                    {ficha.notas.corazon.length > 0 && <p><b className="text-[#8b6439]">Corazón:</b> {ficha.notas.corazon.join(', ')}</p>}
-                    {ficha.notas.fondo.length > 0 && <p><b className="text-[#8b6439]">Fondo:</b> {ficha.notas.fondo.join(', ')}</p>}
-                  </div>
-                ) : (
-                  <dl className="mt-2.5 space-y-1 text-[13px]">
-                    {ficha.familias.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
-                    {ficha.duracion && <div className="flex justify-between gap-3"><dt className="font-semibold">Duración</dt><dd className="text-gray-600">{etiqueta(DURACION_FICHA, ficha.duracion)}</dd></div>}
-                    {ficha.estela && <div className="flex justify-between gap-3"><dt className="font-semibold">Estela</dt><dd className="text-gray-600">{etiqueta(ESTELA, ficha.estela)}</dd></div>}
-                    {ficha.temporadas.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold">Temporada</dt><dd className="text-right text-gray-600">{ficha.temporadas.map((t) => `${TEMPORADAS.find((x) => x.v === t)?.i ?? ''} ${etiqueta(TEMPORADAS, t)}`).join(' · ')}</dd></div>}
-                  </dl>
-                )}
-              </div>
+            {conFicha && ficha && hayDetalles && (
+              <dl className="mt-2.5 space-y-1 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-[13px]">
+                {ficha.familias.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
+                {ficha.temporadas.length > 0 && <div className="flex justify-between gap-3"><dt className="font-semibold text-gray-800">Temporada</dt><dd className="text-right text-gray-600">{ficha.temporadas.map((t) => `${TEMPORADAS.find((x) => x.v === t)?.i ?? ''} ${etiqueta(TEMPORADAS, t)}`).join(' · ')}</dd></div>}
+              </dl>
             )}
             {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:line-clamp-3">{product.description}</p>}
           </div>
