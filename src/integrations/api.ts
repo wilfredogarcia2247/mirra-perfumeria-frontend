@@ -709,22 +709,6 @@ export async function getRentabilidad(fechaInicio?: string, fechaFin?: string) {
   return apiFetch(`/pedidos-venta/rentabilidad${qs}`);
 }
 
-// Costos por presentación: costo general por tamaño (ml) y costos especiales por perfume
-export interface CostosPresentacion {
-  tamanos: { ml: number; presentaciones: number; costo: number | null }[];
-  especiales: { ml: number; producto_id: number; nombre: string; costo: number }[];
-  perfumes: { producto_id: number; nombre: string; tamanos: number[] }[];
-}
-export async function getCostosPresentacion(): Promise<CostosPresentacion> {
-  return apiFetch('/costos-presentacion');
-}
-export async function guardarCostosPresentacion(body: {
-  tamanos: { ml: number; costo: number | string | null }[];
-  especiales: { ml: number; producto_id: number; costo: number | string | null }[];
-}): Promise<CostosPresentacion> {
-  return apiFetch('/costos-presentacion', { method: 'PUT', body: JSON.stringify(body) });
-}
-
 // Reporte "Cómo vamos": periodo A contra periodo B y evolución mes a mes (fechas AAAA-MM-DD)
 export async function getReporteComparativo(opts: { aInicio: string; aFin: string; bInicio: string; bFin: string; evInicio?: string; evFin?: string }) {
   const params = new URLSearchParams({ a_inicio: opts.aInicio, a_fin: opts.aFin, b_inicio: opts.bInicio, b_fin: opts.bFin });

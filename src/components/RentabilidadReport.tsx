@@ -50,11 +50,11 @@ export default function RentabilidadReport({ fechaInicio, fechaFin }: { fechaIni
 
       {sinCostos ? (
         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Faltan los costos de las presentaciones, por eso no se puede calcular la ganancia. <Link to="/costos-presentacion" className="font-medium underline">Cargar costos</Link>
+          Faltan los costos de las presentaciones, por eso no se puede calcular la ganancia. <Link to="/formulas" className="font-medium underline">Cargar costos en Fórmulas</Link>
         </p>
       ) : r.cobertura_costo < 100 ? (
         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Solo el {porc(r.cobertura_costo)} de las ventas tiene costo cargado; costos, ganancia y margen se calculan sobre esa parte. <Link to="/costos-presentacion" className="font-medium underline">Completar costos</Link>
+          Solo el {porc(r.cobertura_costo)} de las ventas tiene costo cargado; costos, ganancia y margen se calculan sobre esa parte. <Link to="/formulas" className="font-medium underline">Completar costos en Fórmulas</Link>
         </p>
       ) : null}
 

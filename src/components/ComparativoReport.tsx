@@ -255,9 +255,9 @@ function Indicadores({ a, b, lb }: { a: Resumen; b: Resumen; lb: string }) {
           <div>
             <p className="text-xs text-muted-foreground">Ganancia estimada (ventas − costo)</p>
             {sinCostos ? (
-              <p className="mt-0.5 text-sm">Faltan los costos de las presentaciones. Cuando se carguen, aquí aparecerá la ganancia (también la de ventas pasadas). <Link to="/costos-presentacion" className="font-medium underline">Cargar costos</Link></p>
+              <p className="mt-0.5 text-sm">Faltan los costos de las presentaciones. Cuando se carguen en Fórmulas, aquí aparecerá la ganancia. <Link to="/formulas" className="font-medium underline">Ir a Fórmulas</Link></p>
             ) : (
-              <p className="mt-0.5 text-xs text-muted-foreground">Calculada sobre el {porc(a.cobertura_costo)} de las ventas que tiene costo cargado. <Link to="/costos-presentacion" className="underline">Ver costos</Link></p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Calculada sobre el {porc(a.cobertura_costo)} de las ventas que tiene costo cargado. <Link to="/formulas" className="underline">Ver Fórmulas</Link></p>
             )}
           </div>
           {!sinCostos && (
