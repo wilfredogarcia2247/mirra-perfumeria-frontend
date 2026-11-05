@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getRentabilidad } from '@/integrations/api';
 
-// Rentabilidad: ventas, costos (Finanzas → Costos por presentación) y ganancia del periodo, total y por tamaño.
+// Rentabilidad: ventas, costos (de la venta o de Fórmulas) y ganancia del periodo, total y por tamaño.
 // Mismo cálculo que "Cómo vamos": pedidos completados, por fecha del pago, ventas con descuentos y sin delivery.
 
 interface Resumen { ventas: number; costo: number; ganancia: number; ventas_con_costo: number; cobertura_costo: number; pedidos: number; unidades: number }
@@ -95,7 +95,7 @@ export default function RentabilidadReport({ fechaInicio, fechaFin }: { fechaIni
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground">
-        Mismo cálculo que "Cómo vamos": pedidos completados, por la fecha del pago; las ventas restan descuentos y no incluyen delivery ni envío. Los costos vienen de Finanzas → Costos por presentación.
+        Mismo cálculo que "Cómo vamos": pedidos completados, por la fecha del pago; las ventas restan descuentos y no incluyen delivery ni envío. Los costos vienen del costo guardado en cada venta o, si falta, del costo de la presentación en Fórmulas.
       </p>
     </div>
   );
