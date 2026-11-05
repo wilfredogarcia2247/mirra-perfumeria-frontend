@@ -3,6 +3,34 @@ export async function getDashboardStats() {
   return apiFetch("/dashboard/stats");
 }
 
+// Esencias por acabarse (con rotación) y perfumes agotados
+export interface EsenciaBaja {
+  id: number;
+  nombre: string;
+  disponible_g: number;        // esencia que queda, en gramos
+  g_por_frasco_grande: number; // gramos de esencia por frasco del tamaño más grande
+  tamano_grande: string | null; // ej. "60 ml"
+  frascos_grandes: number;
+  vendidos_periodo: number;
+  dias_estimados: number | null;
+  rotacion: 'alta' | 'baja';
+  perfumes: { id: number; nombre: string }[];
+  perfume_ids: number[];
+}
+export interface AlertaEsencias {
+  criterio: { umbral_frascos: number; dias_rotacion: number; ventas_alta_rotacion: number };
+  esencias: EsenciaBaja[];
+  perfumes_agotados: number[];
+}
+// Ficha del perfume (panel)
+export async function guardarFichaProducto(id: number, ficha: any) {
+  return apiFetch(`/productos/${id}/ficha`, { method: 'PUT', body: JSON.stringify(ficha) });
+}
+
+export async function getAlertaEsencias(): Promise<AlertaEsencias> {
+  return apiFetch("/alertas/esencias");
+}
+
 // --- Servicios para entidades ---
 
 // Productos
@@ -672,7 +700,23 @@ export async function getClientesRecompra(fechaInicio?: string, fechaFin?: strin
   return apiFetch(`/pedidos-venta/clientes-recompra${qs}`);
 }
 
-export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string }) {
+// Rentabilidad del periodo: ventas, costos y ganancia, total y por tamaño (fechas AAAA-MM-DD)
+export async function getRentabilidad(fechaInicio?: string, fechaFin?: string) {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+  if (fechaFin) params.set('fecha_fin', fechaFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch(`/pedidos-venta/rentabilidad${qs}`);
+}
+
+// Reporte "Cómo vamos": periodo A contra periodo B y evolución mes a mes (fechas AAAA-MM-DD)
+export async function getReporteComparativo(opts: { aInicio: string; aFin: string; bInicio: string; bFin: string; evInicio?: string; evFin?: string }) {
+  const params = new URLSearchParams({ a_inicio: opts.aInicio, a_fin: opts.aFin, b_inicio: opts.bInicio, b_fin: opts.bFin });
+  if (opts.evInicio && opts.evFin) { params.set('ev_inicio', opts.evInicio); params.set('ev_fin', opts.evFin); }
+  return apiFetch(`/pedidos-venta/reporte-comparativo?${params.toString()}`);
+}
+
+export async function getClientesGrupo(opts: { grupo: string; page?: number; pageSize?: number; orden?: 'monto' | 'compras' | 'reciente'; q?: string; fechaInicio?: string; fechaFin?: string; inactividad?: 'todos' | 'hasta60' | '60-90' | '90+' }) {
   const params = new URLSearchParams({
     grupo: opts.grupo,
     page: String(opts.page || 1),
@@ -682,6 +726,7 @@ export async function getClientesGrupo(opts: { grupo: string; page?: number; pag
   if (opts.q) params.set('q', opts.q);
   if (opts.fechaInicio) params.set('fecha_inicio', opts.fechaInicio);
   if (opts.fechaFin) params.set('fecha_fin', opts.fechaFin);
+  if (opts.inactividad && opts.inactividad !== 'todos') params.set('inactividad', opts.inactividad);
   return apiFetch(`/pedidos-venta/clientes-grupo?${params.toString()}`);
 }
 
@@ -1415,8 +1460,39 @@ export async function deleteSucursal(id: number): Promise<{ success: boolean }> 
 // src/integrations/api.ts
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-const WAHA_URL = (import.meta.env.VITE_WHATSAPP_API_URL || '').replace(/\/$/, '');
-const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '';
+
+// "Avísame cuando llegue" (tienda, sin sesión)
+export async function crearAvisoLlegada(productoId: number, nombre: string, telefono: string) {
+  const res = await fetch(`${API_URL}/avisos-llegada`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ producto_id: productoId, nombre, telefono }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || 'No pudimos guardar tu aviso. Inténtalo de nuevo.');
+  return body;
+}
+
+// Panel: clientes esperando un perfume
+export interface AvisoLlegada {
+  id: number;
+  producto_id: number;
+  producto_nombre: string;
+  image_url?: string | null;
+  nombre: string;
+  telefono: string;
+  estado: 'esperando' | 'avisado' | 'descartado';
+  creado_en: string;
+  avisado_en: string | null;
+  disponible: boolean;
+}
+export interface RankingAviso { producto_id: number; producto_nombre: string; esperando: number; desde: string; disponible: boolean }
+export async function getAvisosLlegada(estado: 'esperando' | 'avisado' | 'descartado' = 'esperando'): Promise<{ avisos: AvisoLlegada[]; ranking: RankingAviso[] }> {
+  return apiFetch(`/avisos-llegada?estado=${estado}`);
+}
+export async function setEstadoAvisoLlegada(id: number, estado: 'esperando' | 'avisado' | 'descartado') {
+  return apiFetch(`/avisos-llegada/${id}`, { method: 'PATCH', body: JSON.stringify({ estado }) });
+}
 
 function getToken() {
   return localStorage.getItem("jwt_token");
@@ -1439,14 +1515,18 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     (err as any).status = res.status;
     if (res.status === 401) {
       try { localStorage.removeItem('jwt_token'); } catch (e) { }
-      // Si la 401 ocurre y NO estamos en la página pública (hero -> '/'),
-      // redirigimos al login para forzar re-autenticación. Si estamos en
-      // el landing público, no forzamos navegación (permitir vista pública).
+      // Si la 401 ocurre en el panel, redirigimos al login para re-autenticar.
+      // En la tienda pública (inicio, categorías, nosotros, rastreo) NUNCA
+      // mandamos al cliente al login: antes pasaba en /categoria/... al enviar el pedido.
       try {
         if (typeof window !== 'undefined') {
           const path = window.location.pathname || '/';
-          const isHero = path === '/';
-          if (!isHero) {
+          const isTiendaPublica = path === '/'
+            || path.startsWith('/categoria/')
+            || path === '/about'
+            || path === '/rastreo'
+            || path === '/login';
+          if (!isTiendaPublica) {
             // Reemplazar la entrada de navegación para evitar volver atrás
             window.location.replace('/login');
             // no continuar, lanzamos el error para que el caller también lo maneje
@@ -1521,6 +1601,22 @@ export async function saveDescuentoMayorConfig(data: ConfigDescuentoMayor): Prom
 }
 
 // Quitar (aplicar=false) o volver a aplicar el descuento al mayor de un pedido, p. ej. pago con Cashea
+// Corregir el método de entrega de un pedido (tienda / envío nacional / delivery). No cambia montos.
+export interface EntregaPedidoInput {
+  tipo: 'tienda' | 'envio_nacional' | 'delivery';
+  sucursal_id?: number;
+  estado?: string;
+  ciudad?: string;
+  transportista?: 'MRW' | 'ZOOM' | 'OTRA';
+  transportista_otro?: string;
+  agencia_codigo?: string;
+  agencia_direccion?: string;
+  ubicacion_link?: string;
+}
+export async function setEntregaPedido(pedidoId: number, data: EntregaPedidoInput): Promise<{ id: number; tipo_entrega: string; datos_entrega: any }> {
+  return apiFetch(`/pedidos-venta/${pedidoId}/entrega`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
 export async function setDescuentoMayorPedido(pedidoId: number, aplicar: boolean) {
   return apiFetch(`/pedidos-venta/${pedidoId}/descuento-mayor`, { method: 'PUT', body: JSON.stringify({ aplicar }) });
 }
@@ -1552,124 +1648,16 @@ export async function uploadImage(file: File) {
 
 export { apiFetch, API_URL, getToken };
 
-function wahaConfigError(context: string) {
-  const host = typeof window !== 'undefined' ? window.location.host : 'unknown-host';
-  const mode = import.meta.env.MODE || 'unknown-mode';
-  return new Error(
-    `[${context}] VITE_WHATSAPP_API_URL no configurado. WAHA_URL="${WAHA_URL}" MODE="${mode}" HOST="${host}"`,
-  );
-}
-
-async function wahaFetch(path: string, options: RequestInit = {}) {
-  if (!WAHA_URL) throw wahaConfigError('wahaFetch');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {}),
-    ...(options.headers || {}),
-  };
-  const res = await fetch(`${WAHA_URL}${path}`, {
-    ...options,
-    headers,
-  });
-  const raw = await res.text();
-  let body: any = null;
-  try {
-    body = raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    body = null;
-  }
-
-  if (!res.ok) {
-    const detail = {
-      url: `${WAHA_URL}${path}`,
-      method: options.method || 'GET',
-      status: res.status,
-      statusText: res.statusText,
-      requestHeaders: headers,
-      requestBody: typeof options.body === 'string' ? options.body : '[non-string body]',
-      responseBodyParsed: body,
-      responseBodyRaw: raw,
-    };
-
-    try {
-      // eslint-disable-next-line no-console
-      console.error('[WAHA] request failed', detail);
-    } catch (error) {
-      // ignore console serialization errors
-    }
-
-    throw new Error(
-      body?.message ||
-      body?.error ||
-      `WAHA error ${res.status} ${res.statusText} on ${options.method || 'GET'} ${path}`,
-    );
-  }
-  return body;
-}
-
-function mapWahaSessionStatus(sessionData: any, qrData: any, sessionName: string) {
-  return {
-    ready: sessionData?.status === 'WORKING',
-    hasQr: Boolean(qrData?.data || qrData?.qr),
-    qrImage: qrData?.data ? `data:image/png;base64,${qrData.data}` : null,
-    qrRaw: qrData?.qr || null,
-    session: sessionName,
-    device: {
-      wid: sessionData?.me?.id || null,
-      phone: sessionData?.me?.id ? String(sessionData.me.id).replace('@c.us', '') : null,
-      pushname: sessionData?.me?.pushName || null,
-      platform: sessionData?.engine?.engine || null,
-    },
-    statusCode: (sessionData?.status || 'STOPPED').toLowerCase(),
-    statusMessage: `Estado de sesion: ${sessionData?.status || 'STOPPED'}`,
-    events: {
-      lastReadyAt: null,
-      lastDisconnectedAt: null,
-      lastAuthFailureAt: null,
-      lastAuthFailureMessage: null,
-    },
-    lastSendAttempt: null,
-  };
-}
+// WhatsApp: la página ya NO habla directo con WAHA ni lleva su clave (quedaba a la vista
+// de cualquiera). Todo pasa por nuestro servidor, que exige sesión y tiene el interruptor WAHA_ACTIVO.
 
 export async function getWhatsAppSessionStatus(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    let sessionData: any = null;
-    try {
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    } catch (error: any) {
-      if (!String(error?.message || '').toLowerCase().includes('not found')) throw error;
-      await wahaFetch('/api/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ name: sessionName }),
-      });
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    }
-
-    if (sessionData?.status === 'STOPPED' || sessionData?.status === 'FAILED') {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-      sessionData = await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`);
-    }
-
-    let qrData = null;
-    if (sessionData?.status === 'SCAN_QR_CODE') {
-      qrData = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/auth/qr`);
-    }
-    return mapWahaSessionStatus(sessionData, qrData, sessionName);
-  }
-
   const query = session ? `?session=${encodeURIComponent(session)}` : '';
   const body = await apiFetch(`/whatsapp/session/status${query}`);
   return body?.data || body;
 }
 
 export async function disconnectWhatsAppSession(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    return wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/logout`, { method: 'POST' });
-  }
   const body = await apiFetch('/whatsapp/session/disconnect', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1678,19 +1666,6 @@ export async function disconnectWhatsAppSession(session?: string) {
 }
 
 export async function resetWhatsAppSessionStorage(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    try {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
-    } catch (error) {
-      // ignore if not found
-    }
-    await wahaFetch('/api/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ name: sessionName }),
-    });
-    return wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-  }
   const body = await apiFetch('/whatsapp/session/reset-storage', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1704,24 +1679,6 @@ export async function recoverWhatsAppProfileLock() {
 }
 
 export async function generateWhatsAppNewQr(session?: string) {
-  if (WAHA_URL) {
-    const sessionName = (session || 'default').trim() || 'default';
-    try {
-      await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/logout`, { method: 'POST' });
-    } catch (error) {
-      // ignore if not found
-    }
-    try {
-      await wahaFetch('/api/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ name: sessionName }),
-      });
-    } catch (error) {
-      // ignore if already exists
-    }
-    await wahaFetch(`/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: 'POST' });
-    return getWhatsAppSessionStatus(sessionName);
-  }
   const body = await apiFetch('/whatsapp/session/new-qr', {
     method: 'POST',
     body: JSON.stringify(session ? { session } : {}),
@@ -1730,9 +1687,6 @@ export async function generateWhatsAppNewQr(session?: string) {
 }
 
 export async function getIncomingWhatsAppMessages() {
-  if (WAHA_URL) {
-    return [];
-  }
   const body = await apiFetch('/whatsapp/messages/incoming');
   return body?.data || [];
 }
@@ -1742,31 +1696,22 @@ export async function getOutboundOrderWhatsAppMessages() {
   return body?.data || [];
 }
 
-export async function listWahaChats(session?: string) {
-  if (!WAHA_URL) return [];
-  const sessionName = (session || 'default').trim() || 'default';
-  const body = await wahaFetch(`/api/${encodeURIComponent(sessionName)}/chats`);
-  return Array.isArray(body) ? body : body?.data || [];
+// La lista de chats solo existía hablando directo con WAHA; ya no está disponible.
+export async function listWahaChats(_session?: string) {
+  return [];
 }
 
-export async function listWahaMessages(session?: string, chatId?: string) {
-  if (!WAHA_URL) return [];
-  const sessionName = (session || 'default').trim() || 'default';
-  if (!chatId) return [];
-  const body = await wahaFetch(
-    `/api/${encodeURIComponent(sessionName)}/chats/${encodeURIComponent(chatId)}/messages`,
-  );
-  return Array.isArray(body) ? body : body?.data || [];
+export async function listWahaMessages(_session?: string, _chatId?: string) {
+  return [];
 }
 
 export async function sendWahaTextMessage(session: string, to: string, text: string) {
-  if (!WAHA_URL) throw wahaConfigError('sendWahaTextMessage');
-  const cleanSession = (session || 'default').trim() || 'default';
-  const chatId = to.includes('@') ? to : `${to.replace(/\D/g, '')}@c.us`;
-  return wahaFetch('/api/sendText', {
+  const body = await apiFetch('/whatsapp/send', {
     method: 'POST',
-    body: JSON.stringify({ session: cleanSession, chatId, text }),
+    body: JSON.stringify({ session, to, text }),
   });
+  if (body?.data?.skipped) throw new Error('WhatsApp está desactivado');
+  return body?.data || body;
 }
 
 export async function login(email: string, password: string) {

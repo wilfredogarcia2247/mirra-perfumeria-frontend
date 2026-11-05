@@ -6,6 +6,7 @@ import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito, bajarAlCatalogo } from '@/lib/catalog';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
+import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
 import useCart, { CartItem } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
@@ -108,9 +109,30 @@ export default function Hero() {
     return () => { activo = false; };
   }, []);
 
-  // Al cargar el catálogo, el carrito guardado toma los precios actuales
+  // Enlace compartido (/p/... -> /?producto=33): al cargar el catálogo abre ese perfume
   useEffect(() => {
-    syncWithCatalog(catalogProducts);
+    if (catalogProducts.length === 0) return;
+    const params = new URLSearchParams(location.search);
+    const id = Number(params.get('producto'));
+    if (!Number.isInteger(id) || id <= 0) return;
+    const encontrado = catalogProducts.find((p) => Number(p.id) === id);
+    if (encontrado) setSheetProduct({ product: encontrado, foto: null });
+    params.delete('producto');
+    const resto = params.toString();
+    navigate(`${location.pathname}${resto ? `?${resto}` : ''}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts]);
+
+  // Al cargar el catálogo, el carrito guardado toma los precios actuales y avisa lo que cambió
+  useEffect(() => {
+    const cambios = syncWithCatalog(catalogProducts);
+    const lista = (nombres: string[]) => (nombres.length <= 2 ? nombres.join(' y ') : `${nombres.slice(0, 2).join(', ')} y ${nombres.length - 2} más`);
+    if (cambios.agotados.length > 0) {
+      toast.warning(`Se agotó ${lista(cambios.agotados)}`, { description: 'Quítalo de tu carrito para poder enviar el pedido.', duration: 7000 });
+    }
+    if (cambios.precios.length > 0) {
+      toast(`Actualizamos el precio de ${lista(cambios.precios)}`, { description: 'Tu carrito ya muestra el precio de hoy.', duration: 6000 });
+    }
   }, [catalogProducts, syncWithCatalog]);
 
   useEffect(() => {
@@ -205,6 +227,7 @@ export default function Hero() {
           // attach raw inventory and full objects for detail views
           inventario: item.inventario ?? item.inventario_detalle ?? item.inventory ?? undefined,
           categoria_obj: item.categoria ?? null,
+          ficha: item.ficha ?? null,
           marca_obj: item.marca ?? null,
         } as Product));
 
@@ -341,11 +364,20 @@ export default function Hero() {
     toast.success(`${product.name} agregado al carrito`);
   }
 
+  // Perfumes agotados en el carrito: no se puede enviar hasta quitarlos
+  function hayAgotadosEnCarrito() {
+    if (!cartItems.some((it) => (it.product as any)?.agotado)) return false;
+    toast.error('Hay perfumes agotados en tu carrito', { description: 'Quítalos (✕) para poder enviar el pedido.' });
+    return true;
+  }
+
   function handleCheckout() {
     if (cartItems.length === 0) {
       toast('El carrito está vacío');
       return;
     }
+    if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
+    if (hayAgotadosEnCarrito()) return;
     setIsCheckoutOpen(true);
   }
 
@@ -368,6 +400,11 @@ export default function Hero() {
     })),
     configMayor,
   );
+  // Mínimo de 4 perfumes de 7 ml cuando no hay ninguno de 30 ml o más
+  const faltan7ml = faltanSieteMl(cartItems.map((it) => ({
+    nombre: (it.product as any)?.tamano?.nombre ?? (it.product as any)?.formula?.nombre,
+    cantidad: Number(it.qty || 0),
+  })));
   const descuentoElegido = elegirDescuento(descuentoCuponPosible, mayor.descuento);
   const descuentoCupon = descuentoElegido === 'cupon' ? descuentoCuponPosible : 0;
   const descuentoMayor = descuentoElegido === 'mayor' ? mayor.descuento : 0;
@@ -862,6 +899,9 @@ export default function Hero() {
                                 </button>
                               </div>
                               {displayTamano && <p className="text-xs text-gray-500 mt-0.5">{displayTamano}</p>}
+                              {(it.product as any)?.agotado && (
+                                <p className="mt-1 inline-block rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado · quítalo</p>
+                              )}
                             </div>
 
                             <div className="flex items-end justify-between mt-2">
@@ -913,6 +953,7 @@ export default function Hero() {
                       <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (cartItems.length === 0) { toast('El carrito está vacío'); return; }
+                        if (hayAgotadosEnCarrito()) return;
                         if (!cedulaCliente.trim()) { toast.error('Ingrese el documento de identificación'); return; }
 
                         const documentoCompleto = `${tipoDocumento}-${cedulaCliente.trim()}`;
@@ -1252,6 +1293,12 @@ export default function Hero() {
                   </div>
                 )}
 
+                {!isCheckoutOpen && faltan7ml > 0 && (
+                  <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    {avisoSieteMl(faltan7ml)}
+                  </p>
+                )}
+
                 {!isCheckoutOpen ? (
                   <div className="flex gap-3">
                     <button
@@ -1263,14 +1310,16 @@ export default function Hero() {
                     </button>
                     <button
                       onClick={() => {
+                        if (faltan7ml > 0) { toast.error(avisoSieteMl(faltan7ml)); return; }
+                        if (hayAgotadosEnCarrito()) return;
                         if (deliveryReview) {
                           setConfirmOrderRequest((request) => request + 1);
                         } else {
                           setIsCheckoutOpen(true);
                         }
                       }}
-                      disabled={checkoutSubmitting}
-                      className="flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60"
+                      disabled={checkoutSubmitting || faltan7ml > 0}
+                      className={`flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
                     >
                       <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}

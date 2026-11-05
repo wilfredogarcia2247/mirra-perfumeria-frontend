@@ -2,9 +2,44 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes } from '../integrations/api';
+import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, getPagosByPedido } from '../integrations/api';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+
+// Borradores de pago guardados en el dispositivo (uno por pedido); se descartan a los 2 días
+const PREFIJO_BORRADOR = 'mirra_borrador_pago_';
+const VIGENCIA_BORRADOR_MS = 2 * 24 * 60 * 60 * 1000;
+function limpiarBorradoresViejos() {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(PREFIJO_BORRADOR)) continue;
+      try {
+        const d = JSON.parse(localStorage.getItem(k) || 'null');
+        if (!d || Date.now() - Number(d.guardado) > VIGENCIA_BORRADOR_MS) localStorage.removeItem(k);
+      } catch { localStorage.removeItem(k); }
+    }
+  } catch { /* sin almacenamiento */ }
+}
+
+// Pagos registrados de un pedido (el detalle del pedido no los trae: se piden aparte, como en "Ver pagos")
+async function pagosRegistrados(pedidoId: number): Promise<any[]> {
+  try {
+    const r: any = await getPagosByPedido(pedidoId);
+    return Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
+  } catch { return []; }
+}
+
+// El servidor responde los errores como {"error":"..."}: mostrar solo el texto
+function textoError(e: any, porDefecto = 'Error registrando pago'): string {
+  const raw = e?.message ? String(e.message) : '';
+  if (!raw) return porDefecto;
+  try {
+    const j = JSON.parse(raw);
+    if (j && typeof j === 'object' && (j.error || j.message)) return String(j.error || j.message);
+  } catch { /* no era JSON */ }
+  return raw;
+}
 function extractMonedaFromDetalles(detalles: any) {
   try {
     console.log('PaymentByBank.extractMonedaFromDetalles', { detalles });
@@ -95,6 +130,19 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   const [pedidoAjustes, setPedidoAjustes] = useState<PedidoAjuste[]>([]);
   const [pedidoData, setPedidoData] = useState<any | null>(null);
   const [paymentMode, setPaymentMode] = useState<'single' | 'multiple'>('single');
+  // Motivos por los que no se pudo producir algún perfume (los da el servidor, con nombres)
+  const erroresProduccion = React.useRef<string[]>([]);
+  // ---- Borrador: lo escrito se guarda en este dispositivo y se recupera al volver a este pedido ----
+  const CLAVE_BORRADOR = `${PREFIJO_BORRADOR}${pedidoId}`;
+  const [borradorRecuperado, setBorradorRecuperado] = useState(false);
+  const formaPendiente = React.useRef<number | null>(null);
+  const pagoTerminado = React.useRef(false);
+  const borrarBorrador = () => { try { localStorage.removeItem(CLAVE_BORRADOR); } catch { /* sin almacenamiento */ } };
+  // Al registrar el pago con éxito se borra el borrador
+  const exito = (d: any) => { pagoTerminado.current = true; borrarBorrador(); if (onSuccess) onSuccess(d); };
+  const avisoPendientes = () => (erroresProduccion.current.length > 0
+    ? erroresProduccion.current.join(' · ')
+    : 'Hay perfumes de este pedido sin producir. Revisa sus órdenes de producción antes de completar el pedido.');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showAside, setShowAside] = useState<boolean>(true);
   const [showAllPayments, setShowAllPayments] = useState<boolean>(false);
@@ -285,6 +333,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
   // Intentar completar automáticamente órdenes de producción asociadas a un pedido.
   async function tryAutoCompleteOrdersForPedido(id: number) {
+    erroresProduccion.current = [];
     try {
       try {
         console.log('PaymentByBank.tryAutoCompleteOrdersForPedido.start', { id });
@@ -329,6 +378,8 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                 console.log('✅ Orden de producción completada:', oid);
               } catch (eOrd: any) {
                 console.warn(`⚠️ No se pudo completar orden ${oid}:`, eOrd?.message || eOrd);
+                const motivo = textoError(eOrd, '');
+                if (motivo && !erroresProduccion.current.includes(motivo)) erroresProduccion.current.push(motivo);
               }
             } else {
               console.warn('⚠️ No se pudo determinar almacen_venta_id para orden:', oid);
@@ -412,6 +463,60 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       setConverted(null);
     }
   }, [selectedBancoId, bancos, globalFormas]);
+
+  // Borrador: recuperar lo que se había escrito para este pedido
+  useEffect(() => {
+    limpiarBorradoresViejos();
+    try {
+      const d = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || 'null');
+      if (!d || d.v !== 1) return;
+      if (d.modo === 'single' || d.modo === 'multiple') setPaymentMode(d.modo);
+      if (d.bancoId != null) setSelectedBancoId(Number(d.bancoId));
+      formaPendiente.current = d.formaId != null ? Number(d.formaId) : null;
+      setMonto(d.monto || '');
+      setReferencia(d.referencia || '');
+      setFecha(d.fecha || '');
+      if (Array.isArray(d.pagosNuevos) && d.pagosNuevos.length > 0) setPayments((cur) => [...cur, ...d.pagosNuevos]);
+      setBorradorRecuperado(true);
+    } catch { /* borrador dañado o sin almacenamiento */ }
+  }, [pedidoId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // La forma de pago del borrador se aplica cuando el banco ya cargó sus formas
+  useEffect(() => {
+    const id = formaPendiente.current;
+    if (id != null && availableFormas.some((f) => Number(f.id) === id)) {
+      setSelectedFormaId(id);
+      formaPendiente.current = null;
+    }
+  }, [availableFormas]);
+
+  // Borrador: guardar lo que se escribe (medio segundo después del último cambio)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (pagoTerminado.current) return;
+      try {
+        const pagosNuevos = payments.filter((p) => !p?.existing && !p?.id);
+        const vacio = paymentMode === 'single' && !selectedBancoId && !monto && !referencia && !fecha && pagosNuevos.length === 0;
+        if (vacio) { borrarBorrador(); return; }
+        localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
+          v: 1, guardado: Date.now(), modo: paymentMode, bancoId: selectedBancoId, formaId: selectedFormaId,
+          monto, referencia, fecha, pagosNuevos,
+        }));
+      } catch { /* sin almacenamiento */ }
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [paymentMode, selectedBancoId, selectedFormaId, monto, referencia, fecha, payments]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function descartarBorrador() {
+    borrarBorrador();
+    setBorradorRecuperado(false);
+    setPaymentMode('single');
+    setSelectedBancoId(null);
+    setMonto('');
+    setReferencia('');
+    setFecha('');
+    setPayments((cur) => cur.filter((p) => p?.existing || p?.id));
+  }
 
   useEffect(() => {
     // Cuando cambia banco/forma (su moneda), obtener la tasa. NO depende de monto.
@@ -910,6 +1015,10 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
   })();
 
   const remaining = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum - currentInputEquiv).toFixed(2))) : null;
+  // Para los botones de "Varios pagos": lo que falta según la lista (sin el monto que se está escribiendo)
+  const montoEscrito = Number(String(monto || '').replace(',', '.'));
+  const hayMontoEscrito = Number.isFinite(montoEscrito) && montoEscrito > 0;
+  const restanteSinEscrito = pedidoTotal !== null ? Math.max(0, Number((pedidoTotal - paymentsEquivalenciaSum).toFixed(2))) : null;
   // monto bruto en la moneda de la tasa necesario para cubrir el restante (raw = remaining * tasa.monto)
   const amountToPayInCurrency = (tasa && typeof tasa.monto === 'number' && remaining !== null) ? Number((Number(tasa.monto) * Number(remaining)).toFixed(2)) : null;
 
@@ -1051,15 +1160,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         // Verificar que el pedido ahora incluye los pagos recién creados
         try {
           const fresh = await getPedidoVenta(pedidoId);
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
-            (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
-              (Array.isArray(fresh?.payments) ? fresh.payments :
-                (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos : [])));
+          const pagosList = await pagosRegistrados(pedidoId);
 
           if (createdCount > 0 && pagosList.length === 0) {
             setErrors('Pedido completado pero no se detectaron pagos asociados. Revisa la respuesta del servidor.');
             toast.error('Pedido completado pero no se detectaron pagos asociados');
-            if (onSuccess) onSuccess(fresh || data);
+            exito(fresh || data);
             if (onClose) onClose();
             setLoading(false);
             return;
@@ -1067,7 +1173,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         } catch (e) {
           console.warn('No se pudo verificar pagos tras completar', e);
         }
-        if (onSuccess) onSuccess(data);
+        exito(data);
         toast.success('Pagos registrados y pedido completado correctamente');
         if (onClose) onClose();
       } else {
@@ -1156,7 +1262,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
         try { await createMissingOrdersForPedido(pedidoId); } catch (e) { console.debug(e); }
         if (await pedidoHasPendingProduction(pedidoId)) {
-          toast.error('Hay líneas pendientes por producir. Cree las órdenes de producción antes de completar el pedido.');
+          toast.error(avisoPendientes(), { duration: 10000 }); setErrors(avisoPendientes());
           setLoading(false);
           return;
         }
@@ -1164,9 +1270,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         // Verificar que el pago quedó asociado
         try {
           const fresh = await getPedidoVenta(pedidoId);
-          const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos : (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta : (Array.isArray(fresh?.payments) ? fresh.payments : []));
+          const pagosList = await pagosRegistrados(pedidoId);
           if (!pagosList || pagosList.length === 0) {
-            if (onSuccess) onSuccess(fresh);
+            exito(fresh);
             if (onClose) onClose();
             setLoading(false);
             return;
@@ -1174,16 +1280,16 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         } catch (e) {
           console.warn('No se pudo verificar pago tras completar', e);
         }
-        if (onSuccess) onSuccess(data);
+        exito(data);
         toast.success('Pago registrado y pedido completado correctamente');
         if (onClose) onClose();
       }
     } catch (e: any) {
       console.error('Error registrando pago', e);
       if (e?.status === 409) setErrors('Error de inventario: conflicto al consumir stock reservado');
-      else if (e?.message) setErrors(String(e.message));
+      else if (e?.message) setErrors(textoError(e));
       else setErrors('Error registrando pago');
-      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { /* noop */ }
+      try { toast.error(textoError(e)); } catch (err) { /* noop */ }
     } finally {
       setLoading(false);
     }
@@ -1411,18 +1517,13 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
             const fresh = await getPedidoVenta(pedidoId);
             console.log('🔍 PEDIDO FRESH (después de completar):', JSON.stringify(fresh, null, 2));
             // Buscar pagos en múltiples posibles campos
-            const pagosList = Array.isArray(fresh?.pagos) ? fresh.pagos :
-              (Array.isArray(fresh?.pagos_venta) ? fresh.pagos_venta :
-                (Array.isArray(fresh?.payments) ? fresh.payments :
-                  (Array.isArray(data?.pedido?.pagos) ? data.pedido.pagos :
-                    (Array.isArray(data?.pago) ? [data.pago] :
-                      (data?.pago ? [data.pago] : [])))));
+            const pagosList = await pagosRegistrados(pedidoId);
 
             console.log('🔍 PAGOS ENCONTRADOS:', pagosList?.length || 0, pagosList);
 
             // Si el backend reportó éxito y devolvió un pago, lo consideramos válido aun si el "fresh" falla
             if (pagosList.length === 0 && !data?.pago) {
-              if (onSuccess) onSuccess(fresh || data);
+              exito(fresh || data);
               if (onClose) onClose();
               setLoading(false);
               return;
@@ -1430,7 +1531,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           } catch (e) {
             console.warn('No se pudo verificar pago tras completar (addAndComplete)', e);
           }
-          if (onSuccess) onSuccess(data);
+          exito(data);
           setShowSuccess(true);
           setTimeout(() => setShowSuccess(false), 1600);
           toast.success('Pago registrado y pedido completado');
@@ -1441,15 +1542,15 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         }
       } catch (e: any) {
         console.error('Error en AddAndComplete', e);
-        setErrors(e?.message ?? 'Error registrando pago');
-        try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { }
+        setErrors(textoError(e));
+        try { toast.error(textoError(e)); } catch (err) { }
       } finally {
         setLoading(false);
       }
     } catch (e: any) {
       console.error('Error en AddAndComplete', e);
-      setErrors(e?.message ?? 'Error registrando pago');
-      try { toast.error(e?.message || 'Error registrando pago'); } catch (err) { }
+      setErrors(textoError(e));
+      try { toast.error(textoError(e)); } catch (err) { }
       setLoading(false);
     }
   }
@@ -1627,6 +1728,12 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       </div>
 
       <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
+        {borradorRecuperado && (
+          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <span>Recuperamos lo que habías escrito para este pedido.</span>
+            <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-sky-300 bg-white px-3 text-xs font-medium hover:bg-sky-100">Borrar y empezar de nuevo</button>
+          </div>
+        )}
         {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1930,7 +2037,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
       <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-2 items-stretch z-20">
         <div className="flex-1 flex gap-2">
-          {paymentMode === 'multiple' && (remaining === null || remaining > 0.009) && (
+          {/* Varios pagos: "Añadir" sigue visible mientras haya un monto escrito (aunque complete el total);
+              "Completar" aparece cuando la lista ya cubre el total y no queda nada escrito sin añadir */}
+          {paymentMode === 'multiple' && (hayMontoEscrito || restanteSinEscrito === null || restanteSinEscrito > 0.009) && (
             <Button
               onClick={handleAddPayment}
               disabled={loading}
@@ -1942,7 +2051,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           )}
 
           {/* Quick flows */}
-          {paymentMode === 'multiple' && pedidoTotal !== null && remaining !== null && remaining <= 0.009 ? (
+          {paymentMode === 'multiple' && pedidoTotal !== null && restanteSinEscrito !== null && restanteSinEscrito <= 0.009 && !hayMontoEscrito ? (
             <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
               {loading ? 'Procesando...' : 'Completar pedido'}
             </Button>

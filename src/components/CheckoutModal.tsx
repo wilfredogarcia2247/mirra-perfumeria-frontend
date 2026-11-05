@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, Check, MapPin, Minus, Navigation, Pencil, Plus, Trash2, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
-import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, lookupClienteByCedula, Sucursal } from '@/integrations/api';
+import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, getToken, lookupClienteByCedula, Sucursal } from '@/integrations/api';
 import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 import { enlaceWhatsappPedido } from '@/lib/pedidoWhatsapp';
+import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 
 type FulfillmentType = 'tienda' | 'envio_nacional' | 'delivery';
 const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '');
@@ -184,6 +185,7 @@ export default function CheckoutModal({
   const [localizando, setLocalizando] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState<'delivery' | 'review'>('delivery');
   const formRef = useRef<HTMLFormElement>(null);
+  const enviandoRef = useRef(false);
   const cedulaLookupRequest = useRef(0);
   const currentCedula = useRef('');
   const nombreClienteRef = useRef('');
@@ -530,6 +532,20 @@ export default function CheckoutModal({
     }
     if (localDemo) return toast.info('Esta vista previa local no envía pedidos.');
     if (items.length === 0) return toast.error('Agrega al menos un producto antes de confirmar');
+    const faltan7ml = faltanSieteMl(items.map((it) => {
+      const pr = it.product as any;
+      return { nombre: pr?.formula?.nombre ?? pr?.formula_nombre ?? pr?.tamano?.nombre ?? pr?.tamano_nombre, cantidad: Number(it.qty || 0) };
+    }));
+    if (faltan7ml > 0) return toast.error(avisoSieteMl(faltan7ml));
+
+    // Candado contra pedidos repetidos: antes de crear el pedido se consultan datos en internet
+    // (stock de cada perfume) y eso tarda unos segundos con datos móviles. El botón se bloquea
+    // desde el primer toque; los toques siguientes no hacen nada hasta que termine.
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    setLoading(true);
+    onSubmittingChange?.(true);
+    try {
 
     const lineas = items.map((it) => {
       const product: any = it.product;
@@ -543,10 +559,19 @@ export default function CheckoutModal({
       };
     });
 
-    // Obtener datos frescos de productos
+    // Las consultas de inventario detallado y fórmulas son del panel y piden sesión.
+    // Un cliente de la tienda no tiene sesión: usamos los datos que ya cargó la tienda
+    // (antes esas llamadas fallaban y lo mandaban al login en /categoria/...).
+    const hayPersonal = !!getToken();
+
+    // Obtener datos frescos de productos (solo personal logueado, p. ej. tablets de la tienda)
     const prodMap = new Map<number, any>();
     await Promise.all(items.map(async (it) => {
       const pid = Number(it.product.id);
+      if (!hayPersonal) {
+        prodMap.set(pid, it.product);
+        return;
+      }
       try {
         const fresh = await getProducto(pid);
         prodMap.set(pid, fresh || it.product);
@@ -577,6 +602,11 @@ export default function CheckoutModal({
 
     // Si hay faltantes, intentar validar producción via fórmulas
     if (faltantesItems.length > 0) {
+      if (!hayPersonal) {
+        // Mismo resultado que antes para el cliente: sin sesión no se pueden revisar fórmulas
+        toast.error('No hay stock suficiente para agregar al pedido');
+        return;
+      }
       try {
         const fRaw = await getFormulas();
         const formulas = fRaw && Array.isArray((fRaw as any).data) ? (fRaw as any).data : (Array.isArray(fRaw) ? fRaw : []);
@@ -700,8 +730,6 @@ export default function CheckoutModal({
     }
 
     try {
-      setLoading(true);
-      onSubmittingChange?.(true);
       const created = await createPedidoVentaPublic(payload);
       // comprobar cambios de precio
       try {
@@ -780,7 +808,9 @@ export default function CheckoutModal({
       }
 
       toast.error('Error al crear pedido');
+    }
     } finally {
+      enviandoRef.current = false;
       setLoading(false);
       onSubmittingChange?.(false);
     }

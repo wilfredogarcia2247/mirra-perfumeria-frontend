@@ -1,9 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { Share2, X } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
+import AvisameForm from '@/components/AvisameForm';
+import { compartirPerfume } from '@/lib/compartir';
+import { FAMILIAS, MOMENTO, PARA, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const DURACION = 350;
@@ -23,6 +26,11 @@ interface Props {
 export default function ProductQuickSheet({ product, tasa, origen, onClose, onAdd }: Props) {
   const presentaciones = presentacionesDe(product);
   const [elegida, setElegida] = useState(0);
+  // Ficha del perfume: datos rápidos arriba y detalles (familia, casa y año del original).
+  // Las notas no se muestran porque ya salen en la foto de cada perfume.
+  const ficha = product.ficha ? normalizarFicha(product.ficha) : null;
+  const conFicha = fichaTieneDatos(ficha);
+  const hayDetalles = Boolean(ficha && (ficha.familias.length || ficha.casa || ficha.anio));
   const [abierta, setAbierta] = useState(false);
   const [fotoLista, setFotoLista] = useState(!origen);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -143,7 +151,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className={`fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.2)] transition-transform duration-[350ms] ease-[cubic-bezier(.2,.8,.2,1)] sm:bottom-auto sm:top-1/2 sm:max-h-[90vh] sm:rounded-[22px] ${abierta ? 'translate-y-0 sm:-translate-y-1/2' : 'translate-y-full sm:translate-y-[60%]'}`}
+        className={`fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.2)] transition-transform [transition-duration:350ms] [transition-timing-function:cubic-bezier(.2,.8,.2,1)] sm:bottom-auto sm:top-1/2 sm:max-h-[90vh] sm:rounded-[22px] ${abierta ? 'translate-y-0 sm:-translate-y-1/2' : 'translate-y-full sm:translate-y-[60%]'}`}
       >
         {/* En computadora la foto se achica sola para que nombre, tamaños y botón quepan sin scroll */}
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain sm:flex sm:flex-col">
@@ -179,17 +187,38 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           </div>
           <div className="px-4 pb-2 pt-3.5 sm:shrink-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              {product.category && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{product.category}</span>}
+              {conFicha && ficha && ficha.para ? (
+                <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{PARA.find((x) => x.v === ficha.para)?.i} {etiqueta(PARA, ficha.para)}</span>
+              ) : (
+                product.category && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{product.category}</span>
+              )}
+              {conFicha && ficha?.momento && <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{MOMENTO.find((x) => x.v === ficha.momento)?.i} {etiqueta(MOMENTO, ficha.momento)}</span>}
               {product.mas_pedido && !product.agotado && <span className="rounded-full bg-[#e4572e] px-2.5 py-0.5 text-xs font-bold text-white">🔥 Más pedido</span>}
+              {/* Compartir va en la línea de las etiquetas, pegado a la derecha */}
+              <button
+                type="button"
+                onClick={() => compartirPerfume(product, product.name)}
+                className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#fbf4ea] px-3 py-1.5 text-[13px] font-bold text-[#8b6439] transition active:scale-95"
+              >
+                <Share2 className="h-4 w-4" /> Compartir
+              </button>
             </div>
             <h2 className="mt-1.5 font-bell-mt text-lg font-semibold leading-snug text-gray-900">{product.name}</h2>
+            {ficha?.inspirado_en && <p className="mt-0.5 text-[13px] text-gray-500">Inspirado en {ficha.inspirado_en}</p>}
+            {conFicha && ficha && hayDetalles && (
+              <dl className="mt-2.5 space-y-1 rounded-xl bg-[#faf6f0] px-3 py-2.5 text-[13px]">
+                {/* Título y valor juntos, pegados a la derecha; títulos en mayúsculas pequeñas color café */}
+                {ficha.familias.length > 0 && <div className="flex items-baseline justify-end gap-2.5"><dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#8b6439]">Familia</dt><dd className="text-right text-gray-600">{ficha.familias.map((f) => etiqueta(FAMILIAS, f)).join(' · ')}</dd></div>}
+                {(ficha.casa || ficha.anio) && <div className="flex items-baseline justify-end gap-2.5"><dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#8b6439]">Casa</dt><dd className="text-right text-gray-600">{[ficha.casa, ficha.anio].filter(Boolean).join(' · ')}</dd></div>}
+              </dl>
+            )}
             {product.description && <p className="mt-2 text-sm leading-relaxed text-gray-600 sm:line-clamp-3">{product.description}</p>}
           </div>
         </div>
 
         <div className="border-t border-[#f0e8de] bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
           {product.agotado ? (
-            <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
+            <AvisameForm productoId={product.id} productoNombre={product.name} />
           ) : presentaciones.length > 0 ? (
             <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : presentaciones.length === 4 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {presentaciones.map((p, i) => (
@@ -208,14 +237,16 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           ) : (
             <p className="mb-3 text-center text-sm text-gray-500">Este producto no tiene presentaciones disponibles.</p>
           )}
+          {!product.agotado && (
           <button
             type="button"
             onClick={agregar}
             disabled={!puedeAgregar}
             className={`w-full rounded-xl py-3.5 text-[15px] font-bold transition active:scale-[0.98] ${puedeAgregar ? 'bg-[#CA9E67] text-white hover:bg-[#b58a53]' : 'cursor-not-allowed bg-gray-200 text-gray-500'}`}
           >
-            {product.agotado ? 'Agotado' : puedeAgregar ? `Agregar ${actual.label} · ${precio}` : 'No disponible'}
+            {puedeAgregar ? `Agregar ${actual.label} · ${precio}` : 'No disponible'}
           </button>
+          )}
         </div>
       </div>
     </>,

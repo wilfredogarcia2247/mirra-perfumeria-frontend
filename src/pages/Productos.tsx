@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { getImageUrl } from '@/lib/utils';
 import { Layout } from "@/components/Layout";
-import { getProductos, deleteProducto, getProducto, adjustInventario, getAlmacenes, addProductoAlmacen } from "@/integrations/api";
+import { getProductos, deleteProducto, getProducto, adjustInventario, getAlmacenes, addProductoAlmacen, getAlertaEsencias, type AlertaEsencias, type EsenciaBaja } from "@/integrations/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,7 +18,9 @@ import { Form, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Warehouse, Loader2, Star, ArrowUp, ArrowDown, ArrowUpDown, Sparkles } from "lucide-react";
+import FichaPerfumeDialog from "@/components/FichaPerfumeDialog";
+import { fichaTieneDatos, normalizarFicha } from "@/lib/fichaPerfume";
 import {
   Table,
   TableBody,
@@ -54,6 +56,68 @@ function categoriaIdsDe(product: any): number[] {
 function nombresCategorias(product: any, mapa: Record<number, string>): string {
   if (product?.categorias_nombres) return product.categorias_nombres;
   return categoriaIdsDe(product).map((id) => mapa[id]).filter(Boolean).join(', ') || product?.categoria_nombre || '';
+}
+
+// Stock disponible del producto (suma de almacenes, o el campo stock si no hay detalle)
+function stockDe(product: any): number {
+  const inv = product?.inventario || [];
+  return Array.isArray(inv) && inv.length > 0
+    ? inv.reduce((s: number, it: any) => s + Number(it.stock_disponible || 0), 0)
+    : Number(product?.stock || 0);
+}
+
+// Orden de la lista de productos (flechitas de la tabla y selector en el teléfono)
+type CampoOrden = 'id' | 'nombre' | 'unidad' | 'categoria' | 'marca' | 'stock' | 'costo' | 'precio';
+type Orden = { campo: CampoOrden; dir: 'asc' | 'desc' } | null;
+const CAMPOS_TEXTO: CampoOrden[] = ['nombre', 'unidad', 'categoria', 'marca'];
+const CLAVE_ORDEN = 'productos_orden';
+
+function leerOrdenGuardado(): Orden {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_ORDEN) || 'null');
+    return v && v.campo && (v.dir === 'asc' || v.dir === 'desc') ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// Etiqueta de estado de la esencia: baja (alta o baja rotación) o agotado
+type EstadoProducto = { tipo: 'esencia_baja'; esencia: EsenciaBaja } | { tipo: 'agotado' };
+function EtiquetaEstado({ estado }: { estado?: EstadoProducto }) {
+  if (!estado) return null;
+  if (estado.tipo === 'agotado') {
+    return <span className="shrink-0 whitespace-nowrap rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado</span>;
+  }
+  const e = estado.esencia;
+  const detalle = `Quedan ${e.disponible_g} g de esencia: alcanza para ${e.frascos_grandes} frasco${e.frascos_grandes === 1 ? '' : 's'}${e.tamano_grande ? ` de ${e.tamano_grande}` : ''}. ${e.vendidos_periodo} vendido${e.vendidos_periodo === 1 ? '' : 's'} en 30 días.`;
+  return e.rotacion === 'alta' ? (
+    <span title={detalle} className="shrink-0 whitespace-nowrap rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800">⚠️ Esencia baja · alta rotación</span>
+  ) : (
+    <span title={detalle} className="shrink-0 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">Esencia baja · baja rotación</span>
+  );
+}
+
+// Encabezado de columna tocable: 1er toque ↑ (menor a mayor / A-Z), 2do ↓, 3ro vuelve al orden normal
+function EncabezadoOrden({ campo, titulo, orden, onOrden }: { campo: CampoOrden; titulo: string; orden: Orden; onOrden: (c: CampoOrden) => void }) {
+  const activo = orden?.campo === campo;
+  const Icono = !activo ? ArrowUpDown : orden!.dir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <TableHead
+      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3"
+      aria-sort={activo ? (orden!.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onOrden(campo)}
+        className={`relative inline-flex items-center uppercase tracking-wider hover:text-foreground transition-colors ${activo ? 'text-foreground font-semibold' : ''}`}
+        title="Ordenar"
+      >
+        {titulo}
+        {/* La flecha va en el margen derecho de la columna (12px), así no ensancha la tabla */}
+        <Icono className={`absolute left-full top-1/2 ml-0.5 h-3 w-3 -translate-y-1/2 ${activo ? 'opacity-100' : 'opacity-40'}`} />
+      </button>
+    </TableHead>
+  );
 }
 
 export default function Productos() {
@@ -190,12 +254,84 @@ export default function Productos() {
   // y luego la que viene en el objeto del producto (normalizada con getImageUrl).
   const currentImage = imageUrl ?? (editingProduct ? getImageUrl(editingProduct) ?? null : null);
 
-  const filteredProducts = productos.filter((product) => {
+  // Alertas de esencia baja / agotados (si fallan, la lista funciona igual sin etiquetas)
+  const [alertas, setAlertas] = useState<AlertaEsencias | null>(null);
+  useEffect(() => {
+    getAlertaEsencias().then(setAlertas).catch(() => setAlertas(null));
+  }, []);
+  const estadoPorProducto = React.useMemo(() => {
+    const mapa = new Map<number, EstadoProducto>();
+    if (!alertas) return mapa;
+    for (const id of alertas.perfumes_agotados || []) mapa.set(Number(id), { tipo: 'agotado' });
+    for (const e of alertas.esencias || []) {
+      mapa.set(Number(e.id), { tipo: 'esencia_baja', esencia: e });
+      for (const pid of e.perfume_ids || []) {
+        if (!mapa.has(Number(pid))) mapa.set(Number(pid), { tipo: 'esencia_baja', esencia: e });
+      }
+    }
+    return mapa;
+  }, [alertas]);
+
+  const [filtroEstado, setFiltroEstado] = useState<'' | 'esencia_baja' | 'agotado' | 'disponible' | 'sin_ficha' | 'ficha_por_revisar'>('');
+  const [fichaProducto, setFichaProducto] = useState<any | null>(null);
+  const estadoFicha = (p: any): 'revisada' | 'por_revisar' | 'sin_ficha' => {
+    const f = p?.ficha ? normalizarFicha(p.ficha) : null;
+    if (!fichaTieneDatos(f)) return 'sin_ficha';
+    return f!.revisada ? 'revisada' : 'por_revisar';
+  };
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('');
+  const [filtroMarca, setFiltroMarca] = useState<string>('');
+
+  const [orden, setOrden] = useState<Orden>(() => leerOrdenGuardado());
+  const guardarOrden = (o: Orden) => {
+    setOrden(o);
+    try { localStorage.setItem(CLAVE_ORDEN, JSON.stringify(o)); } catch { /* sin guardado */ }
+  };
+  const alternarOrden = (campo: CampoOrden) => {
+    if (orden?.campo !== campo) return guardarOrden({ campo, dir: 'asc' });
+    if (orden.dir === 'asc') return guardarOrden({ campo, dir: 'desc' });
+    return guardarOrden(null);
+  };
+
+  const filteredProducts = productos.filter((product: any) => {
     const term = searchTerm.toLowerCase();
+    const estado = estadoPorProducto.get(Number(product.id));
+    if (filtroEstado === 'esencia_baja' && estado?.tipo !== 'esencia_baja') return false;
+    if (filtroEstado === 'agotado' && estado?.tipo !== 'agotado') return false;
+    if (filtroEstado === 'disponible' && estado?.tipo === 'agotado') return false;
+    if (filtroEstado === 'sin_ficha' && estadoFicha(product) !== 'sin_ficha') return false;
+    if (filtroEstado === 'ficha_por_revisar' && estadoFicha(product) !== 'por_revisar') return false;
+    if (filtroCategoria && !categoriaIdsDe(product).includes(Number(filtroCategoria))) return false;
+    if (filtroMarca && String(product.marca_id ?? '') !== filtroMarca) return false;
     return (
       (product.nombre || "").toLowerCase().includes(term) ||
       false
     );
+  });
+
+  const valorOrden = (p: any, campo: CampoOrden): string | number | null => {
+    switch (campo) {
+      case 'id': return Number(p.id);
+      case 'nombre': return p.nombre || '';
+      case 'unidad': return p.unidad || '';
+      case 'categoria': return nombresCategorias(p, categoriasMap) || '';
+      case 'marca': return p.marca_nombre ?? marcasMap[p.marca_id] ?? '';
+      case 'stock': return stockDe(p);
+      case 'costo': return p.costo == null || p.costo === '' ? null : Number(p.costo);
+      case 'precio': return p.precio_venta == null || p.precio_venta === '' ? null : Number(p.precio_venta);
+    }
+  };
+  const sortedProducts = !orden ? filteredProducts : [...filteredProducts].sort((a: any, b: any) => {
+    const va = valorOrden(a, orden.campo);
+    const vb = valorOrden(b, orden.campo);
+    // Los vacíos siempre al final, en cualquier dirección
+    const vacioA = va === null || va === '' || (typeof va === 'number' && Number.isNaN(va));
+    const vacioB = vb === null || vb === '' || (typeof vb === 'number' && Number.isNaN(vb));
+    if (vacioA || vacioB) return vacioA === vacioB ? 0 : vacioA ? 1 : -1;
+    const cmp = CAMPOS_TEXTO.includes(orden.campo)
+      ? String(va).localeCompare(String(vb), 'es', { numeric: true, sensitivity: 'base' })
+      : Number(va) - Number(vb);
+    return orden.dir === 'asc' ? cmp : -cmp;
   });
 
   async function onSubmit(values: any) {
@@ -763,13 +899,90 @@ export default function Productos() {
           />
         </div>
 
+        <FichaPerfumeDialog
+          producto={fichaProducto}
+          onCerrar={() => setFichaProducto(null)}
+          onGuardado={(id, ficha) => setProductos((prev: any[]) => prev.map((p) => (Number(p.id) === id ? { ...p, ficha } : p)))}
+        />
+
+        {/* Filtros: estado de la esencia, categoría y marca */}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value as any)}
+            aria-label="Filtrar por estado"
+            className="col-span-2 h-11 rounded-md border bg-background px-3 text-base sm:col-span-1 sm:h-9 sm:w-56 sm:text-sm"
+          >
+            <option value="">Estado: todos</option>
+            <option value="esencia_baja">⚠️ Esencia baja{Array.isArray(alertas?.esencias) ? ` (${alertas!.esencias.length})` : ''}</option>
+            <option value="agotado">Agotados{Array.isArray(alertas?.perfumes_agotados) ? ` (${alertas!.perfumes_agotados.length})` : ''}</option>
+            <option value="disponible">Disponibles</option>
+            <option value="sin_ficha">Sin ficha del perfume</option>
+            <option value="ficha_por_revisar">Ficha por revisar</option>
+          </select>
+          <select
+            value={filtroCategoria}
+            onChange={(e) => setFiltroCategoria(e.target.value)}
+            aria-label="Filtrar por categoría"
+            className="h-11 min-w-0 rounded-md border bg-background px-3 text-base sm:h-9 sm:w-44 sm:text-sm"
+          >
+            <option value="">Categoría</option>
+            {categorias.map((c: any) => <option key={c.id} value={String(c.id)}>{c.nombre}</option>)}
+          </select>
+          <select
+            value={filtroMarca}
+            onChange={(e) => setFiltroMarca(e.target.value)}
+            aria-label="Filtrar por marca"
+            className="h-11 min-w-0 rounded-md border bg-background px-3 text-base sm:h-9 sm:w-44 sm:text-sm"
+          >
+            <option value="">Marca</option>
+            {marcas.map((m: any) => <option key={m.id} value={String(m.id)}>{m.nombre}</option>)}
+          </select>
+          {(filtroEstado || filtroCategoria || filtroMarca) && (
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado(''); setFiltroCategoria(''); setFiltroMarca(''); }}
+              className="col-span-2 h-9 text-sm font-medium text-muted-foreground underline underline-offset-2 sm:col-span-1 sm:px-2"
+            >
+              Quitar filtros
+            </button>
+          )}
+        </div>
+
+        {/* Ordenar (solo teléfono: en la tabla se ordena tocando los títulos) */}
+        <label className="flex items-center gap-2 sm:hidden">
+          <span className="shrink-0 text-sm text-muted-foreground">Ordenar:</span>
+          <select
+            value={orden ? `${orden.campo}:${orden.dir}` : ''}
+            onChange={(e) => {
+              const [campo, dir] = e.target.value.split(':');
+              guardarOrden(campo ? { campo: campo as CampoOrden, dir: dir as 'asc' | 'desc' } : null);
+            }}
+            className="h-11 w-full rounded-md border bg-background px-3 text-base"
+          >
+            <option value="">Orden normal</option>
+            <option value="nombre:asc">Nombre: A → Z</option>
+            <option value="nombre:desc">Nombre: Z → A</option>
+            <option value="stock:asc">Stock: menor a mayor ↑</option>
+            <option value="stock:desc">Stock: mayor a menor ↓</option>
+            <option value="precio:asc">Precio: menor a mayor ↑</option>
+            <option value="precio:desc">Precio: mayor a menor ↓</option>
+            <option value="costo:asc">Costo: menor a mayor ↑</option>
+            <option value="costo:desc">Costo: mayor a menor ↓</option>
+            <option value="categoria:asc">Categoría: A → Z</option>
+            <option value="marca:asc">Marca: A → Z</option>
+            <option value="id:desc">Más nuevos primero</option>
+            <option value="id:asc">Más antiguos primero</option>
+          </select>
+        </label>
+
         {loading ? (
           <TableSkeleton columns={10} />
         ) : (
           <>
             {/* ── Móvil: tarjetas ── */}
             <div className="flex flex-col gap-3 sm:hidden">
-              {filteredProducts.map((product: any) => {
+              {sortedProducts.map((product: any) => {
                 const inv = product?.inventario || [];
                 const totalStock = Array.isArray(inv) && inv.length > 0
                   ? inv.reduce((s: number, it: any) => s + Number(it.stock_disponible || 0), 0)
@@ -823,6 +1036,7 @@ export default function Productos() {
                             {product.visible_en_catalogo === false && (
                               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">Oculto</span>
                             )}
+                            <EtiquetaEstado estado={estadoPorProducto.get(Number(product.id))} />
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {nombresCategorias(product, categoriasMap) || '—'} · {product.marca_nombre ?? marcasMap[product.marca_id] ?? '—'}
@@ -843,6 +1057,9 @@ export default function Productos() {
                         <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={openStock}>
                           <Warehouse className="h-4 w-4" /> Stock
                         </button>
+                        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors min-h-[44px]" onClick={() => setFichaProducto(product)}>
+                          <Sparkles className="h-4 w-4" /> Ficha
+                        </button>
                         <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors min-h-[44px]" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}>
                           <Trash2 className="h-4 w-4" /> Borrar
                         </button>
@@ -859,23 +1076,24 @@ export default function Productos() {
             {/* ── Desktop: tabla ── */}
             <Card className="hidden sm:block">
               <CardContent className="p-0">
-                <Table>
+                {/* Márgenes de columna de 12px (en vez de 16px) para que la tabla quepa a 1280px con el menú abierto */}
+                <Table className="[&_td]:px-3 [&_th]:px-3">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">ID</TableHead>
+                      <EncabezadoOrden campo="id" titulo="ID" orden={orden} onOrden={alternarOrden} />
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Imagen</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Nombre</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Unidad</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Categoría</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Marca</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Stock</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Costo</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Precio</TableHead>
+                      <EncabezadoOrden campo="nombre" titulo="Nombre" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="unidad" titulo="Unidad" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="categoria" titulo="Categoría" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="marca" titulo="Marca" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="stock" titulo="Stock" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="costo" titulo="Costo" orden={orden} onOrden={alternarOrden} />
+                      <EncabezadoOrden campo="precio" titulo="Precio" orden={orden} onOrden={alternarOrden} />
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((product: any) => (
+                    {sortedProducts.map((product: any) => (
                       <TableRow key={product.id} className="hover:bg-muted/40 transition-colors duration-150">
                         <TableCell className="text-xs tabular-nums text-muted-foreground">#{product.id}</TableCell>
                         <TableCell>
@@ -894,7 +1112,8 @@ export default function Productos() {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
+                          {/* Las etiquetas bajan de línea si no caben, para no montarse sobre la columna vecina */}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span>{product.nombre}</span>
                             {product.destacado && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
@@ -904,6 +1123,7 @@ export default function Productos() {
                             {product.visible_en_catalogo === false ? (
                               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Oculto</span>
                             ) : null}
+                            <EtiquetaEstado estado={estadoPorProducto.get(Number(product.id))} />
                           </div>
                         </TableCell>
                         <TableCell>{product.unidad}</TableCell>
@@ -922,7 +1142,7 @@ export default function Productos() {
                         <TableCell>{product.costo ?? '-'}</TableCell>
                         <TableCell>{product.precio_venta ?? '-'}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-0.5">
                             <Button variant="ghost" size="icon" onClick={() => {
                               setEditingProduct(product);
                               form.reset({ nombre: product.nombre, unidad: product.unidad, costo: product.costo, precio_venta: product.precio_venta, proveedor_id: product.proveedor_id, categoria_id: product.categoria_id ?? null, marca_id: product.marca_id ?? null });
@@ -945,6 +1165,7 @@ export default function Productos() {
                               setViewStockDetalle(null);
                               getProducto(product.id).then((d) => setViewStockDetalle(d)).catch((e) => { console.error('Error cargando existencias:', e); toast.error('No se pudo cargar existencias'); }).finally(() => setViewStockLoading(false));
                             }}><Warehouse className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" title="Ficha del perfume y enlace" onClick={() => setFichaProducto(product)}><Sparkles className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(product); setAlertOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                           </div>
                         </TableCell>

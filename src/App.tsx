@@ -21,9 +21,10 @@ import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
-import WhatsappAdmin from "./pages/WhatsappAdmin";
 import CintilloMensajes from "./pages/CintilloMensajes";
 import DescuentoMayor from "./pages/DescuentoMayor";
+import AvisosLlegada from "./pages/AvisosLlegada";
+import AbrirPerfume from "./pages/AbrirPerfume";
 import Sucursales from "./pages/Sucursales";
 import MarketingSection from "./pages/MarketingSection";
 import Cupones from "./pages/Cupones";
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/rastreo" element={<Rastreo />} />
           </Route>
           <Route path="/login" element={<Login />} />
+          <Route path="/p/:slug" element={<AbrirPerfume />} />
 
           {import.meta.env.DEV && <Route path="/influencer-preview" element={<InfluencerDashboard preview />} />}
           {import.meta.env.DEV && <Route path="/influencer-admin-preview" element={<InfluencerAdminPreview />} />}
@@ -113,12 +115,13 @@ const App = () => (
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
-              <Route path="/admin/whatsapp" element={<WhatsappAdmin />} />
+              {/* /admin/whatsapp quitado: WhatsApp (WAHA) desactivado */}
               <Route path="/admin/cintillo" element={<CintilloMensajes />} />
               <Route path="/admin/sucursales" element={<Sucursales />} />
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />
               <Route path="/admin/marketing/cupones" element={<Cupones />} />
               <Route path="/admin/marketing/descuento-mayor" element={<DescuentoMayor />} />
+              <Route path="/admin/marketing/avisos" element={<AvisosLlegada />} />
             </Route>
 
             <Route element={<ModuleProtectedRoute moduleKey="marcas" />}>

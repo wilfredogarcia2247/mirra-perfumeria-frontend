@@ -7,6 +7,7 @@ import { getCachedTasaActiva } from '@/integrations/api';
 import { getPrecioMostrar } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
+import AvisameForm from '@/components/AvisameForm';
 
 interface Props {
   product: Product;
@@ -220,9 +221,9 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
 
         {/* Fixed Footer Actions */}
         <div className="border-t border-gray-100 p-4 sm:p-6 bg-white z-20">
-          {product.agotado && (
-            <p className="mb-3 text-center text-sm text-gray-600">Este perfume está agotado por el momento. Pronto volverá a estar disponible.</p>
-          )}
+          {product.agotado ? (
+            <AvisameForm productoId={product.id} productoNombre={product.name} />
+          ) : (
           <Button
             size="lg"
             className="w-full text-lg h-12 bg-gradient-to-r from-primary-600 to-amber-600 hover:from-primary-700 hover:to-amber-700 text-white shadow-lg shadow-primary-500/20 rounded-xl transition-all active:scale-[0.98]"
@@ -241,6 +242,7 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
               </>
             )}
           </Button>
+          )}
         </div>
 
       </div>

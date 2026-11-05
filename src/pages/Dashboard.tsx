@@ -4,6 +4,7 @@ import { Package, ShoppingCart, Warehouse, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/integrations/api';
+import EsenciasAlertaCard from '@/components/EsenciasAlertaCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -83,6 +84,9 @@ export default function Dashboard() {
         </div>
 
         {/* Charts */}
+        {/* Esencias por acabarse (con rotación): alerta, va arriba */}
+        <EsenciasAlertaCard />
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader className="pb-2 px-4 sm:px-6">

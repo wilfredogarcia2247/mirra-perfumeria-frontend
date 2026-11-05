@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { getPedidosStats, getOutboundOrderWhatsAppMessages } from '@/integrations/api';
+import { getPedidosStats, getOutboundOrderWhatsAppMessages, getAlertaEsencias } from '@/integrations/api';
 
 export type AppNotification = {
   id: string;
-  type: 'pedido' | 'whatsapp';
+  type: 'pedido' | 'whatsapp' | 'esencia';
   title: string;
   body: string;
   timestamp: Date;
@@ -14,6 +14,7 @@ export type AppNotification = {
 const STORAGE_PEDIDOS = 'mirra_notif_pedidos_total';
 const STORAGE_WA = 'mirra_notif_wa_count';
 const POLL_MS = 30_000;
+const STORAGE_ESENCIAS = 'mirra_notif_esencias_dia';
 
 
 export function useNotifications() {
@@ -80,6 +81,26 @@ export function useNotifications() {
         lastWa.current = Array.isArray(msgs) ? msgs.length : 0;
       } catch (_) {}
       ready.current = true;
+
+      // Esencias de alta rotación por acabarse: un aviso al día (no en cada recarga)
+      try {
+        const hoy = new Date().toISOString().slice(0, 10);
+        let yaAvisado = false;
+        try { yaAvisado = localStorage.getItem(STORAGE_ESENCIAS) === hoy; } catch (_) {}
+        if (!yaAvisado) {
+          const alertas = await getAlertaEsencias();
+          const urgentes = (alertas?.esencias || []).filter((e) => e.rotacion === 'alta');
+          if (urgentes.length > 0) {
+            push({
+              type: 'esencia',
+              title: `${urgentes.length} esencia${urgentes.length > 1 ? 's' : ''} de alta rotación por acabarse`,
+              body: 'Revisa "Esencias por acabarse" en el Dashboard y repón pronto.',
+              timestamp: new Date(),
+            });
+          }
+          try { localStorage.setItem(STORAGE_ESENCIAS, hoy); } catch (_) {}
+        }
+      } catch (_) {}
     };
 
     init();
