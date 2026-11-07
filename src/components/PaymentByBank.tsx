@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { mensajeConDetalles } from '@/lib/utils';
 import { getBancos, getFormasPago, completarPedidoVenta, completarPedidoAtomico, createPago, getPedidoVenta, getTasaBySimbolo, getTasasCambio, apiFetch, getOrdenProduccionDetailed, completarOrdenProduccion, getAlmacenes, getPagosByPedido } from '../integrations/api';
 // helpers
 const normalizeSymbol = (s: any) => s ? String(s).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
@@ -36,7 +37,7 @@ function textoError(e: any, porDefecto = 'Error registrando pago'): string {
   if (!raw) return porDefecto;
   try {
     const j = JSON.parse(raw);
-    if (j && typeof j === 'object' && (j.error || j.message)) return String(j.error || j.message);
+    if (j && typeof j === 'object' && (j.error || j.message)) return mensajeConDetalles(j, String(j.error || j.message));
   } catch { /* no era JSON */ }
   return raw;
 }
@@ -1289,7 +1290,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       if (e?.status === 409) setErrors('Error de inventario: conflicto al consumir stock reservado');
       else if (e?.message) setErrors(textoError(e));
       else setErrors('Error registrando pago');
-      try { toast.error(textoError(e)); } catch (err) { /* noop */ }
+      try { toast.error(textoError(e), { duration: 12000 }); } catch (err) { /* noop */ }
     } finally {
       setLoading(false);
     }
@@ -1543,14 +1544,14 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
       } catch (e: any) {
         console.error('Error en AddAndComplete', e);
         setErrors(textoError(e));
-        try { toast.error(textoError(e)); } catch (err) { }
+        try { toast.error(textoError(e), { duration: 12000 }); } catch (err) { }
       } finally {
         setLoading(false);
       }
     } catch (e: any) {
       console.error('Error en AddAndComplete', e);
       setErrors(textoError(e));
-      try { toast.error(textoError(e)); } catch (err) { }
+      try { toast.error(textoError(e), { duration: 12000 }); } catch (err) { }
       setLoading(false);
     }
   }
