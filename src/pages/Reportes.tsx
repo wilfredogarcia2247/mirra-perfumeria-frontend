@@ -16,7 +16,7 @@ import {
   getVentasPorPresentacion,
   getReporteEntregas,
 } from '@/integrations/api';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -188,6 +188,19 @@ function getReportSlug(pathname: string): ReportSlug {
 export default function Reportes() {
   const location = useLocation();
   const selectedReport = getReportSlug(location.pathname);
+  // Al tocar un reporte de la lista, bajar hasta donde empieza (en el teléfono la lista es larga)
+  const reporteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!(location.state as { irAlReporte?: boolean } | null)?.irAlReporte) return;
+    const id = window.setTimeout(() => {
+      const el = reporteRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      // Solo si el inicio del reporte no se ve (debajo de la barra de arriba y en la parte visible)
+      if (top < 56 || top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
@@ -1761,6 +1774,7 @@ export default function Reportes() {
               <Link
                 key={report.slug}
                 to={route}
+                state={{ keepScroll: true, irAlReporte: true }}
                 className={`rounded-lg border p-4 transition-colors ${active ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
               >
                 <p className="font-medium">{report.title}</p>
@@ -1770,6 +1784,7 @@ export default function Reportes() {
           })}
         </div>
 
+        <div ref={reporteRef} className="scroll-mt-20 space-y-6">
         {DATE_FILTER_REPORTS.has(selectedReport) && (
           <Card>
             <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -1819,6 +1834,7 @@ export default function Reportes() {
         )}
 
         {renderReport()}
+        </div>
       </div>
     </Layout>
   );
