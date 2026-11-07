@@ -5,6 +5,7 @@ import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
 import AvisameForm from '@/components/AvisameForm';
+import { useBloquearScroll } from "@/hooks/useBloquearScroll";
 import { compartirPerfume } from '@/lib/compartir';
 import { FAMILIAS, MOMENTO, PARA, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
 
@@ -81,11 +82,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
   }, []);
 
   // Bloquear el scroll de la página mientras la ventana está abierta
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  useBloquearScroll();
 
   const cerrar = () => {
     if (cerrando.current) return;
@@ -153,11 +150,12 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
         onTouchEnd={onTouchEnd}
         className={`fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.2)] transition-transform [transition-duration:350ms] [transition-timing-function:cubic-bezier(.2,.8,.2,1)] sm:bottom-auto sm:top-1/2 sm:max-h-[90vh] sm:rounded-[22px] ${abierta ? 'translate-y-0 sm:-translate-y-1/2' : 'translate-y-full sm:translate-y-[60%]'}`}
       >
-        {/* En computadora la foto se achica sola para que nombre, tamaños y botón quepan sin scroll */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain sm:flex sm:flex-col">
+        {/* La foto se achica sola (hasta 200 px) para que nombre, tamaños y botón quepan sin scroll.
+            Solo si el texto es muy largo queda scroll como último recurso. */}
+        <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <div
             ref={heroRef}
-            className="relative aspect-square max-h-[58dvh] w-full bg-[#f5eee6] sm:max-h-none sm:min-h-[200px] sm:shrink"
+            className="relative aspect-square min-h-[200px] w-full shrink overflow-hidden bg-[#f5eee6]"
           >
             <img
               ref={heroImgRef}
@@ -168,7 +166,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
                 img.onerror = null;
                 img.src = FALLBACK_IMAGES[Number(product.id) % FALLBACK_IMAGES.length];
               }}
-              className={`h-full w-full object-contain transition-opacity duration-150 ${fotoLista ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-150 ${fotoLista ? 'opacity-100' : 'opacity-0'}`}
             />
             <span className="absolute left-1/2 top-2 h-[5px] w-11 -translate-x-1/2 rounded-full bg-white/85 shadow sm:hidden" />
             <button
@@ -185,7 +183,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
               </div>
             )}
           </div>
-          <div className="px-4 pb-2 pt-3.5 sm:shrink-0">
+          <div className="shrink-0 px-4 pb-2 pt-3.5">
             <div className="flex flex-wrap items-center gap-1.5">
               {conFicha && ficha && ficha.para ? (
                 <span className="rounded-full bg-[#f5eee6] px-2.5 py-0.5 text-xs font-semibold text-[#8b6439]">{PARA.find((x) => x.v === ficha.para)?.i} {etiqueta(PARA, ficha.para)}</span>

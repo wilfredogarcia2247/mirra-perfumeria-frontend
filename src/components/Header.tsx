@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Menu, X, Truck } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { bajarAlCatalogo } from '@/lib/catalog';
+import { scrollBloqueado, useBloquearScroll } from '@/hooks/useBloquearScroll';
 import { getCatalogoPaginated, getMensajesCintilloActivos, type CintilloMensaje } from '@/integrations/api';
 
 interface HeaderProps {
@@ -57,14 +58,13 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
   }, [productosAbierto]);
 
   // Bloquear scroll del body cuando el menú está abierto
-  useEffect(() => {
-    document.body.style.overflow = isMenuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [isMenuOpen]);
+  useBloquearScroll(isMenuOpen);
 
   // Efecto para el scroll
   useEffect(() => {
     const handleScroll = () => {
+      // Con una ventana abierta la página está congelada y scrollY vale 0: no cambiar el encabezado
+      if (scrollBloqueado()) return;
       const isScrolled = window.scrollY > 10;
       if (isScrolled !== scrolled) {
         setScrolled(isScrolled);
@@ -288,7 +288,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
 
       {/* Menú móvil */}
       <div
-        className={`md:hidden tabletv:block bg-white shadow-lg transition-all duration-300 ease-in-out overflow-y-auto ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-gray-200' : 'max-h-0 overflow-hidden'
+        className={`md:hidden tabletv:block bg-white shadow-lg transition-all duration-300 ease-in-out overflow-y-auto overscroll-contain ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-gray-200' : 'max-h-0 overflow-hidden'
           }`}
       >
         <div className="px-4 py-3 space-y-1">

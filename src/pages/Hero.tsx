@@ -19,6 +19,7 @@ import Footer from '@/components/Footer';
 import FeaturedShowcase from '@/components/FeaturedShowcase';
 import PortadaCinta from '@/components/PortadaCinta';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useBloquearScroll } from '@/hooks/useBloquearScroll';
 import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
 interface CuponPublico {
@@ -74,6 +75,8 @@ export default function Hero() {
   const [deliveryReview, setDeliveryReview] = useState<CheckoutDeliveryReview | null>(null);
   // Pedido recién creado: pantalla "Pedido recibido" con el botón para enviarlo por WhatsApp
   const [pedidoRecibido, setPedidoRecibido] = useState<{ pedidoId?: number; whatsappUrl: string } | null>(null);
+  // El carrito (con el checkout adentro) y el aviso de pedido recibido congelan la página de atrás
+  useBloquearScroll(isCartOpen || pedidoRecibido !== null);
   const [confirmOrderRequest, setConfirmOrderRequest] = useState(0);
   const [editDeliveryRequest, setEditDeliveryRequest] = useState(0);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
@@ -757,7 +760,7 @@ export default function Hero() {
             </div>
 
             {/* Content Area - Scrollable */}
-            <div             className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-3 py-4' : 'px-6 py-6'}`}>
+            <div             className={`flex-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-3 py-4' : 'px-6 py-6'}`}>
               <CheckoutModal
                 open
                 visible={isCheckoutOpen}
