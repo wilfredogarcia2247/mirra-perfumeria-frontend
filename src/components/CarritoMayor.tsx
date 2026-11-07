@@ -1,6 +1,6 @@
 // Carrito: barra de progreso hacia el descuento al mayor y sugerencias de perfumes para alcanzarlo.
-import { useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import type { ConfigDescuentoMayor } from '@/integrations/api';
 import type { CartItem } from '@/hooks/use-cart';
 import type { Product } from '@/lib/types';
@@ -113,6 +113,48 @@ function tamanoPreferido(items: CartItem[], config: ConfigDescuentoMayor): numbe
   return mejor;
 }
 
+// Fila que se desliza hacia los lados. Con el dedo o el touchpad se mueve sola;
+// con mouse muestra flechas ‹ › (solo en equipos con mouse), que se ocultan en cada extremo.
+function FilaDeslizable({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [puede, setPuede] = useState({ izq: false, der: false });
+  const medir = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setPuede({ izq: el.scrollLeft > 4, der: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    medir();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [medir, children]);
+  const mover = (dir: 1 | -1) => {
+    const el = ref.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+  };
+  const flecha = 'absolute top-[38%] z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-800 shadow-md transition hover:bg-gray-50 [@media(hover:hover)_and_(pointer:fine)]:flex';
+  return (
+    <div className="relative">
+      <div ref={ref} onScroll={medir} className="mt-2 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {children}
+      </div>
+      {puede.izq && (
+        <button type="button" aria-label="Ver sugerencias anteriores" onClick={() => mover(-1)} className={`${flecha} left-2`}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+      {puede.der && (
+        <button type="button" aria-label="Ver más sugerencias" onClick={() => mover(1)} className={`${flecha} right-2`}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SugerenciasDescuentoMayor({
   catalogo,
   items,
@@ -178,7 +220,7 @@ export function SugerenciasDescuentoMayor({
           {faltan > 0 ? `${faltan} ${plural(faltan, 'perfume más', 'perfumes más')}` : ''}
         </span>
       </div>
-      <div className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <FilaDeslizable>
         {visibles.map((s) => (
           <article
             key={s.product.id}
@@ -212,7 +254,7 @@ export function SugerenciasDescuentoMayor({
             </div>
           </article>
         ))}
-      </div>
+      </FilaDeslizable>
     </section>
   );
 }
