@@ -87,7 +87,7 @@ function Rail({ children, dark = false, itemClassName }: { children: React.React
     : 'border-gray-200 bg-white text-gray-800 shadow hover:bg-gray-50';
   return (
     <div className="relative">
-      <div ref={ref} className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={ref} className="flex snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-4 scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {children.map((child, index) => (
           <div key={index} className={`shrink-0 snap-start ${itemClassName}`}>{child}</div>
         ))}
@@ -118,26 +118,26 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
   const presentations = presentationsOf(product);
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#e8d9c5] bg-white shadow-lg">
-      <button type="button" onClick={open} className="relative block aspect-[4/5] overflow-hidden">
+      <button type="button" onClick={open} className="relative block aspect-square overflow-hidden">
         <ProductImage product={product} className="transition-transform duration-700 group-hover:scale-105" />
         {product.agotado && <SoldOutOverlay />}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white to-transparent" />
-        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#CA9E67] px-2.5 py-1 text-[11px] font-semibold text-white">
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#CA9E67] px-2 py-0.5 text-[10px] sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px] font-semibold text-white">
           <Star className="h-3 w-3 fill-current" /> Recomendado
         </span>
       </button>
-      <div className="flex flex-1 flex-col gap-2 p-5">
-        {brand && <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-700">{brand}</p>}
-        <h3 className="line-clamp-2 min-h-[3.25rem] font-bell-mt text-lg font-semibold leading-snug text-gray-900">{cleanName(product.name, false)}</h3>
-        {presentations.length > 0 && <p className="text-xs text-gray-500">{presentations.join(' · ')}</p>}
-        <div className="mt-auto pt-3">
+      <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:px-5 sm:py-4">
+        {brand && <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-700 sm:text-[11px]">{brand}</p>}
+        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-semibold sm:min-h-[3.25rem] sm:text-lg leading-snug text-gray-900">{cleanName(product.name, false)}</h3>
+        {presentations.length > 0 && <p className="text-[11px] text-gray-500 sm:text-xs">{presentations.join(' · ')}</p>}
+        <div className="mt-auto pt-1.5 sm:pt-2">
           {price ? (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-gray-500">Desde</p>
-              <p className="whitespace-nowrap text-xl font-semibold text-[#8b6439]">{price}</p>
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 sm:text-[11px]">Desde</p>
+              <p className="whitespace-nowrap text-lg font-semibold leading-tight text-[#8b6439] sm:text-xl">{price}</p>
             </>
           ) : <p className="text-sm text-gray-500">Consultar precio</p>}
-          <button type="button" onClick={open} className={`mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition ${product.agotado ? 'bg-gray-200 text-gray-500' : 'bg-[#CA9E67] text-white hover:bg-[#b58a53]'}`}>
+          <button type="button" onClick={open} className={`mt-2.5 w-full rounded-lg px-3 py-2 text-[13px] font-semibold sm:mt-3 sm:px-4 sm:py-2.5 sm:text-sm transition ${product.agotado ? 'bg-gray-200 text-gray-500' : 'bg-[#CA9E67] text-white hover:bg-[#b58a53]'}`}>
             {product.agotado ? 'Agotado por el momento' : 'Ver presentaciones'}
           </button>
         </div>
@@ -192,7 +192,7 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
               Ver todos los perfumes
             </a>
           </div>
-          <Rail itemClassName="w-[78%] sm:w-[46%] lg:w-[calc(33.333%-11px)]">
+          <Rail itemClassName="w-[62%] sm:w-[46%] lg:w-[calc(33.333%-11px)]">
             {featured.map((product) => <FeaturedCard key={product.id} product={product} tasa={tasa} onOpen={(p, foto) => setSelected({ product: p, foto })} />)}
           </Rail>
           {/* En celular el botón va debajo de las tarjetas, para que los productos aparezcan antes */}
