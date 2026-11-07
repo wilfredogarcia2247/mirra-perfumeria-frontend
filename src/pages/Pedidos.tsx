@@ -1703,7 +1703,9 @@ export default function Pedidos() {
         for (const o of ordList) {
           const oid = Number(o?.orden?.id ?? o?.id ?? o?.orden_id ?? null);
           const estado = String(o?.orden?.estado ?? o?.estado ?? '').toLowerCase();
-          if (Number.isFinite(oid) && oid > 0 && estado !== 'completado' && estado !== 'finalizado' && estado !== 'terminado') {
+          // Las órdenes se guardan como "Completada": ya terminadas no se vuelven a completar
+          const yaTerminada = ['completado', 'completada', 'finalizado', 'finalizada', 'terminado', 'terminada'].includes(estado);
+          if (Number.isFinite(oid) && oid > 0 && !yaTerminada) {
             try {
               // Determinar almacen_venta_id: preferir el que trae la orden, luego el pedido, luego intentar resolver uno
               let almacenId: number | null = null;
@@ -1737,6 +1739,8 @@ export default function Pedidos() {
             } catch (errOrd) {
               console.error('Error completando orden de producción', oid, errOrd);
               const message = parseApiError(errOrd) || `No se pudo completar la orden de producción ${oid}`;
+              // Si ya estaba completada (por ejemplo desde Producción), no es un error: seguir con el pedido
+              if (/ya est[aá] completada/i.test(message)) continue;
               toast.error(message);
               // Si no podemos completar una orden, refrescar detalle y abortar completar pedido
               if (selectedPedido?.id) await openDetalle(selectedPedido.id);
@@ -1854,7 +1858,7 @@ export default function Pedidos() {
       const ordListFinal = Array.isArray(ordRespFinal) ? ordRespFinal : (ordRespFinal?.data || []);
       const pendingAfter = (ordListFinal || []).filter((o: any) => {
         const estado = String(o?.orden?.estado ?? o?.estado ?? '').toLowerCase();
-        return !(estado === 'completado' || estado === 'finalizado' || estado === 'terminado');
+        return !['completado', 'completada', 'finalizado', 'finalizada', 'terminado', 'terminada'].includes(estado);
       });
       // Comentado: originalmente abortábamos la finalización aquí si quedaban órdenes pendientes.
       // El usuario pidió permitir completar el pedido aunque queden órdenes pendientes, así que
