@@ -6,14 +6,14 @@ import { useEffect } from 'react';
 // Lleva la cuenta de ventanas abiertas para que una encima de otra no se pisen.
 
 let abiertas = 0;
-let guardado: { y: number; position: string; top: string; left: string; right: string; width: string; overflow: string } | null = null;
+let guardado: { y: number; ruta: string; position: string; top: string; left: string; right: string; width: string; overflow: string } | null = null;
 
 function bloquear() {
   abiertas += 1;
   if (abiertas > 1) return;
   const b = document.body.style;
   const y = window.scrollY;
-  guardado = { y, position: b.position, top: b.top, left: b.left, right: b.right, width: b.width, overflow: b.overflow };
+  guardado = { y, ruta: window.location.pathname, position: b.position, top: b.top, left: b.left, right: b.right, width: b.width, overflow: b.overflow };
   document.body.dataset.scrollBloqueado = 'true';
   b.position = 'fixed';
   b.top = `-${y}px`;
@@ -36,6 +36,8 @@ function desbloquear() {
   b.width = g.width;
   b.overflow = g.overflow;
   delete document.body.dataset.scrollBloqueado;
+  // Si se cerró porque el cliente fue a otra página (ej. un enlace del menú), la página nueva empieza arriba
+  if (window.location.pathname !== g.ruta) return;
   window.scrollTo({ top: g.y, left: 0, behavior: 'instant' as ScrollBehavior });
 }
 
