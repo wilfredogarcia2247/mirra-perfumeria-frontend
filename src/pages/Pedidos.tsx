@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from "sonner";
+import ResumenTamanos from '@/components/ResumenTamanos';
+import { ordenarPorTamano } from '@/lib/pedidoTamanos';
 
 type AjusteDraft = {
   id?: number | string;
@@ -2132,7 +2134,9 @@ export default function Pedidos() {
                           )
                         )}
                         <EntregaBadge pedido={p} />
-                        <span className="text-xs text-muted-foreground">{fmtProductosCount(p)} prod.</span>
+                        {Array.isArray(p.productos) && p.productos.length > 0
+                          ? <ResumenTamanos lineas={p.productos} />
+                          : <span className="text-xs text-muted-foreground">{fmtProductosCount(p)} prod.</span>}
                         {fmtCupon(p) && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-[2px] text-[10.5px] font-medium text-amber-800">
                             <TicketPercent className="w-3 h-3" />
@@ -2169,7 +2173,7 @@ export default function Pedidos() {
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Estado</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Entrega</TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right tabletv:hidden">Prods.</TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Perfumes</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right tabletv:hidden">Tasa</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-right">Total</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 text-center w-12"></TableHead>
@@ -2200,7 +2204,11 @@ export default function Pedidos() {
                             </div>
                           </TableCell>
                           <TableCell>{entregaInfo(p) ? <EntregaBadge pedido={p} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
-                          <TableCell className="text-sm tabular-nums text-right tabletv:hidden">{fmtProductosCount(p)}</TableCell>
+                          <TableCell className="max-w-[220px]">
+                            {Array.isArray(p.productos) && p.productos.length > 0
+                              ? <ResumenTamanos lineas={p.productos} />
+                              : <span className="text-sm tabular-nums">{fmtProductosCount(p)}</span>}
+                          </TableCell>
                           <TableCell className="text-xs tabular-nums text-muted-foreground text-right tabletv:hidden">{fmtTasa(p) ? fmtTasa(p)!.toFixed(2) : '—'}</TableCell>
                           <TableCell className="text-right">
                             <div className="text-sm font-medium tabular-nums">{totalParts.usd}</div>
@@ -2451,7 +2459,7 @@ export default function Pedidos() {
                         </tr>
                       </thead>
                       <tbody>
-                        {Array.isArray(selectedPedido.productos) && selectedPedido.productos.map((it: any) => (
+                        {Array.isArray(selectedPedido.productos) && ordenarPorTamano(selectedPedido.productos).map((it: any) => (
                           <tr key={it.id} className="border-t">
                             <td className="hidden py-2 w-16 md:table-cell">
                               <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
@@ -3159,7 +3167,9 @@ export default function Pedidos() {
               </div>
             )}
 
-            <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full">
+            <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-2">
+              {/* Resumen por tamaño, a la vista justo antes de completar (sirve para revisar el paquete) */}
+              <ResumenTamanos lineas={selectedPedido?.productos} conTotal className="w-full" />
               <div className="w-full flex flex-col md:flex-row tabletv:flex-wrap items-stretch md:items-center justify-between gap-2">
                 <div className="grid grid-cols-1 gap-2 md:flex">
                   <Button size="lg" variant="default" onClick={() => {
