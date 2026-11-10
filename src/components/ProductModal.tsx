@@ -8,6 +8,7 @@ import { getPrecioMostrar } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
 import AvisameForm from '@/components/AvisameForm';
+import { useBloquearScroll } from '@/hooks/useBloquearScroll';
 
 interface Props {
   product: Product;
@@ -55,6 +56,8 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
     }
   }, [product?.tamanos, product?.formulas, initialTamano]);
 
+  useBloquearScroll(open);
+
   if (!open) return null;
 
   return createPortal(
@@ -91,7 +94,7 @@ export default function ProductModal({ product, open, initialTamano, onClose, on
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-0 sm:p-6 pb-24 sm:pb-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-0 sm:p-6 pb-24 sm:pb-6">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 h-full">
 
             {/* Imagen del producto */}

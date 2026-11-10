@@ -58,6 +58,15 @@ export function getImageUrl(obj?: any, fallbackIndex?: number): string | undefin
 // `err.message` puede ser JSON serializado o texto plano. Esta función
 // intenta parsear JSON y extraer `message` o `error`, y si no es JSON,
 // devuelve el texto crudo.
+// El servidor a veces manda el motivo real aparte, en "details"
+// (ej. {"error":"Error completando órdenes de producción","details":["Orden 5: ... falta ROLLON ..."]}).
+// Devuelve el mensaje con ese detalle pegado para que se vea en pantalla.
+export function mensajeConDetalles(parsed: { details?: unknown } | null | undefined, msg: string): string {
+  const d = parsed?.details;
+  const lista = Array.isArray(d) ? d.map((x) => String(x ?? '').trim()).filter(Boolean) : (typeof d === 'string' && d.trim() ? [d.trim()] : []);
+  return lista.length ? `${msg}: ${lista.join(' · ')}` : msg;
+}
+
 export function parseApiError(err: unknown): string {
   if (!err) return 'Error desconocido';
 
@@ -73,7 +82,7 @@ export function parseApiError(err: unknown): string {
       const parsed = JSON.parse(s);
       if (parsed && typeof parsed === 'object') {
         const msg = parsed.message || parsed.error || parsed.detail || parsed.msg;
-        if (msg) return String(msg);
+        if (msg) return mensajeConDetalles(parsed, String(msg));
         // JSON sin campo reconocido → fallback genérico
         return 'Error del servidor';
       }

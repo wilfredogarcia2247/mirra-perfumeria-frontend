@@ -9,6 +9,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+// Nombre del mes en curso para el título de "Productos más vendidos" (ej. "noviembre")
+const mesActual = new Date().toLocaleDateString('es-VE', { month: 'long' });
+
 const emptyChart = MONTH_NAMES.map((name) => ({ name, ventas: 0, compras: 0 }));
 
 interface Stats {
@@ -47,7 +50,7 @@ export default function Dashboard() {
     { title: "Total Productos", value: stats.totalProductos, icon: Package, sub: "En catálogo activo", format: (v: number) => v.toLocaleString('es-VE') },
     { title: "Pedidos Activos", value: stats.pedidosActivos, icon: ShoppingCart, sub: "Pendientes de despacho", format: (v: number) => v.toString() },
     { title: "Almacenes", value: stats.almacenes, icon: Warehouse, sub: "Ubicaciones registradas", format: (v: number) => v.toString() },
-    { title: "Ventas del Mes", value: stats.ventasMes, icon: DollarSign, sub: "Órdenes completadas", format: (v: number) => `$${v.toFixed(2)}` },
+    { title: "Ventas del Mes", value: stats.ventasMes, icon: DollarSign, sub: "Pedidos completados con pago", format: (v: number) => `$${v.toFixed(2)}` },
   ];
 
   return (
@@ -127,7 +130,7 @@ export default function Dashboard() {
         {/* Top Products */}
         <Card>
           <CardHeader className="pb-2 px-4 sm:px-6">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Productos más vendidos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Productos más vendidos — {mesActual}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 px-4 sm:px-6">
             {loading ? (
@@ -136,7 +139,7 @@ export default function Dashboard() {
               </div>
             ) : topProductos.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                Sin datos de ventas aún — aparecerán al completar pedidos.
+                Aún no hay ventas este mes — aparecerán al completar pedidos con pago.
               </div>
             ) : (
               <div>

@@ -16,7 +16,7 @@ import {
   getVentasPorPresentacion,
   getReporteEntregas,
 } from '@/integrations/api';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -60,6 +60,9 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
   { slug: 'cierre-diario', title: 'Cierre diario', description: 'Ventas, ajustes y presentaciones del día' },
   { slug: 'entregas', title: 'Entregas y ciudades', description: 'Cómo reciben sus pedidos y desde dónde nos compran' },
 ];
+
+// Reportes calculados en esta pantalla que excluyen las regalías (avisan cuántas hubo)
+const REPORTES_CON_REGALIAS = new Set<ReportSlug>(['ventas-periodo', 'productos-favoritos', 'ticket-promedio', 'compras']);
 
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
 
@@ -185,6 +188,19 @@ function getReportSlug(pathname: string): ReportSlug {
 export default function Reportes() {
   const location = useLocation();
   const selectedReport = getReportSlug(location.pathname);
+  // Al tocar un reporte de la lista, bajar hasta donde empieza (en el teléfono la lista es larga)
+  const reporteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!(location.state as { irAlReporte?: boolean } | null)?.irAlReporte) return;
+    const id = window.setTimeout(() => {
+      const el = reporteRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      // Solo si el inicio del reporte no se ve (debajo de la barra de arriba y en la parte visible)
+      if (top < 56 || top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
@@ -510,6 +526,8 @@ export default function Reportes() {
       });
     let completedOrders = 0;
     let cancelledOrders = 0;
+    // Completados sin ningún pago: regalías, no cuentan como venta
+    const regalias = { pedidos: 0, unidades: 0, valor: 0 };
     let dailySales = 0;
     let monthSales = 0;
     let monthCompletedOrders = 0;
@@ -524,10 +542,19 @@ export default function Reportes() {
 
     for (const pedido of pedidos) {
       const estado = String(pedido?.estado || 'sin_estado').toLowerCase();
-      ordersByStatus[estado] = (ordersByStatus[estado] || 0) + 1;
+      const estadoKey = pedido?.regalia ? 'completado sin pago (regalía)' : estado;
+      ordersByStatus[estadoKey] = (ordersByStatus[estadoKey] || 0) + 1;
       if (estado.includes('cancel')) cancelledOrders += 1;
       const isCompleted = COMPLETED_STATES.has(estado);
       if (!isCompleted) continue;
+      if (pedido?.regalia) {
+        regalias.pedidos += 1;
+        for (const item of Array.isArray(pedido?.productos) ? pedido.productos : []) {
+          regalias.unidades += parseNumber(item?.cantidad ?? 0);
+        }
+        regalias.valor += parseNumber(pedido?.total ?? 0);
+        continue;
+      }
 
       completedOrders += 1;
       const fecha = new Date(pedido?.fecha || pedido?.created_at || Date.now());
@@ -718,6 +745,7 @@ export default function Reportes() {
     return {
       totalPedidos: pedidos.length,
       completedOrders,
+      regalias,
       cancelledOrders,
       salesTotal,
       monthlySales,
@@ -899,7 +927,7 @@ export default function Reportes() {
               {!cierreError && close && (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <Card><CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pedidos completados</p><p className="mt-2 text-2xl font-semibold tabular-nums">{close.cantidad_pedidos}</p></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pedidos vendidos</p><p className="mt-2 text-2xl font-semibold tabular-nums">{close.cantidad_pedidos}</p><p className="mt-1 text-xs text-muted-foreground">Completados con pago</p></CardContent></Card>
                     {amountRows.map((row) => (
                       <Card key={row.label} className={row.emphasized ? 'border-primary/40 bg-primary/5' : undefined}>
                         <CardContent className="p-4">
@@ -941,6 +969,37 @@ export default function Reportes() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {close.regalias?.cantidad_pedidos > 0 && (
+                    <Card className="border-violet-200 bg-violet-50/40">
+                      <CardHeader className="border-b border-violet-200/70 pb-3">
+                        <CardTitle className="text-base font-medium">🎁 Regalías (completados sin pago)</CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          No suman a las ventas del día. Salieron {close.regalias.unidades} perfume(s) en {close.regalias.cantidad_pedidos} pedido(s);
+                          a precio de venta habrían sido {formatCloseUsd(close.regalias.valor_usd)} · {formatCloseBs(close.regalias.valor_bs)}.
+                          Si alguno sí se cobró, registra el pago y pasará a vendidos.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-4">
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {(close.regalias.presentaciones || []).map((item: any) => (
+                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border border-violet-200 bg-white px-3 py-2">
+                              <span className="font-medium">{item.presentacion}</span>
+                              <span className="tabular-nums">{item.unidades} uds</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="space-y-2">
+                          {(close.regalias.pedidos || []).map((pedido: any) => (
+                            <div key={pedido.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-200 bg-white px-3 py-2 text-sm">
+                              <span className="font-medium">Pedido #{pedido.id} · {pedido.cliente}</span>
+                              <span className="tabular-nums text-muted-foreground">{pedido.unidades} perfume(s) · {formatCloseUsd(pedido.valor_usd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card>
                     <CardHeader className="border-b border-border/60 pb-3">
@@ -1715,6 +1774,7 @@ export default function Reportes() {
               <Link
                 key={report.slug}
                 to={route}
+                state={{ keepScroll: true, irAlReporte: true }}
                 className={`rounded-lg border p-4 transition-colors ${active ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
               >
                 <p className="font-medium">{report.title}</p>
@@ -1724,6 +1784,7 @@ export default function Reportes() {
           })}
         </div>
 
+        <div ref={reporteRef} className="scroll-mt-20 space-y-6">
         {DATE_FILTER_REPORTS.has(selectedReport) && (
           <Card>
             <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -1766,7 +1827,14 @@ export default function Reportes() {
           </Card>
         )}
 
+        {REPORTES_CON_REGALIAS.has(selectedReport) && metrics.regalias?.pedidos > 0 && (
+          <p role="status" className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+            🎁 {metrics.regalias.pedidos} pedido(s) completado(s) sin pago ({metrics.regalias.unidades} perfume(s), ${metrics.regalias.valor.toFixed(2)} a precio de venta) son regalías y no cuentan como venta en este reporte.
+          </p>
+        )}
+
         {renderReport()}
+        </div>
       </div>
     </Layout>
   );
