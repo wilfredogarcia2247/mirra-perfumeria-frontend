@@ -9,7 +9,7 @@ type Props = {
 };
 
 // Lee si el usuario es admin desde el token JWT
-function esAdmin(token: string | null): boolean {
+export function esAdmin(token: string | null): boolean {
   try {
     if (!token) return false;
     const parts = token.split('.');

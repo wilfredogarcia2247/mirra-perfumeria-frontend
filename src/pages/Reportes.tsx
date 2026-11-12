@@ -18,7 +18,10 @@ import {
 } from '@/integrations/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/use-auth';
+import { usePermissions } from '@/hooks/use-permissions';
+import { esAdmin } from '@/components/ModuleProtectedRoute';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import RecomprasReport from '@/components/RecomprasReport';
 import ComparativoReport from '@/components/ComparativoReport';
@@ -185,7 +188,45 @@ function getReportSlug(pathname: string): ReportSlug {
   return REPORT_OPTIONS.some((item) => item.slug === value) ? (value as ReportSlug) : 'resumen-general';
 }
 
+// Permiso de cada reporte: "rep_" + slug con guiones bajos (ver backend MODULOS, grupo Reportes)
+const claveReporte = (slug: ReportSlug) => `rep_${slug.replace(/-/g, '_')}`;
+
+// Muestra solo los reportes que el usuario tiene permitidos (el admin ve todos)
 export default function Reportes() {
+  const location = useLocation();
+  const { token } = useAuth();
+  const { hasPermission } = usePermissions();
+  const admin = esAdmin(token);
+  const permitidos = new Set(REPORT_OPTIONS.filter((r) => admin || hasPermission(claveReporte(r.slug))).map((r) => r.slug));
+  const pedido = getReportSlug(location.pathname);
+
+  if (!permitidos.has(pedido)) {
+    const primero = REPORT_OPTIONS.find((r) => permitidos.has(r.slug));
+    const enInicio = location.pathname === '/reportes' || location.pathname === '/reportes/';
+    // Al entrar a "Reportes" sin permiso para "Cómo vamos", abrir el primero que sí puede ver
+    if (primero && enInicio) {
+      const destino = primero.slug === 'resumen-general' ? '/reportes' : `/reportes/${primero.slug}`;
+      return <Navigate to={destino} replace />;
+    }
+    return (
+      <Layout>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-base font-medium text-foreground">No tienes acceso a este reporte</p>
+          <p className="text-sm text-muted-foreground">Pídele a un administrador que te dé permiso.</p>
+          {primero && (
+            <Link to={`/reportes/${primero.slug}`} className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+              Ver mis reportes
+            </Link>
+          )}
+        </div>
+      </Layout>
+    );
+  }
+
+  return <ReportesContenido permitidos={permitidos} />;
+}
+
+function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
   const location = useLocation();
   const selectedReport = getReportSlug(location.pathname);
   // Al tocar un reporte de la lista, bajar hasta donde empieza (en el teléfono la lista es larga)
@@ -1767,7 +1808,7 @@ export default function Reportes() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {REPORT_OPTIONS.map((report) => {
+          {REPORT_OPTIONS.filter((report) => permitidos.has(report.slug)).map((report) => {
             const route = report.slug === 'resumen-general' ? '/reportes' : `/reportes/${report.slug}`;
             const active = selectedReport === report.slug;
             return (

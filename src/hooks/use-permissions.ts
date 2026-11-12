@@ -87,6 +87,11 @@ export function usePermissions() {
      */
     const hasPermission = (module: string): boolean => {
         if (!module) return false;
+        // "reportes" = entrar a la pantalla de Reportes: basta con tener al menos un reporte (rep_*)
+        if (module === 'reportes') {
+            return permissions.reportes === true
+                || Object.keys(permissions).some((k) => k.startsWith('rep_') && permissions[k] === true);
+        }
         return permissions[module] === true;
     };
 
