@@ -1514,7 +1514,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const err = new Error(txt || res.statusText);
     (err as any).status = res.status;
     if (res.status === 401) {
-      try { localStorage.removeItem('jwt_token'); } catch (e) { }
+      try { localStorage.removeItem('jwt_token'); localStorage.removeItem('user_permissions'); } catch (e) { }
       // Si la 401 ocurre en el panel, redirigimos al login para re-autenticar.
       // En la tienda pública (inicio, categorías, nosotros, rastreo) NUNCA
       // mandamos al cliente al login: antes pasaba en /categoria/... al enviar el pedido.
@@ -1723,6 +1723,8 @@ export async function login(email: string, password: string) {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   if (data.token) {
+    // Permisos guardados de la sesión anterior (quizás de otra persona en la misma tablet): fuera
+    try { localStorage.removeItem("user_permissions"); } catch (e) { /* noop */ }
     localStorage.setItem("jwt_token", data.token);
   }
   return data;

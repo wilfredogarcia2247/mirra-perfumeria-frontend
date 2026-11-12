@@ -194,13 +194,29 @@ const claveReporte = (slug: ReportSlug) => `rep_${slug.replace(/-/g, '_')}`;
 // Muestra solo los reportes que el usuario tiene permitidos (el admin ve todos)
 export default function Reportes() {
   const location = useLocation();
-  const { token } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { token, userId } = useAuth();
+  const { hasPermission, loadUserPermissions } = usePermissions();
+  const [listo, setListo] = useState(false);
   const admin = esAdmin(token);
+  // Pedir los permisos al abrir (los guardados pueden estar viejos)
+  useEffect(() => {
+    let activo = true;
+    (async () => {
+      if (userId && !admin) {
+        try { await loadUserPermissions(userId); } catch { /* sin permisos */ }
+      }
+      if (activo) setListo(true);
+    })();
+    return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, admin]);
   const permitidos = new Set(REPORT_OPTIONS.filter((r) => admin || hasPermission(claveReporte(r.slug))).map((r) => r.slug));
   const pedido = getReportSlug(location.pathname);
 
   if (!permitidos.has(pedido)) {
+    if (!listo) {
+      return <Layout><div className="p-6 text-sm text-muted-foreground">Cargando…</div></Layout>;
+    }
     const primero = REPORT_OPTIONS.find((r) => permitidos.has(r.slug));
     const enInicio = location.pathname === '/reportes' || location.pathname === '/reportes/';
     // Al entrar a "Reportes" sin permiso para "Cómo vamos", abrir el primero que sí puede ver

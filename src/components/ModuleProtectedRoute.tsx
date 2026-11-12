@@ -43,7 +43,7 @@ function SinAcceso() {
 export default function ModuleProtectedRoute({ moduleKey }: Props) {
   const { isAuthenticated, token, userId } = useAuth();
   const location = useLocation();
-  const { permissions, hasPermission, loadUserPermissions } = usePermissions();
+  const { hasPermission, loadUserPermissions } = usePermissions();
   const [ready, setReady] = useState(false);
 
   const isAdmin = useMemo(() => esAdmin(token), [token]);
@@ -51,8 +51,9 @@ export default function ModuleProtectedRoute({ moduleKey }: Props) {
   useEffect(() => {
     let active = true;
     (async () => {
-      // Si ya hay permisos cargados, usarlos; si no, pedirlos una vez.
-      if (userId && Object.keys(permissions).length === 0) {
+      // Siempre pedir los permisos al abrir: los guardados pueden estar viejos
+      // (el admin los cambió). Mientras tanto se usan los guardados si dan acceso.
+      if (userId) {
         try { await loadUserPermissions(userId); } catch { /* sin permisos */ }
       }
       if (active) setReady(true);
@@ -68,12 +69,13 @@ export default function ModuleProtectedRoute({ moduleKey }: Props) {
   // El admin entra a todo
   if (isAdmin) return <Outlet />;
 
-  // Mientras se cargan los permisos, no decidir aún (evita falsos "sin acceso")
+  // Con permiso (guardado o recién pedido) se entra sin esperar
+  if (hasPermission(moduleKey)) return <Outlet />;
+
+  // Sin permiso en lo guardado: esperar la respuesta del servidor antes de negar (evita falsos "sin acceso")
   if (!ready) {
     return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   }
-
-  if (hasPermission(moduleKey)) return <Outlet />;
 
   return <SinAcceso />;
 }
