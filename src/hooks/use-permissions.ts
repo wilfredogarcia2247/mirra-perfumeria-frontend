@@ -1,19 +1,9 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '@/integrations/api';
 
-// Tipo para los permisos basado en la estructura de usuario_modulos
-export interface UserPermissions {
-    dashboard?: boolean;
-    tasas_cambio?: boolean;
-    bancos?: boolean;
-    marcas?: boolean;
-    categorias?: boolean;
-    almacenes?: boolean;
-    productos?: boolean;
-    formulas?: boolean;
-    pedidos?: boolean;
-    usuarios?: boolean;
-}
+// Permisos del usuario: una clave por pantalla (ver backend MODULOS). Flexible:
+// agregar una pantalla nueva no requiere tocar este tipo.
+export type UserPermissions = Record<string, boolean>;
 
 const PERMISSIONS_KEY = 'user_permissions';
 
@@ -95,7 +85,7 @@ export function usePermissions() {
      * @param module - Nombre del módulo (ej: 'dashboard', 'productos', 'tasas_cambio')
      * @returns true si tiene permiso, false si no
      */
-    const hasPermission = (module: keyof UserPermissions): boolean => {
+    const hasPermission = (module: string): boolean => {
         if (!module) return false;
         return permissions[module] === true;
     };

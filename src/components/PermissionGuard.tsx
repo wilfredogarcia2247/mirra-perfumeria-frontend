@@ -2,8 +2,8 @@ import React from 'react';
 import { usePermissions } from '@/hooks/use-permissions';
 
 interface PermissionGuardProps {
-    /** Nombre del módulo requerido para mostrar el contenido */
-    module?: 'dashboard' | 'tasas_cambio' | 'bancos' | 'marcas' | 'categorias' | 'almacenes' | 'productos' | 'formulas' | 'pedidos' | 'usuarios';
+    /** Nombre del módulo/pantalla requerido para mostrar el contenido */
+    module?: string;
     /** Contenido a proteger */
     children: React.ReactNode;
     /** Contenido alternativo a mostrar si no tiene permiso */
