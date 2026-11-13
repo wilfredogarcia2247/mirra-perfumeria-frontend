@@ -7,8 +7,9 @@ import useCart from '@/hooks/use-cart';
 
 // Enlaces de Mirra (una sola sucursal por ahora)
 const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
-const MAPS = 'https://maps.app.goo.gl/GS65NuHTcD9gGqGC7';
 const WHATSAPP = 'https://wa.me/584141454086';
+// Ficha de Maps abierta en la pestaña de Reseñas (!9m1!1b1)
+const VER_RESENAS = 'https://www.google.com/maps/place/Mirra+Perfumeria/@10.6599868,-71.6670047,702m/data=!3m1!1e3!4m8!3m7!1s0x8e8999ecc14f62d9:0x1ec7bc896e7acb66!8m2!3d10.6599868!4d-71.6670047!9m1!1b1!16s%2Fg%2F11ynk58hcc';
 // Abre Maps directo en modo ruta, desde donde esté el cliente (sin punto de salida fijo)
 const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Mirra+Perfumeria,+Local+%234,+Diagonal+al+Restaurant+Yangtze,+Centro+Comercial+Aviur,+Maracaibo+4001,+Zulia';
 
@@ -178,7 +179,7 @@ export default function Comunidad() {
             <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
               <PenLine className="h-4 w-4" /> Dejar mi reseña
             </a>
-            <a href={MAPS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
+            <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
               Ver todas
             </a>
           </div>
