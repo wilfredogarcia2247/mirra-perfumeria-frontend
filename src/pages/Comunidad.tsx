@@ -4,6 +4,7 @@ import { ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
+import { getResenasGoogle, type ResenaGoogle, type ResenasGoogle } from '@/integrations/api';
 
 // Enlaces de Mirra (una sola sucursal por ahora)
 const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
@@ -135,10 +136,87 @@ function Titulo({ children, sub }: { children: React.ReactNode; sub: string }) {
   );
 }
 
+const formatoNota = (n: number) => n.toLocaleString('es-VE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+function Estrellas({ valor, className = '' }: { valor: number; className?: string }) {
+  const llenas = Math.round(valor);
+  return (
+    <span className={`tracking-[1px] ${className}`} aria-label={`${formatoNota(valor)} de 5 estrellas`}>
+      <span className="text-[#f5b301]">{'★'.repeat(llenas)}</span>
+      <span className="text-gray-300">{'★'.repeat(Math.max(0, 5 - llenas))}</span>
+    </span>
+  );
+}
+
+function LogoGoogle({ className = '' }: { className?: string }) {
+  return (
+    <span className={`font-[Arial,sans-serif] font-bold ${className}`}>
+      <span className="text-[#4285F4]">G</span><span className="text-[#EA4335]">o</span><span className="text-[#FBBC05]">o</span>
+      <span className="text-[#4285F4]">g</span><span className="text-[#34A853]">l</span><span className="text-[#EA4335]">e</span>
+    </span>
+  );
+}
+
+// Tarjeta de una reseña real de Google (nombre y foto enlazan al perfil del autor, como pide Google)
+function TarjetaResena({ resena }: { resena: ResenaGoogle }) {
+  const [abierta, setAbierta] = useState(false);
+  const [sinFoto, setSinFoto] = useState(!resena.foto);
+  const larga = resena.texto.length > 200;
+  const Autor = resena.autorUrl ? 'a' : 'span';
+  const enlaceAutor = resena.autorUrl ? { href: resena.autorUrl, target: '_blank', rel: 'noopener noreferrer' } : {};
+  return (
+    <article className={`flex w-[82%] max-w-[320px] shrink-0 snap-start flex-col rounded-[18px] border border-[#f1e6d6] bg-white p-4 ${SOMBRA}`}>
+      <div className="flex items-center gap-2.5">
+        {sinFoto ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-sm font-bold text-[#8b6439]" aria-hidden="true">
+            {resena.autor.trim().charAt(0).toUpperCase()}
+          </span>
+        ) : (
+          <img
+            src={resena.foto ?? ''}
+            alt=""
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+            onError={() => setSinFoto(true)}
+          />
+        )}
+        <div className="min-w-0">
+          <Autor {...enlaceAutor} className="block truncate text-sm font-semibold text-gray-900">{resena.autor}</Autor>
+          <p className="text-xs text-gray-500">
+            <Estrellas valor={resena.estrellas} className="text-[13px]" /> {resena.cuando && <>· {resena.cuando}</>}
+          </p>
+        </div>
+      </div>
+      <p className={`mt-2.5 whitespace-pre-line text-[13.5px] leading-relaxed text-gray-700 ${abierta ? '' : 'line-clamp-5'}`}>
+        {resena.texto}
+      </p>
+      {larga && (
+        <button type="button" onClick={() => setAbierta(!abierta)} className="mt-1 self-start text-[13px] font-semibold text-[#8b6439]">
+          {abierta ? 'Leer menos' : 'Leer más'}
+        </button>
+      )}
+      <p className="mt-auto pt-3 text-[11px] text-gray-400">
+        Reseña de <LogoGoogle className="text-[11px]" />
+      </p>
+    </article>
+  );
+}
+
 export default function Comunidad() {
   const { count } = useCart();
   const navigate = useNavigate();
   const [preguntaAbierta, setPreguntaAbierta] = useState<number | null>(null);
+
+  // Nota y reseñas reales de Google; si no llegan, la sección queda solo con los botones
+  const [google, setGoogle] = useState<ResenasGoogle | null>(null);
+  useEffect(() => {
+    let activo = true;
+    getResenasGoogle().then((d) => { if (activo) setGoogle(d); });
+    return () => { activo = false; };
+  }, []);
+  const nota = google?.nota ?? null;
+  const resenas = google?.resenas ?? [];
 
   // Alto del menú fijo (igual que en Sobre nosotros): la portada queda debajo y los saltos a cada sección no se esconden
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
@@ -188,8 +266,18 @@ export default function Comunidad() {
           className="relative mt-5 inline-flex items-center gap-2.5 rounded-full border border-[#e7c793]/55 px-[18px] py-2.5 text-sm text-[#f6ead9] shadow-[0_6px_18px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]"
           style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.05))' }}
         >
-          <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
-          <span className="whitespace-nowrap">Ver reseñas en Google</span>
+          {nota != null ? (
+            <>
+              <strong className="text-base font-bold text-white">{formatoNota(nota)}</strong>
+              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
+              <span className="whitespace-nowrap">{google!.total} reseñas en Google</span>
+            </>
+          ) : (
+            <>
+              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
+              <span className="whitespace-nowrap">Ver reseñas en Google</span>
+            </>
+          )}
         </a>
       </div>
       <svg className="relative -mt-[27px] block h-7 w-full" viewBox="0 0 375 28" preserveAspectRatio="none" aria-hidden="true">
@@ -201,16 +289,33 @@ export default function Comunidad() {
         <div className={ancho}>
           <Titulo sub="Tu opinión nos ayuda a crecer y a que más personas encuentren su aroma.">Lo que dicen de nosotros</Titulo>
           <div className={`flex items-center gap-3.5 rounded-[18px] border border-[#f1e6d6] bg-white p-4 ${SOMBRA}`}>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-2xl" aria-hidden="true">⭐</div>
+            {nota != null ? (
+              <div className="shrink-0 text-center">
+                <p className="text-[34px] font-bold leading-none text-gray-900">{formatoNota(nota)}</p>
+                <Estrellas valor={nota} className="text-sm" />
+              </div>
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-2xl" aria-hidden="true">⭐</div>
+            )}
             <div className="min-w-0">
-              <p className="font-[Arial,sans-serif] text-[15px] font-bold">
-                <span className="text-[#4285F4]">G</span><span className="text-[#EA4335]">o</span><span className="text-[#FBBC05]">o</span>
-                <span className="text-[#4285F4]">g</span><span className="text-[#34A853]">l</span><span className="text-[#EA4335]">e</span>
-                <span className="font-semibold text-gray-600"> Maps</span>
+              <p className="text-[15px]">
+                <LogoGoogle />
+                <span className="font-[Arial,sans-serif] font-semibold text-gray-600"> Maps</span>
               </p>
-              <p className="mt-0.5 text-[13px] leading-snug text-gray-600">Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-gray-600">
+                {nota != null
+                  ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
+                  : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
+              </p>
             </div>
           </div>
+          {resenas.length > 0 && (
+            <div className="-mx-4 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {resenas.map((r, i) => (
+                <TarjetaResena key={`${r.autor}-${i}`} resena={r} />
+              ))}
+            </div>
+          )}
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
               <PenLine className="h-4 w-4" /> Dejar mi reseña
