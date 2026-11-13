@@ -119,8 +119,8 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
     p: '¿Hacen cambios?',
     r: (
       <>
-        Sí, nuestras políticas de cambio cubren todos tus productos. Para saber más,{' '}
-        <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#8b6439] underline underline-offset-2">escríbenos por WhatsApp</a>.
+        Sí, si tu perfume llegó con el frasco partido o derramado, te lo cambiamos.{' '}
+        <Link to="/terminos#cambios" className="font-semibold text-[#8b6439] underline underline-offset-2">Ver condiciones</Link>.
       </>
     ),
   },

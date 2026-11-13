@@ -15,6 +15,8 @@ export default function Footer() {
               <li><a href="/" className="text-cream-200 hover:text-cream-50 transition">Catálogo</a></li>
               <li><a href="/about" className="text-cream-200 hover:text-cream-50 transition">Sobre Nosotros</a></li>
               <li><a href="/comunidad" className="text-cream-200 hover:text-cream-50 transition">Comunidad y reseñas</a></li>
+              <li><a href="/terminos" className="text-cream-200 hover:text-cream-50 transition">Términos y condiciones</a></li>
+              <li><a href="/privacidad" className="text-cream-200 hover:text-cream-50 transition">Política de privacidad</a></li>
             </ul>
           </div>
           <div>

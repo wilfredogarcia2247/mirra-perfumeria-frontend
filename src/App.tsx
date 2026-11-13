@@ -20,6 +20,7 @@ import Marcas from "./pages/Marcas";
 import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
 import Comunidad from "./pages/Comunidad";
+import { Terminos, Privacidad } from "./pages/Legal";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import CintilloMensajes from "./pages/CintilloMensajes";
@@ -59,6 +60,8 @@ const App = () => (
             <Route path="/about" element={<AboutUs />} />
             <Route path="/comunidad" element={<Comunidad />} />
             <Route path="/rastreo" element={<Rastreo />} />
+            <Route path="/terminos" element={<Terminos />} />
+            <Route path="/privacidad" element={<Privacidad />} />
           </Route>
           <Route path="/login" element={<Login />} />
           <Route path="/p/:slug" element={<AbrirPerfume />} />
