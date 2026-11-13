@@ -1593,25 +1593,16 @@ export async function getDescuentoMayorPublic(): Promise<ConfigDescuentoMayor> {
   return response.json();
 }
 
-// Reseñas reales de Google Maps (página Comunidad). null = sin datos: la página se ve sin reseñas.
-export type ResenaGoogle = {
-  autor: string;
-  autorUrl: string | null;
-  foto: string | null;
-  estrellas: number;
-  cuando: string;
-  publicada: string | null;
-  texto: string;
-  enlace: string | null;
-};
-export type ResenasGoogle = { nota: number | null; total: number; enlace: string | null; resenas: ResenaGoogle[] };
+// Nota, total y resumen (Gemini) de las reseñas de Google Maps (página Comunidad). null = sin datos.
+export type ResumenGoogle = { texto: string; aviso: string; reportar: string | null };
+export type ResenasGoogle = { nota: number | null; total: number; enlace: string | null; resumen: ResumenGoogle | null };
 
 export async function getResenasGoogle(): Promise<ResenasGoogle | null> {
   try {
     const response = await fetch(`${API_URL}/resenas-google`);
     if (!response.ok) return null;
     const datos = await response.json();
-    if (!datos || !Array.isArray(datos.resenas)) return null;
+    if (!datos || typeof datos !== 'object') return null;
     return datos;
   } catch {
     return null;

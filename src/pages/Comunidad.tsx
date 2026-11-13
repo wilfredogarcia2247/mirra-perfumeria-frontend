@@ -4,7 +4,7 @@ import { ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
-import { getResenasGoogle, type ResenaGoogle, type ResenasGoogle } from '@/integrations/api';
+import { getResenasGoogle, type ResenasGoogle, type ResumenGoogle } from '@/integrations/api';
 
 // Enlaces de Mirra (una sola sucursal por ahora)
 const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
@@ -157,49 +157,22 @@ function LogoGoogle({ className = '' }: { className?: string }) {
   );
 }
 
-// Tarjeta de una reseña real de Google (nombre y foto enlazan al perfil del autor, como pide Google)
-function TarjetaResena({ resena }: { resena: ResenaGoogle }) {
-  const [abierta, setAbierta] = useState(false);
-  const [sinFoto, setSinFoto] = useState(!resena.foto);
-  const larga = resena.texto.length > 200;
-  const Autor = resena.autorUrl ? 'a' : 'span';
-  const enlaceAutor = resena.autorUrl ? { href: resena.autorUrl, target: '_blank', rel: 'noopener noreferrer' } : {};
+// Resumen que escribe Gemini con las reseñas de Google (Google pide mostrar el aviso y el enlace para reportar)
+function TarjetaResumen({ resumen }: { resumen: ResumenGoogle }) {
   return (
-    <article className={`flex w-[82%] max-w-[320px] shrink-0 snap-start flex-col rounded-[18px] border border-[#f1e6d6] bg-white p-4 ${SOMBRA}`}>
-      <div className="flex items-center gap-2.5">
-        {sinFoto ? (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-sm font-bold text-[#8b6439]" aria-hidden="true">
-            {resena.autor.trim().charAt(0).toUpperCase()}
-          </span>
-        ) : (
-          <img
-            src={resena.foto ?? ''}
-            alt=""
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            className="h-9 w-9 shrink-0 rounded-full object-cover"
-            onError={() => setSinFoto(true)}
-          />
-        )}
-        <div className="min-w-0">
-          <Autor {...enlaceAutor} className="block truncate text-sm font-semibold text-gray-900">{resena.autor}</Autor>
-          <p className="text-xs text-gray-500">
-            <Estrellas valor={resena.estrellas} className="text-[13px]" /> {resena.cuando && <>· {resena.cuando}</>}
-          </p>
-        </div>
+    <div className={`mt-3 rounded-[18px] border border-[#f1e6d6] bg-white px-4 pb-3.5 pt-4 ${SOMBRA}`}>
+      <div className="flex items-center gap-2">
+        <span className="h-5 font-[Georgia,serif] text-[44px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a97c45]">Lo que dicen nuestros clientes</p>
       </div>
-      <p className={`mt-2.5 whitespace-pre-line text-[13.5px] leading-relaxed text-gray-700 ${abierta ? '' : 'line-clamp-5'}`}>
-        {resena.texto}
-      </p>
-      {larga && (
-        <button type="button" onClick={() => setAbierta(!abierta)} className="mt-1 self-start text-[13px] font-semibold text-[#8b6439]">
-          {abierta ? 'Leer menos' : 'Leer más'}
-        </button>
-      )}
-      <p className="mt-auto pt-3 text-[11px] text-gray-400">
-        Reseña de <LogoGoogle className="text-[11px]" />
-      </p>
-    </article>
+      <p className="mt-2.5 text-[13.5px] leading-relaxed text-gray-700">{resumen.texto}</p>
+      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-gray-400">
+        <span>✦ {resumen.aviso}</span>
+        {resumen.reportar && (
+          <a href={resumen.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -208,7 +181,7 @@ export default function Comunidad() {
   const navigate = useNavigate();
   const [preguntaAbierta, setPreguntaAbierta] = useState<number | null>(null);
 
-  // Nota y reseñas reales de Google; si no llegan, la sección queda solo con los botones
+  // Nota, total y resumen de Google; si no llegan, la sección queda solo con los botones
   const [google, setGoogle] = useState<ResenasGoogle | null>(null);
   useEffect(() => {
     let activo = true;
@@ -216,7 +189,7 @@ export default function Comunidad() {
     return () => { activo = false; };
   }, []);
   const nota = google?.nota ?? null;
-  const resenas = google?.resenas ?? [];
+  const resumen = google?.resumen ?? null;
 
   // Alto del menú fijo (igual que en Sobre nosotros): la portada queda debajo y los saltos a cada sección no se esconden
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
@@ -309,13 +282,7 @@ export default function Comunidad() {
               </p>
             </div>
           </div>
-          {resenas.length > 0 && (
-            <div className="-mx-4 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {resenas.map((r, i) => (
-                <TarjetaResena key={`${r.autor}-${i}`} resena={r} />
-              ))}
-            </div>
-          )}
+          {resumen && <TarjetaResumen resumen={resumen} />}
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
               <PenLine className="h-4 w-4" /> Dejar mi reseña
