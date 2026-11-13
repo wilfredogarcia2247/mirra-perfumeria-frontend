@@ -157,19 +157,28 @@ function LogoGoogle({ className = '' }: { className?: string }) {
   );
 }
 
-// Resumen que escribe Gemini con las reseñas de Google (Google pide mostrar el aviso y el enlace para reportar)
+// Página de ayuda de Google sobre los resúmenes (enlace exigido por Google junto al resumen)
+const ACERCA_RESUMEN = 'https://support.google.com/local-listings/answer/9851099';
+
+// Resumen que escribe Gemini con las reseñas de Google. Google exige: título "Resumen de reseñas",
+// el aviso debajo del texto, "Acerca de este resumen", "Reportar" y un enlace a las reseñas ("Ver todas").
 function TarjetaResumen({ resumen }: { resumen: ResumenGoogle }) {
   return (
     <div className={`mt-3 rounded-[18px] border border-[#f1e6d6] bg-white px-4 pb-3.5 pt-4 ${SOMBRA}`}>
       <div className="flex items-center gap-2">
         <span className="h-5 font-[Georgia,serif] text-[44px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a97c45]">Lo que dicen nuestros clientes</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a97c45]">Resumen de reseñas</p>
       </div>
       <p className="mt-2.5 text-[13.5px] leading-relaxed text-gray-700">{resumen.texto}</p>
-      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-gray-400">
-        <span>✦ {resumen.aviso}</span>
+      <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-gray-400">
+        <span className="w-full sm:w-auto">✦ {resumen.aviso}</span>
+        <span aria-hidden="true" className="hidden sm:inline">·</span>
+        <a href={ACERCA_RESUMEN} target="_blank" rel="noopener noreferrer" className="underline">Acerca de este resumen</a>
         {resumen.reportar && (
-          <a href={resumen.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>
+          <>
+            <span aria-hidden="true">·</span>
+            <a href={resumen.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>
+          </>
         )}
       </div>
     </div>
