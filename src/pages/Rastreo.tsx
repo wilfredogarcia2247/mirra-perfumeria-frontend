@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Search, Package, MapPin, User, Weight, Clock, CheckCircle2, Truck, Building2, ArrowRight, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useNavigate } from "react-router-dom";
+import useCart from "@/hooks/use-cart";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:3000/api";
 
@@ -92,6 +94,8 @@ const STEP_CONFIG = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Rastreo() {
+  const { count } = useCart();
+  const navigate = useNavigate();
   // Alto del menú fijo (cambia si hay mensajes en la franja de arriba): el bloque empieza justo debajo
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
   useEffect(() => {
@@ -152,7 +156,8 @@ export default function Rastreo() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <Header cartItemsCount={0} cartPulseKey={0} onCartClick={() => {}} />
+      {/* El carrito vive en la página de la tienda: ir allá y abrirlo */}
+      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate("/", { state: { abrirCarrito: true } })} />
 
       {/* ── Hero banner ── */}
       {/* El relleno superior iguala la altura del menú fijo: así el bloque queda centrado debajo de él */}

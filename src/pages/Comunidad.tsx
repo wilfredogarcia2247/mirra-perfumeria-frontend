@@ -224,7 +224,7 @@ export default function Comunidad() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/')} />
+      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
 
       {/* Portada oscura */}
       <div

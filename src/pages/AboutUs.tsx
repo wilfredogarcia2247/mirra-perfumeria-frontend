@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Instagram, Phone, Heart, Lightbulb, Zap, Store, Users, Target } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
@@ -40,7 +41,7 @@ function FadeInSection({ children, delay = 0, className = "" }: { children: Reac
 
 export default function AboutUs() {
   const { count } = useCart();
-  const [isCartOpen, setIsCartOpen] = React.useState(false);
+  const navigate = useNavigate();
 
   // Alto del menú fijo (cambia si hay mensajes en la franja de arriba): el título queda centrado debajo
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
@@ -59,13 +60,12 @@ export default function AboutUs() {
     return () => ro.disconnect();
   }, []);
 
-  const handleCartClick = () => {
-    console.log('Cart clicked from About Us page');
-  };
+  // El carrito vive en la página de la tienda: ir allá y abrirlo
+  const handleCartClick = () => navigate('/', { state: { abrirCarrito: true } });
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Header cartItemsCount={count} onCartClick={handleCartClick} />
+      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={handleCartClick} />
 
       {/* Hero Banner Area */}
       {/* Arriba: alto del menú + el mismo espacio que abajo (56 px en teléfono, 64 px en pantallas grandes) */}

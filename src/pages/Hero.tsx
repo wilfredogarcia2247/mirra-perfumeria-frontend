@@ -156,6 +156,16 @@ export default function Hero() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [irAlCatalogo, location.key]);
 
+  // Llegó desde el carrito de otra página (Comunidad, Nosotros, Rastreo): abrir el carrito aquí
+  const abrirCarrito = Boolean((location.state as { abrirCarrito?: boolean } | null)?.abrirCarrito);
+  useEffect(() => {
+    if (!abrirCarrito) return;
+    setIsCartOpen(true);
+    // Se usa una sola vez: si el cliente recarga la página, el carrito no se vuelve a abrir solo
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirCarrito, location.key]);
+
   const buscarClientePorCedula = async (value: string) => {
     const cedula = value.trim();
     if (!cedula) {
