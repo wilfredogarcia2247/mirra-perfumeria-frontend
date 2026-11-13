@@ -1271,14 +1271,6 @@ export default function CheckoutModal({
           >
             {loading ? 'Enviando...' : checkoutStep === 'delivery' ? fulfillmentType ? 'Guardar entrega y volver al carrito' : 'Elige una opción de entrega' : 'Confirmar pedido'}
           </button>
-          {checkoutStep !== 'delivery' && (
-            <p className="-mt-3 text-center text-[11px] leading-relaxed text-gray-500">
-              Al enviar tu pedido aceptas los{' '}
-              <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Términos y condiciones</a>
-              {' '}y la{' '}
-              <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Política de privacidad</a>.
-            </p>
-          )}
           {checkoutStep === 'delivery' && (
             <p className="-mt-3 text-center text-xs leading-relaxed text-gray-500">
               Volverás al carrito para revisar tus productos. Podrás editar la entrega antes de confirmar.

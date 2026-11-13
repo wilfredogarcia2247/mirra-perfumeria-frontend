@@ -1313,6 +1313,7 @@ export default function Hero() {
                 )}
 
                 {!isCheckoutOpen ? (
+                  <>
                   <div className="flex gap-3">
                     <button
                       onClick={vaciarCarrito}
@@ -1338,6 +1339,16 @@ export default function Hero() {
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
+                  {/* Debajo de "Confirmar pedido", antes de tocarlo (enlaces en otra pestaña para no perder el pedido) */}
+                  {deliveryReview && (
+                    <p className="mt-2.5 text-center text-[11px] leading-relaxed text-gray-500">
+                      Al enviar tu pedido aceptas los{' '}
+                      <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Términos y condiciones</a>
+                      {' '}y la{' '}
+                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Política de privacidad</a>.
+                    </p>
+                  )}
+                  </>
                 ) : null}
               </div>
             )}
