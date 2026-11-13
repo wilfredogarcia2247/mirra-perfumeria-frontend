@@ -9,6 +9,8 @@ import useCart from '@/hooks/use-cart';
 const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
 const MAPS = 'https://maps.app.goo.gl/GS65NuHTcD9gGqGC7';
 const WHATSAPP = 'https://wa.me/584141454086';
+// Abre Maps directo en modo ruta, desde donde esté el cliente (sin punto de salida fijo)
+const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Mirra+Perfumeria,+Local+%234,+Diagonal+al+Restaurant+Yangtze,+Centro+Comercial+Aviur,+Maracaibo+4001,+Zulia';
 
 const SOMBRA = 'shadow-[0_8px_22px_rgba(90,59,34,0.13),0_2px_5px_rgba(90,59,34,0.08)]';
 
@@ -284,7 +286,7 @@ export default function Comunidad() {
             </p>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2.5">
-            <a href={MAPS} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
+            <a href={COMO_LLEGAR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
               <Navigation className="h-4 w-4" /> Cómo llegar
             </a>
             <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className={btnBorde}>
