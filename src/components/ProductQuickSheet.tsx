@@ -240,7 +240,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
             type="button"
             onClick={agregar}
             disabled={!puedeAgregar}
-            className={`w-full rounded-xl py-3.5 text-[15px] font-bold transition active:scale-[0.98] ${puedeAgregar ? 'bg-[#CA9E67] text-white hover:bg-[#b58a53]' : 'cursor-not-allowed bg-gray-200 text-gray-500'}`}
+            className={`w-full rounded-xl py-3.5 text-[15px] font-bold transition active:scale-[0.98] ${puedeAgregar ? 'btn-dorado' :'cursor-not-allowed bg-gray-200 text-gray-500'}`}
           >
             {puedeAgregar ? `Agregar ${actual.label} · ${precio}` : 'No disponible'}
           </button>

@@ -394,6 +394,18 @@
   .cinta-fila { animation: none; }
 }
 
+/* Botón dorado con brillo de la tienda ("Agregar" en la hoja del perfume, botones de Comunidad).
+   El carrito ("Finalizar compra") sigue negro a propósito. */
+.btn-dorado {
+  background: linear-gradient(180deg, #dab580 0%, #c69a5f 50%, #a97c45 100%);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(80, 50, 20, 0.35);
+  box-shadow: 0 6px 14px rgba(169, 124, 69, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -2px 0 rgba(90, 60, 25, 0.18);
+}
+.btn-dorado:hover {
+  background: linear-gradient(180deg, #d3ab72 0%, #bb8e52 50%, #9c713c 100%);
+}
+
 /* Tablet (táctil, ancha y alta; ver `tablet` en tailwind.config.ts): en la administración los botones
    de las tablas tienen al menos 40 px para tocarlos con el dedo. No aplica en PC ni en celular. */
 @media (pointer: coarse) and (min-width: 700px) and (min-height: 600px) {

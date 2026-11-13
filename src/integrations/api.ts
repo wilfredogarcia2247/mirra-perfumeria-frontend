@@ -1524,6 +1524,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
           const isTiendaPublica = path === '/'
             || path.startsWith('/categoria/')
             || path === '/about'
+            || path === '/comunidad'
             || path === '/rastreo'
             || path === '/login';
           if (!isTiendaPublica) {

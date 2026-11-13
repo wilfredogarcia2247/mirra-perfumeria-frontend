@@ -205,6 +205,12 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             >
               Nosotros
             </Link>
+            <Link
+              to="/comunidad"
+              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+            >
+              Comunidad
+            </Link>
 
             <div ref={productosRef} className="relative group">
               <button
@@ -303,6 +309,12 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
           >
             Sobre Nosotros
+          </Link>
+          <Link
+            to="/comunidad"
+            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+          >
+            Comunidad y reseñas
           </Link>
           {/* Sección Productos */}
           <div>

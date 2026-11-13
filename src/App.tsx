@@ -19,6 +19,7 @@ import Bancos from "./pages/Bancos";
 import Marcas from "./pages/Marcas";
 import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
+import Comunidad from "./pages/Comunidad";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import CintilloMensajes from "./pages/CintilloMensajes";
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/" element={<Hero />} />
             <Route path="/categoria/:categorySlug" element={<Hero />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/comunidad" element={<Comunidad />} />
             <Route path="/rastreo" element={<Rastreo />} />
           </Route>
           <Route path="/login" element={<Login />} />
