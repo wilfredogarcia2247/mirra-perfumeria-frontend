@@ -248,7 +248,7 @@ export default function Comunidad() {
           <Titulo sub="Te lo llevamos donde estés.">Envíos</Titulo>
           <div className="grid gap-3">
             {[
-              { ico: '🛵', t: 'Delivery en Maracaibo', d: <>Te lo llevamos a tu casa o trabajo. El costo depende de la zona; te lo confirmamos por WhatsApp.</> },
+              { ico: '🛵', t: 'Delivery en Maracaibo y San Francisco', d: <>Te lo llevamos a tu casa o trabajo. El costo depende de la zona; te lo confirmamos por WhatsApp.</> },
               { ico: '📦', t: 'Envíos nacionales por MRW', d: <>A cualquier ciudad de Venezuela. Sigue tu paquete en <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.</> },
               { ico: '🏬', t: 'Retiro en tienda', d: <>Pasa por tu pedido a nuestro local, de lunes a sábado de 9:00 AM a 6:00 PM.</> },
             ].map((e) => (
