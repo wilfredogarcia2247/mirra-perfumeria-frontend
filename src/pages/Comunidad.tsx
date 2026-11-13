@@ -77,6 +77,32 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
     ),
   },
   {
+    p: '¿Los perfumes son originales?',
+    r: 'Creamos nuestras fragancias inspiradas en tus aromas favoritos, con una base de aceite de alta concentración.',
+  },
+  {
+    p: '¿Cuánto dura el perfume?',
+    r: 'Depende de cómo lo uses y de cuántas atomizaciones apliques. Por ejemplo, no dura igual si vas en moto al aire libre que si estás en una oficina.',
+  },
+  {
+    p: '¿Qué formas de pago aceptan?',
+    r: 'Pago móvil, efectivo, punto de venta y plataformas digitales. Al enviar tu pedido por WhatsApp te pasamos los datos para pagar.',
+  },
+  {
+    p: '¿Cuánto tarda mi pedido?',
+    r: 'Por lo general lo armamos el mismo día y lo enviamos al día siguiente. Según la ciudad, llega de 1 a 2 días después de enviado.',
+  },
+  {
+    p: '¿Cómo sé dónde va mi envío?',
+    r: (
+      <>
+        Si lo enviamos por MRW, síguelo con tu número de guía en{' '}
+        <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.
+        Si es delivery, te avisamos por WhatsApp.
+      </>
+    ),
+  },
+  {
     p: '¿Hay un mínimo para los de 7 ml?',
     r: 'Sí: los de 7 ml se piden desde 4 unidades. Si en el pedido llevas un perfume de 30 ml o más, puedes llevar los de 7 ml que quieras.',
   },
@@ -85,8 +111,17 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
     r: 'Sí: 10% desde 4 perfumes y 15% desde 24 perfumes, en tamaños de 30 a 100 ml. Si tienes un cupón, se aplica el descuento más alto.',
   },
   {
-    p: '¿Qué formas de pago aceptan?',
-    r: 'Pago móvil, efectivo, punto de venta y plataformas digitales. Al enviar tu pedido por WhatsApp te pasamos los datos para pagar.',
+    p: '¿Qué pasa si un perfume está agotado?',
+    r: 'Toca “Avísame cuando llegue” en el perfume, deja tu nombre y teléfono, y te avisamos cuando vuelva.',
+  },
+  {
+    p: '¿Hacen cambios?',
+    r: (
+      <>
+        Sí, nuestras políticas de cambio cubren todos tus productos. Para saber más,{' '}
+        <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#8b6439] underline underline-offset-2">escríbenos por WhatsApp</a>.
+      </>
+    ),
   },
 ];
 
@@ -103,6 +138,7 @@ function Titulo({ children, sub }: { children: React.ReactNode; sub: string }) {
 export default function Comunidad() {
   const { count } = useCart();
   const navigate = useNavigate();
+  const [preguntaAbierta, setPreguntaAbierta] = useState<number | null>(null);
 
   // Alto del menú fijo (igual que en Sobre nosotros): la portada queda debajo y los saltos a cada sección no se esconden
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
@@ -223,22 +259,32 @@ export default function Comunidad() {
         <div className={ancho}>
           <Titulo sub="Toca una pregunta para ver la respuesta.">Preguntas frecuentes</Titulo>
           <div className="space-y-2.5">
-            {PREGUNTAS.map((q, i) => (
-              <details
-                key={q.p}
-                open={i === 0}
-                className="group rounded-[14px] border border-[#f1e6d6] bg-white shadow-[0_4px_12px_rgba(90,59,34,0.09)] open:border-[#e7c793]"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2.5 p-3.5 text-sm font-semibold text-gray-900 [&::-webkit-details-marker]:hidden">
-                  {q.p}
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-base leading-none text-[#8b6439] group-open:bg-[#CA9E67] group-open:text-white">
-                    <span className="group-open:hidden">+</span>
-                    <span className="hidden group-open:inline">−</span>
-                  </span>
-                </summary>
-                <div className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</div>
-              </details>
-            ))}
+            {/* Solo una abierta a la vez: al abrir otra, la anterior se cierra; tocar la abierta la cierra */}
+            {PREGUNTAS.map((q, i) => {
+              const abierta = preguntaAbierta === i;
+              return (
+                <div
+                  key={q.p}
+                  className={`rounded-[14px] border bg-white shadow-[0_4px_12px_rgba(90,59,34,0.09)] ${abierta ? 'border-[#e7c793]' : 'border-[#f1e6d6]'}`}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={abierta}
+                    aria-controls={`respuesta-${i}`}
+                    onClick={() => setPreguntaAbierta(abierta ? null : i)}
+                    className="flex w-full items-center justify-between gap-2.5 p-3.5 text-left text-sm font-semibold text-gray-900"
+                  >
+                    {q.p}
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base leading-none ${abierta ? 'bg-[#CA9E67] text-white' : 'bg-[#f5eee6] text-[#8b6439]'}`} aria-hidden="true">
+                      {abierta ? '−' : '+'}
+                    </span>
+                  </button>
+                  {abierta && (
+                    <div id={`respuesta-${i}`} className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
