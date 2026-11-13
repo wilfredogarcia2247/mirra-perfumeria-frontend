@@ -65,7 +65,13 @@ const REDES = [
 const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
   {
     p: '¿Cómo compro por la página?',
-    r: 'Escoge tus perfumes y el tamaño, agrégalos al carrito y toca “Finalizar compra”. Se abre WhatsApp con tu pedido listo para enviarlo y te confirmamos el pago y la entrega.',
+    r: (
+      <ol className="list-decimal space-y-1 pl-4">
+        <li>Agrega tus perfumes al carrito y toca <b>“Finalizar compra”</b>.</li>
+        <li>Llena tus datos de entrega y toca <b>“Confirmar pedido”</b>.</li>
+        <li>Se abre WhatsApp con tu pedido: toca <b>Enviar</b> para que nos llegue.</li>
+      </ol>
+    ),
   },
   {
     p: '¿Hay un mínimo para los de 7 ml?',
@@ -227,7 +233,7 @@ export default function Comunidad() {
                     <span className="hidden group-open:inline">−</span>
                   </span>
                 </summary>
-                <p className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</p>
+                <div className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</div>
               </details>
             ))}
           </div>
