@@ -20,6 +20,7 @@ import Marcas from "./pages/Marcas";
 import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
 import Comunidad from "./pages/Comunidad";
+import SetTodaOcasion from "./pages/SetTodaOcasion";
 import { Terminos, Privacidad } from "./pages/Legal";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/categoria/:categorySlug" element={<Hero />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/comunidad" element={<Comunidad />} />
+            <Route path="/set-toda-ocasion" element={<SetTodaOcasion />} />
             <Route path="/rastreo" element={<Rastreo />} />
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/privacidad" element={<Privacidad />} />

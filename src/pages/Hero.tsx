@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
@@ -19,6 +19,9 @@ import Footer from '@/components/Footer';
 import FeaturedShowcase from '@/components/FeaturedShowcase';
 import PortadaCinta from '@/components/PortadaCinta';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { productoDesdeCatalogo, slugifyCategory } from '@/lib/catalogoPublico';
+import { FILTROS_MOMENTO, RUTA_SET, haySet, momentoDe } from '@/lib/setTodaOcasion';
+import { AvisoSetTodaOcasion, FranjaSetTodaOcasion } from '@/components/SetTodaOcasionPromo';
 import { useBloquearScroll } from '@/hooks/useBloquearScroll';
 import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
@@ -31,24 +34,10 @@ interface CuponPublico {
   colaborador_nombre?: string | null;
 }
 
-function slugifyCategory(name: string) {
-  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-// Nombres de todas las categorías del producto (la API envía `categorias`; `categoria` es la antigua única)
-function categoryNames(item: any): string[] {
-  const list = Array.isArray(item?.categorias) ? item.categorias : [];
-  const names = list.map((c: any) => String(c?.nombre ?? c?.name ?? '')).filter(Boolean);
-  if (names.length > 0) return names;
-  const single = (item?.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item?.categoria_nombre ?? item?.category ?? '';
-  return single ? [String(single)] : [];
-}
-
-// Texto que ve el cliente: si es de Hombre y de Mujer se muestra "Unisex"
-function categoryLabel(names: string[]) {
-  const slugs = names.map(slugifyCategory);
-  if (slugs.includes('hombre') && slugs.includes('mujer')) return 'Unisex';
-  return names.join(', ');
+// Título de la lista según el filtro (categoría o momento del día)
+function tituloFiltro(slug: string) {
+  const momento = FILTROS_MOMENTO.find((m) => m.slug === slug);
+  return momento ? momento.titulo : slug.split('-').join(' ');
 }
 
 export default function Hero() {
@@ -219,30 +208,7 @@ export default function Hero() {
         // getCatalogoPaginated normaliza a { items, meta }
         const items = Array.isArray(res) ? res : (res?.items ?? res?.data ?? []);
 
-        const productsList: Product[] = (Array.isArray(items) ? items : []).map((item: any) => ({
-          id: item.id ?? item.producto_id ?? 0,
-          name: item.nombre ?? item.name ?? '',
-          image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
-          featured: Boolean(item.destacado ?? item.featured ?? false),
-          agotado: Boolean(item.agotado),
-          mas_pedido: Boolean(item.mas_pedido),
-          brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
-          categories: categoryNames(item),
-          category: categoryLabel(categoryNames(item)),
-          description: item.descripcion ?? item.description ?? '',
-          price: Number(item.precio_venta ?? item.price ?? 0) || 0,
-          precio_venta: item.precio_venta ?? null,
-          // Attach formulas and tamanos array from catalog (variants). `formulas` is used by the new API
-          formulas: Array.isArray(item.formulas) ? item.formulas : (item.formulas || []),
-          // Prefer explicit `tamanos` when present, otherwise fall back to `formulas` or `sizes`.
-          tamanos: Array.isArray(item.tamanos) ? item.tamanos : (Array.isArray(item.formulas) ? item.formulas : (item.sizes || [])),
-          stock: Number(item.stock ?? item.stock_disponible ?? 0) || 0,
-          // attach raw inventory and full objects for detail views
-          inventario: item.inventario ?? item.inventario_detalle ?? item.inventory ?? undefined,
-          categoria_obj: item.categoria ?? null,
-          ficha: item.ficha ?? null,
-          marca_obj: item.marca ?? null,
-        } as Product));
+        const productsList: Product[] = (Array.isArray(items) ? items : []).map(productoDesdeCatalogo);
 
         if (!mounted) return;
         setCatalogProducts(productsList);
@@ -277,9 +243,13 @@ export default function Hero() {
       ))
       : catalogProducts;
 
+    const filtroMomento = FILTROS_MOMENTO.find((m) => m.slug === selectedCategory.toLowerCase());
     const categoryFiltered = selectedCategory === 'all'
       ? filtered
-      : filtered.filter((product) => {
+      : filtroMomento
+        // Día / Toda ocasión / Noche: según la ficha del perfume
+        ? filtered.filter((product) => momentoDe(product) === filtroMomento.momento)
+        : filtered.filter((product) => {
         // Un perfume unisex (Hombre y Mujer) aparece en las dos categorías
         const names = product.categories && product.categories.length > 0 ? product.categories : [product.category || ''];
         return names.map(slugifyCategory).includes(selectedCategory.toLowerCase());
@@ -332,12 +302,20 @@ export default function Hero() {
     return () => ro.disconnect();
   }, []);
 
-  // Filtros rápidos: solo los que tienen perfumes
+  // ¿Hay perfumes con ficha para armar el Set toda ocasión? (si no, no se muestra nada del set)
+  const conSet = useMemo(() => haySet(catalogProducts), [catalogProducts]);
+
+  // Filtros rápidos: solo los que tienen perfumes. Primero el botón del set, luego
+  // Todos / Hombre / Mujer y al final Día / Toda ocasión / Noche.
   const filtrosRapidos = (() => {
     const slugsDe = (p: Product) => (p.categories && p.categories.length > 0 ? p.categories : [p.category || '']).map(slugifyCategory);
-    const lista: { slug: string; label: string }[] = [{ slug: 'all', label: 'Todos' }];
+    const lista: { slug: string; label: string; set?: boolean }[] = [{ slug: 'all', label: 'Todos' }];
     if (catalogProducts.some((p) => slugsDe(p).includes('hombre'))) lista.push({ slug: 'hombre', label: 'Hombre' });
     if (catalogProducts.some((p) => slugsDe(p).includes('mujer'))) lista.push({ slug: 'mujer', label: 'Mujer' });
+    for (const m of FILTROS_MOMENTO) {
+      if (catalogProducts.some((p) => momentoDe(p) === m.momento)) lista.push({ slug: m.slug, label: m.label });
+    }
+    if (conSet) lista.unshift({ slug: 'set', label: '🎁 Set toda ocasión', set: true });
     return lista.length > 1 ? lista : [];
   })();
 
@@ -509,14 +487,16 @@ export default function Hero() {
         </div>
       )}
 
+      {!loading && conSet && <FranjaSetTodaOcasion productos={catalogProducts} />}
+
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
           <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3 capitalize">
-            {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${selectedCategory.split('-').join(' ')}`}
+            {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${tituloFiltro(selectedCategory)}`}
           </h2>
           <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
           <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">
-            {categorySlug ? `Explora nuestra selección de ${categorySlug.replace(/-/g, ' ')}` : 'Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.'}
+            {categorySlug ? `Explora nuestra selección ${FILTROS_MOMENTO.find((m) => m.slug === categorySlug)?.frase ?? `de ${categorySlug.replace(/-/g, ' ')}`}` : 'Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.'}
           </p>
         </div>
         <div className="mb-8 sm:mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
@@ -543,6 +523,18 @@ export default function Hero() {
           >
             <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar perfumes">
               {filtrosRapidos.map((f) => {
+                if (f.set) {
+                  return (
+                    <button
+                      key={f.slug}
+                      type="button"
+                      onClick={() => navigate(RUTA_SET)}
+                      className="btn-dorado shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[0.98]"
+                    >
+                      {f.label}
+                    </button>
+                  );
+                }
                 const activo = selectedCategory.toLowerCase() === f.slug;
                 return (
                   <button
@@ -575,6 +567,10 @@ export default function Hero() {
               />
             ))}
           </div>
+        )}
+
+        {conSet && (
+          <AvisoSetTodaOcasion bloqueado={isCartOpen || isCheckoutOpen || sheetProduct !== null || pedidoRecibido !== null} />
         )}
 
         {sheetProduct && (
