@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
-import { getResenasGoogle, type ResenasGoogle, type ResumenGoogle } from '@/integrations/api';
+import { getResenasGoogle, type ResenaGoogle, type ResenasGoogle, type ResumenGoogle } from '@/integrations/api';
 
 // Enlaces de Mirra (una sola sucursal por ahora)
 const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
@@ -185,6 +185,141 @@ function TarjetaResumen({ resumen }: { resumen: ResumenGoogle }) {
   );
 }
 
+// Mezcla el orden (cada visita muestra otra reseña primero)
+function revolver<T>(lista: T[]): T[] {
+  const a = lista.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Una reseña del carrusel. Google exige mostrar nombre (con enlace al perfil), foto,
+// fecha, el texto sin cambios, enlace a la reseña y "Reportar".
+function DiapositivaResena({ r }: { r: ResenaGoogle }) {
+  const textoRef = useRef<HTMLParagraphElement>(null);
+  const [abierta, setAbierta] = useState(false);
+  const [cortada, setCortada] = useState(false);
+  const [sinFoto, setSinFoto] = useState(!r.foto);
+
+  useEffect(() => {
+    const p = textoRef.current;
+    if (p && !abierta) setCortada(p.scrollHeight > p.clientHeight + 2);
+  }, [r.texto, abierta]);
+
+  const nombre = r.perfil ? (
+    <a href={r.perfil} target="_blank" rel="noopener noreferrer" className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</a>
+  ) : (
+    <span className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</span>
+  );
+
+  return (
+    <div className="flex w-full shrink-0 snap-center flex-col items-center justify-center px-7 pt-4 text-center">
+      <span className="h-[26px] font-[Georgia,serif] text-[58px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
+      <p
+        ref={textoRef}
+        className={`mt-2 font-[Georgia,serif] text-base italic leading-[1.55] text-[#3b2a1a] ${abierta ? '' : 'line-clamp-5'}`}
+      >
+        {r.texto}
+      </p>
+      {(cortada || abierta) && (
+        <button type="button" onClick={() => setAbierta((a) => !a)} className="pt-1 text-[12.5px] font-semibold text-[#8b6439]">
+          {abierta ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+      <div className="mt-3.5 flex max-w-full items-center gap-2.5 text-left">
+        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[1.5px] border-[#CA9E67] bg-[#f5eee6] text-sm font-bold text-[#8b6439]">
+          {sinFoto ? (
+            r.autor.charAt(0).toUpperCase()
+          ) : (
+            <img src={r.foto!} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" onError={() => setSinFoto(true)} />
+          )}
+        </span>
+        <div className="min-w-0">
+          {nombre}
+          <span className="text-[11px] text-[#8a7560]">
+            <span className="tracking-[1px] text-[#f5b301]" aria-label={`${r.estrellas} de 5 estrellas`}>{'★'.repeat(Math.round(r.estrellas))}</span>
+            {r.hace && ` · ${r.hace}`}
+          </span>
+        </div>
+      </div>
+      {(r.enlace || r.reportar) && (
+        <p className="mt-2 text-[11px] text-[#8a7560]">
+          {r.enlace && (
+            <a href={r.enlace} target="_blank" rel="noopener noreferrer" className="underline">
+              Ver en <span className="font-[Arial,sans-serif] font-bold">Google</span>
+            </a>
+          )}
+          {r.enlace && r.reportar && ' · '}
+          {r.reportar && <a href={r.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Carrusel de reseñas de Google en franja crema: se desliza con el dedo o con las flechas
+function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
+  const pistaRef = useRef<HTMLDivElement>(null);
+  const [actual, setActual] = useState(0);
+
+  const alDeslizar = () => {
+    const p = pistaRef.current;
+    if (p && p.clientWidth) setActual(Math.min(resenas.length - 1, Math.round(p.scrollLeft / p.clientWidth)));
+  };
+  const irA = (i: number) => {
+    const p = pistaRef.current;
+    if (!p) return;
+    const destino = Math.max(0, Math.min(resenas.length - 1, i));
+    p.scrollTo({ left: destino * p.clientWidth, behavior: 'smooth' });
+  };
+  const flecha = 'flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#e2cfb4] bg-white text-[#8b6439] transition active:scale-95 disabled:opacity-40';
+
+  return (
+    <div
+      className="-mx-4 mt-3 pb-5 pt-2 sm:mx-0 sm:rounded-[18px]"
+      style={{ background: 'linear-gradient(180deg,#faf4ea,#f1e4d0)' }}
+      aria-roledescription="carrusel"
+      aria-label="Reseñas de Google"
+    >
+      <div
+        ref={pistaRef}
+        onScroll={alDeslizar}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {resenas.map((r, i) => (
+          <DiapositivaResena key={`${r.autor}-${i}`} r={r} />
+        ))}
+      </div>
+      {resenas.length > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-3.5">
+          <button type="button" className={flecha} onClick={() => irA(actual - 1)} disabled={actual === 0} aria-label="Reseña anterior">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            {resenas.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => irA(i)}
+                aria-label={`Ver reseña ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${i === actual ? 'w-[18px] bg-[#CA9E67]' : 'w-1.5 bg-[#e2d3bf]'}`}
+              />
+            ))}
+          </div>
+          <button type="button" className={flecha} onClick={() => irA(actual + 1)} disabled={actual === resenas.length - 1} aria-label="Reseña siguiente">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      <p className="mt-2.5 text-center text-[11px] text-[#8a7560]">
+        Reseñas de <span className="font-[Arial,sans-serif] font-bold">Google</span>
+      </p>
+    </div>
+  );
+}
+
 export default function Comunidad() {
   const { count } = useCart();
   const navigate = useNavigate();
@@ -199,6 +334,8 @@ export default function Comunidad() {
   }, []);
   const nota = google?.nota ?? null;
   const resumen = google?.resumen ?? null;
+  // Orden mezclado una vez por visita
+  const resenas = useMemo(() => revolver(google?.resenas ?? []), [google]);
 
   // Alto del menú fijo (igual que en Sobre nosotros): la portada queda debajo y los saltos a cada sección no se esconden
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
@@ -291,6 +428,7 @@ export default function Comunidad() {
               </p>
             </div>
           </div>
+          {resenas.length > 0 && <CarruselResenas resenas={resenas} />}
           {resumen && <TarjetaResumen resumen={resumen} />}
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>

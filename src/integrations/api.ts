@@ -1597,7 +1597,24 @@ export async function getDescuentoMayorPublic(): Promise<ConfigDescuentoMayor> {
 
 // Nota, total y resumen (Gemini) de las reseñas de Google Maps (página Comunidad). null = sin datos.
 export type ResumenGoogle = { texto: string; aviso: string; reportar: string | null };
-export type ResenasGoogle = { nota: number | null; total: number; enlace: string | null; resumen: ResumenGoogle | null };
+export type ResenaGoogle = {
+  autor: string;
+  perfil: string | null;
+  foto: string | null;
+  estrellas: number;
+  texto: string;
+  hace: string;
+  enlace: string | null;
+  reportar: string | null;
+};
+export type ResenasGoogle = {
+  nota: number | null;
+  total: number;
+  enlace: string | null;
+  resumen: ResumenGoogle | null;
+  // Hasta 5 reseñas que elige Google; puede faltar si el servidor es viejo
+  resenas?: ResenaGoogle[];
+};
 
 export async function getResenasGoogle(): Promise<ResenasGoogle | null> {
   try {
