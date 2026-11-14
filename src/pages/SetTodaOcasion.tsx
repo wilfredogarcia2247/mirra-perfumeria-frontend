@@ -249,9 +249,21 @@ export default function SetTodaOcasion() {
   const otroAgregado = estaEnCarrito(agregados[otro]);
   const quien = (p: ParaSet) => (p === 'mujer' ? 'ella' : 'él');
 
-  // Agrega los tres al carrito y el cliente se queda aquí (puede armar el otro set)
+  // Saca del carrito las líneas de un set (si se agregó el mismo set dos veces, le resta 1 a cada una)
+  const sacarDelCarrito = (claves: string[]) => {
+    for (const clave of claves) {
+      const linea = items.find((it) => it.key === clave);
+      if (!linea) continue;
+      if (linea.qty > 1) updateQty(clave, linea.qty - 1);
+      else removeItem(clave);
+    }
+  };
+
+  // Agrega los tres al carrito y el cliente se queda aquí. Si el set de esta pestaña ya estaba en
+  // el carrito y el cliente cambió algo, lo reemplaza (no lo suma ni duplica perfumes).
   const comprar = () => {
     if (lineas.length === 0 || yaAgregado) return;
+    if (setEnCarrito) sacarDelCarrito(agregados[para] ?? []);
     for (const l of lineas) {
       addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined, set_etiqueta: para, set_total: lineas.length } as Product, 1);
     }
@@ -266,12 +278,7 @@ export default function SetTodaOcasion() {
   // Quita del carrito solo lo que agregó el set de esta pestaña (sus líneas van aparte de los
   // perfumes sueltos): si se agregó el mismo set dos veces, le resta 1 a cada uno.
   const quitarSet = () => {
-    for (const clave of agregados[para] ?? []) {
-      const linea = items.find((it) => it.key === clave);
-      if (!linea) continue;
-      if (linea.qty > 1) updateQty(clave, linea.qty - 1);
-      else removeItem(clave);
-    }
+    sacarDelCarrito(agregados[para] ?? []);
     const nuevos = { ...agregados };
     delete nuevos[para];
     guardarAgregados(nuevos);
@@ -337,7 +344,7 @@ export default function SetTodaOcasion() {
       onClick={comprar}
       className="w-full rounded-[10px] bg-[#1c1917] py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.99]"
     >
-      Agregar set al carrito
+      {setEnCarrito ? 'Actualizar set en el carrito' : 'Agregar set al carrito'}
     </button>
   );
 
