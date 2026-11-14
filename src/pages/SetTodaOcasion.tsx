@@ -253,7 +253,7 @@ export default function SetTodaOcasion() {
   const comprar = () => {
     if (lineas.length === 0 || yaAgregado) return;
     for (const l of lineas) {
-      addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined, set_etiqueta: para } as Product, 1);
+      addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined, set_etiqueta: para, set_total: lineas.length } as Product, 1);
     }
     guardarAgregados({ ...agregados, [para]: firma });
     setPulso((n) => n + 1);

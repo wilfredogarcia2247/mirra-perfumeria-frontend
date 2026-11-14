@@ -161,7 +161,7 @@ export function useCart() {
       if (seAgoto) cambios.agotados.push(nombre);
       cambio = true;
       // (se conserva la etiqueta del set, si la tiene)
-      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio, set_etiqueta: viejo.set_etiqueta } as Product };
+      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio, set_etiqueta: viejo.set_etiqueta, set_total: viejo.set_total } as Product };
     });
     if (cambio) setItems(next);
     return cambios;

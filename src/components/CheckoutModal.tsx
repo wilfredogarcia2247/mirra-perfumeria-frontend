@@ -549,7 +549,7 @@ export default function CheckoutModal({
     try {
 
     // Etiqueta del Set toda ocasión en cada línea (solo para mostrar el pedido agrupado)
-    const etiquetasSet = etiquetasParaEnviar(items, (it) => it.product.set_etiqueta);
+    const etiquetasSet = etiquetasParaEnviar(items, (it) => it.product.set_etiqueta, (it) => it.product.set_total);
 
     const lineas = items.map((it) => {
       const product: any = it.product;

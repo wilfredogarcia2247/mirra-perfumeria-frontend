@@ -889,7 +889,7 @@ export default function Hero() {
                   )}
                   {/* Cart Items List */}
                   {(() => {
-                    const { sets, sueltos } = agruparPorSet(cartItems, (it) => it.product.set_etiqueta);
+                    const { sets, sueltos } = agruparPorSet(cartItems, (it) => it.product.set_etiqueta, (it) => it.product.set_total);
                     const precioLinea = (it: CartItem) => Number(it.product.precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0) * (it.qty || 1);
                     const fila = (it: CartItem, momento?: { num: string; texto: string }) => {
                       const base = Number((it.product as any).precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0);
@@ -1101,7 +1101,7 @@ export default function Hero() {
                         });
 
                         // Etiqueta del set en cada línea (para mostrar el pedido agrupado)
-                        const etiquetasSet = etiquetasParaEnviar(cartItems, (it) => it.product.set_etiqueta);
+                        const etiquetasSet = etiquetasParaEnviar(cartItems, (it) => it.product.set_etiqueta, (it) => it.product.set_total);
                         productosSnapshot.forEach((p, i) => { const e = etiquetasSet.get(cartItems[i]); if (e) Object.assign(p, { set_etiqueta: e }); });
                         const payload = {
                           cliente_id: clienteIdActual ?? undefined,

@@ -25,6 +25,8 @@ export interface Product {
   ficha?: import('./fichaPerfume').FichaPerfume | null;
   // En el carrito: vino del Set toda ocasión para ella ('mujer') o para él ('hombre')
   set_etiqueta?: 'mujer' | 'hombre';
+  // Cuántos perfumes tenía ese set al agregarlo (si quita uno, deja de mostrarse como set)
+  set_total?: number;
   // Precio del tamaño elegido al agregarlo al carrito
   precio_snapshot?: number;
 }
