@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, RotateCw } from 'lucide-react';
+import { Check, Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -30,6 +30,19 @@ const CLAVE_PARA = 'mirra_set_para';
 // Para él y volver, o al salir a la tienda y regresar, queda igual que como lo dejó.
 const CLAVE_ELECCION = 'mirra_set_eleccion';
 type Guardado = Partial<Record<ParaSet, Partial<Record<MomentoSet, { id: Product['id']; tam: number }>>>>;
+// Sets ya agregados al carrito en esta visita (qué perfumes y tamaños), por pestaña
+const CLAVE_AGREGADOS = 'mirra_set_agregados';
+const leerAgregados = (): Partial<Record<ParaSet, string[]>> => {
+  try {
+    const g = JSON.parse(sessionStorage.getItem(CLAVE_AGREGADOS) || '{}');
+    return g && typeof g === 'object' ? g : {};
+  } catch {
+    return {};
+  }
+};
+// Clave de una línea en el carrito (igual que use-cart: producto:presentación)
+const claveCarrito = (producto: Product, tamanoId: unknown) => `${producto.id ?? ''}:${tamanoId ?? ''}`;
+
 const leerGuardado = (): Guardado => {
   try {
     const g = JSON.parse(sessionStorage.getItem(CLAVE_ELECCION) || '{}');
@@ -100,7 +113,9 @@ const Etiqueta = ({ i, texto }: { i: number; texto: string }) => (
 export default function SetTodaOcasion() {
   const navigate = useNavigate();
   const esPC = useEsPC();
-  const { count, addItem } = useCart();
+  const { count, addItem, items } = useCart();
+  const [pulso, setPulso] = useState(0);
+  const [agregados, setAgregados] = useState<Partial<Record<ParaSet, string[]>>>(leerAgregados);
   const [productos, setProductos] = useState<Product[] | null>(null);
   const [tasa, setTasa] = useState<Tasa>(null);
   const [para, setPara] = useState<ParaSet>(leerPara);
@@ -223,13 +238,31 @@ export default function SetTodaOcasion() {
   const total = lineas.reduce((s, l) => s + Number(l.pres!.precio || 0), 0);
   const hayOtros = (m: MomentoSet) => (opciones[m]?.length ?? 0) > 1;
 
+  // El set de cada pestaña cuenta como agregado si sus perfumes (con ese tamaño) siguen en el
+  // carrito. Si el cliente vacía el carrito, deja de contar.
+  const enCarrito = new Set(items.map((it) => it.key));
+  const firma = lineas.map((l) => claveCarrito(l.producto, l.pres!.tamano?.id));
+  const estaEnCarrito = (claves?: string[]) => !!claves?.length && claves.every((k) => enCarrito.has(k));
+  const yaAgregado = firma.length > 0 && estaEnCarrito(agregados[para]) && agregados[para]!.join('|') === firma.join('|');
+  const otro: ParaSet = para === 'mujer' ? 'hombre' : 'mujer';
+  const otroAgregado = estaEnCarrito(agregados[otro]);
+  const quien = (p: ParaSet) => (p === 'mujer' ? 'ella' : 'él');
+
+  // Agrega los tres al carrito y el cliente se queda aquí (puede armar el otro set)
   const comprar = () => {
-    if (lineas.length === 0) return;
+    if (lineas.length === 0 || yaAgregado) return;
     for (const l of lineas) {
       addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined } as Product, 1);
     }
-    toast.success(lineas.length === 1 ? 'Se agregó el perfume al carrito' : `Se agregaron los ${lineas.length} perfumes al carrito`);
-    navigate('/', { state: { abrirCarrito: true } });
+    const nuevos = { ...agregados, [para]: firma };
+    setAgregados(nuevos);
+    try { sessionStorage.setItem(CLAVE_AGREGADOS, JSON.stringify(nuevos)); } catch { /* sin almacenamiento */ }
+    setPulso((n) => n + 1);
+  };
+  const irAlCarrito = () => navigate('/', { state: { abrirCarrito: true } });
+  const armarElOtro = () => {
+    elegirPara(otro);
+    if (!esPC) window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const inspirado = (p: Product) => (p.ficha ? normalizarFicha(p.ficha).inspirado_en : null);
@@ -247,24 +280,50 @@ export default function SetTodaOcasion() {
           className={`relative pb-2.5 text-sm transition ${para === v ? 'font-semibold text-[#1c1917] after:absolute after:inset-x-0 after:-bottom-px after:h-[1.5px] after:bg-[#1c1917]' : 'text-[#78716c] hover:text-[#1c1917]'}`}
         >
           {t}
+          {estaEnCarrito(agregados[v]) && <Check className="ml-1 inline h-3.5 w-3.5 -translate-y-px text-[#b08a57]" aria-label="ya en el carrito" />}
         </button>
       ))}
     </div>
   );
 
-  const comprarBoton = (
+  // Confirmación después de agregar: armar el otro set o ir al carrito
+  const confirmacion = yaAgregado && (
+    <div className="mb-3 rounded-xl bg-[#f3eee8] px-3.5 py-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300" role="status">
+      <p className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[#1c1917]">
+        <Check className="h-4 w-4 text-[#b08a57]" /> Set para {quien(para)} agregado
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
+        {!otroAgregado && (
+          <button type="button" onClick={armarElOtro} className="group font-semibold text-[#1c1917]">
+            Armar el de {quien(otro)} <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          </button>
+        )}
+        <button type="button" onClick={irAlCarrito} className="text-[#57534e] underline underline-offset-[3px]">Ver carrito</button>
+      </div>
+    </div>
+  );
+
+  const comprarBoton = yaAgregado ? (
+    <button
+      type="button"
+      disabled
+      className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[#1c1917] bg-white py-3.5 text-[15px] font-semibold text-[#1c1917]"
+    >
+      <Check className="h-4 w-4" /> Set agregado
+    </button>
+  ) : (
     <button
       type="button"
       onClick={comprar}
       className="w-full rounded-[10px] bg-[#1c1917] py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.99]"
     >
-      Comprar set
+      Agregar set al carrito
     </button>
   );
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
-      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
+      <Header cartItemsCount={count} cartPulseKey={pulso} onCartClick={irAlCarrito} />
 
       <main
         className="mx-auto max-w-xl px-4 pb-10 lg:max-w-7xl lg:px-8 lg:pb-16"
@@ -365,6 +424,7 @@ export default function SetTodaOcasion() {
                 <span className="text-[13px] text-[#78716c]">Total</span>
                 <strong className="text-xl font-semibold text-[#1c1917]">{formatPrecio(total, tasa)}</strong>
               </div>
+              {confirmacion}
               {comprarBoton}
             </aside>
           )}
@@ -375,6 +435,7 @@ export default function SetTodaOcasion() {
         // Teléfono: total y botón fijos abajo
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#ece6de] bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto max-w-xl">
+            {confirmacion}
             <div className="mb-2.5 flex items-baseline justify-between text-[13px] text-[#78716c]">
               <span>Total del set</span>
               <strong className="text-[15px] font-semibold text-[#1c1917]">{formatPrecio(total, tasa)}</strong>
@@ -386,7 +447,7 @@ export default function SetTodaOcasion() {
 
       <Footer />
       {/* Espacio para que la barra fija de abajo no tape el final del pie de página */}
-      {!esPC && lineas.length > 0 && <div className="h-32" aria-hidden="true" />}
+      {!esPC && lineas.length > 0 && <div className={yaAgregado ? "h-52" : "h-32"} aria-hidden="true" />}
     </div>
   );
 }
