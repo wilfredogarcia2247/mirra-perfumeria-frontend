@@ -16,17 +16,21 @@ export const MOMENTOS_SET: { v: MomentoSet; label: string; icono: string }[] = [
   { v: 'noche', label: 'Para la noche', icono: '🌙' },
 ];
 
-// Filtros de la tienda por momento (/categoria/dia, /categoria/toda-ocasion, /categoria/noche)
-// titulo: va en el título de la lista (que pone mayúscula a cada palabra); frase: en el texto de abajo
-export const FILTROS_MOMENTO: { slug: string; label: string; titulo: string; frase: string; momento: MomentoSet }[] = [
-  { slug: 'dia', label: 'Día', titulo: 'Día', frase: 'para el día', momento: 'dia' },
-  { slug: 'toda-ocasion', label: 'Toda ocasión', titulo: 'Toda ocasión', frase: 'para toda ocasión', momento: 'ambos' },
-  { slug: 'noche', label: 'Noche', titulo: 'Noche', frase: 'para la noche', momento: 'noche' },
+// Filtro "Momento del día" de la tienda (dentro del botón Filtros)
+export const MOMENTOS_FILTRO: { v: MomentoSet; t: string }[] = [
+  { v: 'dia', t: 'Día' },
+  { v: 'ambos', t: 'Toda ocasión' },
+  { v: 'noche', t: 'Noche' },
 ];
 
 export const RUTA_SET = '/set-toda-ocasion';
 
 const fichaDe = (p: Product) => (p.ficha ? normalizarFicha(p.ficha) : null);
+
+// Familias olfativas de la ficha (dulce, cítrico, amaderado...)
+export function familiasDe(p: Product): string[] {
+  return fichaDe(p)?.familias ?? [];
+}
 
 export function momentoDe(p: Product): MomentoSet | null {
   const m = fichaDe(p)?.momento;
@@ -68,4 +72,18 @@ export function elegirAlAzar(lista: Product[], actualId?: Product['id'] | null):
 export function presentacionInicial(pres: Presentacion[]): number {
   const i = pres.findIndex((x) => (mlDe(x.tamano?.nombre) ?? 0) >= 30);
   return i >= 0 ? i : 0;
+}
+
+// Botón Filtros de la tienda: familias y momentos elegidos
+export type SeleccionFiltros = { familias: string[]; momentos: string[] };
+
+// ¿Pasa el perfume los filtros? Dentro de un grupo vale cualquiera (dulce O cítrico);
+// entre grupos deben cumplirse los dos (dulce Y de noche).
+export function pasaFiltros(p: Product, sel: SeleccionFiltros): boolean {
+  if (sel.familias.length && !familiasDe(p).some((f) => sel.familias.includes(f))) return false;
+  if (sel.momentos.length) {
+    const m = momentoDe(p);
+    if (!m || !sel.momentos.includes(m)) return false;
+  }
+  return true;
 }

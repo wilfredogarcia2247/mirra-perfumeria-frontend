@@ -26,6 +26,18 @@ type Eleccion = { producto: Product; tam: number };
 type Elecciones = Partial<Record<MomentoSet, Eleccion>>;
 
 const CLAVE_PARA = 'mirra_set_para';
+// Lo elegido en cada pestaña (perfume y tamaño) durante la visita: al cambiar de Para ella a
+// Para él y volver, o al salir a la tienda y regresar, queda igual que como lo dejó.
+const CLAVE_ELECCION = 'mirra_set_eleccion';
+type Guardado = Partial<Record<ParaSet, Partial<Record<MomentoSet, { id: Product['id']; tam: number }>>>>;
+const leerGuardado = (): Guardado => {
+  try {
+    const g = JSON.parse(sessionStorage.getItem(CLAVE_ELECCION) || '{}');
+    return g && typeof g === 'object' ? g : {};
+  } catch {
+    return {};
+  }
+};
 const leerPara = (): ParaSet => {
   try {
     return localStorage.getItem(CLAVE_PARA) === 'hombre' ? 'hombre' : 'mujer';
@@ -92,7 +104,11 @@ export default function SetTodaOcasion() {
   const [productos, setProductos] = useState<Product[] | null>(null);
   const [tasa, setTasa] = useState<Tasa>(null);
   const [para, setPara] = useState<ParaSet>(leerPara);
-  const [elecciones, setElecciones] = useState<Elecciones>({});
+  // Cada pestaña (Para ella / Para él) guarda sus propios perfumes y tamaños
+  const [porPara, setPorPara] = useState<Partial<Record<ParaSet, Elecciones>>>({});
+  const elecciones: Elecciones = porPara[para] ?? {};
+  const setElecciones = (cambio: (e: Elecciones) => Elecciones) =>
+    setPorPara((pp) => ({ ...pp, [para]: cambio(pp[para] ?? {}) }));
   const [vuelta, setVuelta] = useState<Partial<Record<MomentoSet, number>>>({});
   const [altoMenu, setAltoMenu] = useState<number | null>(null);
 
@@ -141,19 +157,51 @@ export default function SetTodaOcasion() {
   const marcarCambio = (ms: MomentoSet[]) =>
     setVuelta((v) => ms.reduce((acc, m) => ({ ...acc, [m]: (acc[m] ?? 0) + 1 }), { ...v }));
 
-  // Al cargar y al cambiar Para ella / Para él: sortear los tres
+  // Al entrar a una pestaña: si ya tenía perfumes elegidos (en esta visita), se respetan;
+  // solo se sortean los que falten. Un perfume que ya no está disponible se reemplaza.
   useEffect(() => {
     if (!productos) return;
-    const nuevas: Elecciones = {};
-    for (const m of MOMENTOS_SET) nuevas[m.v] = nuevaEleccion(m.v);
-    setElecciones(nuevas);
+    setPorPara((pp) => {
+      const actuales = pp[para];
+      if (actuales && MOMENTOS_SET.every((m) => actuales[m.v] || !(opciones[m.v]?.length))) return pp;
+      const guardado = leerGuardado()[para] ?? {};
+      const nuevas: Elecciones = { ...(actuales ?? {}) };
+      for (const m of MOMENTOS_SET) {
+        if (nuevas[m.v]) continue;
+        const g = guardado[m.v];
+        const p = g ? (opciones[m.v] ?? []).find((x) => String(x.id) === String(g.id)) : undefined;
+        if (p) {
+          const pres = presentacionesConPrecio(p);
+          nuevas[m.v] = { producto: p, tam: g!.tam >= 0 && g!.tam < pres.length ? g!.tam : presentacionInicial(pres) };
+        } else {
+          nuevas[m.v] = nuevaEleccion(m.v);
+        }
+      }
+      return { ...pp, [para]: nuevas };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opciones]);
+
+  // Guardar lo elegido durante la visita (sin borrar lo de la otra pestaña)
+  useEffect(() => {
+    const pestanas = Object.keys(porPara) as ParaSet[];
+    if (pestanas.length === 0) return;
+    const g: Guardado = leerGuardado();
+    for (const k of pestanas) {
+      const fila: Partial<Record<MomentoSet, { id: Product['id']; tam: number }>> = {};
+      for (const m of MOMENTOS_SET) {
+        const e = porPara[k]?.[m.v];
+        if (e) fila[m.v] = { id: e.producto.id, tam: e.tam };
+      }
+      g[k] = fila;
+    }
+    try { sessionStorage.setItem(CLAVE_ELECCION, JSON.stringify(g)); } catch { /* sin almacenamiento */ }
+  }, [porPara]);
 
   const sortearTodos = () => {
     const nuevas: Elecciones = {};
     for (const m of MOMENTOS_SET) nuevas[m.v] = nuevaEleccion(m.v, elecciones[m.v]?.producto.id);
-    setElecciones(nuevas);
+    setElecciones(() => nuevas);
     marcarCambio(MOMENTOS_SET.map((m) => m.v));
   };
   const elegirPara = (p: ParaSet) => {
