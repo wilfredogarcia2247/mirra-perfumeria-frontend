@@ -17,7 +17,8 @@ const primerNombre = (n: string) => String(n || '').trim().split(/\s+/)[0] || ''
 function enlaceWhatsapp(a: AvisoLlegada): string {
   const tienda = typeof window !== 'undefined' ? window.location.origin : 'https://mirraperfumeria.com';
   const texto = `¡Hola ${primerNombre(a.nombre)}! 👋 Te escribimos de Mirra Perfumería: ya llegó *${nombrePerfume(a.producto_nombre)}* 🎉\n\nPuedes pedirlo aquí: ${tienda}`;
-  return `https://wa.me/${a.telefono}?text=${encodeURIComponent(texto)}`;
+  // Enlace directo (no wa.me): la redirección de wa.me daña los emojis en WhatsApp Web y escritorio ("�")
+  return `https://api.whatsapp.com/send?phone=${a.telefono}&text=${encodeURIComponent(texto)}`;
 }
 
 const telefonoBonito = (t: string) => {
