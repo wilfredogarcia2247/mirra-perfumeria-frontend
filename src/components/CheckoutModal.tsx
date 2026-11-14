@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, Check, MapPin, Minus, Navigation, Pencil, Plus, Trash2, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CartItem } from '@/hooks/use-cart';
+import { etiquetasParaEnviar } from '@/lib/setsPedido';
 import { createPedidoVentaPublic, getFormulas, getProducto, getSucursalesActivas, getTasaActiva, getToken, lookupClienteByCedula, Sucursal } from '@/integrations/api';
 import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 import { enlaceWhatsappPedido } from '@/lib/pedidoWhatsapp';
@@ -547,6 +548,9 @@ export default function CheckoutModal({
     onSubmittingChange?.(true);
     try {
 
+    // Etiqueta del Set toda ocasión en cada línea (solo para mostrar el pedido agrupado)
+    const etiquetasSet = etiquetasParaEnviar(items, (it) => it.product.set_etiqueta);
+
     const lineas = items.map((it) => {
       const product: any = it.product;
       const formulaId = product?.formula?.id ?? product?.formula_id ?? product?.tamano?.id ?? product?.tamano_id;
@@ -556,6 +560,7 @@ export default function CheckoutModal({
         cantidad: Number(it.qty || 0),
         ...(formulaId != null ? { formula_id: Number(formulaId), tamano_id: Number(formulaId) } : {}),
         ...(formulaName != null ? { formula_nombre: String(formulaName), tamano_nombre: String(formulaName) } : {}),
+        ...(etiquetasSet.get(it) ? { set_etiqueta: etiquetasSet.get(it) } : {}),
       };
     });
 
@@ -691,6 +696,7 @@ export default function CheckoutModal({
         subtotal: getItemPrice(it) * Number(it.qty || 0),
         ...(formulaId != null ? { formula_id: Number(formulaId), tamano_id: Number(formulaId) } : {}),
         ...(formulaName != null ? { formula_nombre: String(formulaName), tamano_nombre: String(formulaName) } : {}),
+        ...(etiquetasSet.get(it) ? { set_etiqueta: etiquetasSet.get(it) } : {}),
       };
     });
 

@@ -40,8 +40,8 @@ const leerAgregados = (): Partial<Record<ParaSet, string[]>> => {
     return {};
   }
 };
-// Clave de una línea en el carrito (igual que use-cart: producto:presentación)
-const claveCarrito = (producto: Product, tamanoId: unknown) => `${producto.id ?? ''}:${tamanoId ?? ''}`;
+// Clave de una línea del set en el carrito (igual que use-cart: producto:presentación:set)
+const claveCarrito = (producto: Product, tamanoId: unknown, set: ParaSet) => `${producto.id ?? ''}:${tamanoId ?? ''}:set-${set}`;
 
 const leerGuardado = (): Guardado => {
   try {
@@ -241,7 +241,7 @@ export default function SetTodaOcasion() {
   // El set de cada pestaña cuenta como agregado si sus perfumes (con ese tamaño) siguen en el
   // carrito. Si el cliente vacía el carrito, deja de contar.
   const enCarrito = new Set(items.map((it) => it.key));
-  const firma = lineas.map((l) => claveCarrito(l.producto, l.pres!.tamano?.id));
+  const firma = lineas.map((l) => claveCarrito(l.producto, l.pres!.tamano?.id, para));
   const estaEnCarrito = (claves?: string[]) => !!claves?.length && claves.every((k) => enCarrito.has(k));
   const setEnCarrito = estaEnCarrito(agregados[para]); // el set de esta pestaña está en el carrito
   const yaAgregado = firma.length > 0 && setEnCarrito && agregados[para]!.join('|') === firma.join('|');
@@ -253,7 +253,7 @@ export default function SetTodaOcasion() {
   const comprar = () => {
     if (lineas.length === 0 || yaAgregado) return;
     for (const l of lineas) {
-      addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined } as Product, 1);
+      addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined, set_etiqueta: para } as Product, 1);
     }
     guardarAgregados({ ...agregados, [para]: firma });
     setPulso((n) => n + 1);
@@ -263,8 +263,8 @@ export default function SetTodaOcasion() {
     try { sessionStorage.setItem(CLAVE_AGREGADOS, JSON.stringify(nuevos)); } catch { /* sin almacenamiento */ }
   };
 
-  // Quita del carrito solo lo que agregó el set de esta pestaña: si un perfume ya estaba
-  // antes (más de 1 unidad), le resta 1 y deja el resto.
+  // Quita del carrito solo lo que agregó el set de esta pestaña (sus líneas van aparte de los
+  // perfumes sueltos): si se agregó el mismo set dos veces, le resta 1 a cada uno.
   const quitarSet = () => {
     for (const clave of agregados[para] ?? []) {
       const linea = items.find((it) => it.key === clave);

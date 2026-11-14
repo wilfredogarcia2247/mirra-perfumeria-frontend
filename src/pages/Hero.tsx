@@ -3,7 +3,8 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
-import { volarAlCarrito, bajarAlCatalogo } from '@/lib/catalog';
+import { volarAlCarrito, bajarAlCatalogo, presentationLabel } from '@/lib/catalog';
+import { agruparPorSet, etiquetasParaEnviar, NOMBRE_SET } from '@/lib/setsPedido';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
 import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
@@ -20,7 +21,7 @@ import FeaturedShowcase from '@/components/FeaturedShowcase';
 import PortadaCinta from '@/components/PortadaCinta';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { productoDesdeCatalogo, slugifyCategory } from '@/lib/catalogoPublico';
-import { MOMENTOS_FILTRO, RUTA_SET, haySet, pasaFiltros, type SeleccionFiltros } from '@/lib/setTodaOcasion';
+import { MOMENTOS_FILTRO, MOMENTOS_SET, RUTA_SET, haySet, momentoDe, pasaFiltros, type SeleccionFiltros } from '@/lib/setTodaOcasion';
 import { FAMILIAS } from '@/lib/fichaPerfume';
 import FiltrosTienda from '@/components/FiltrosTienda';
 import { AvisoSetTodaOcasion, FranjaSetTodaOcasion } from '@/components/SetTodaOcasionPromo';
@@ -887,15 +888,19 @@ export default function Hero() {
                     />
                   )}
                   {/* Cart Items List */}
-                  <div className="space-y-4">
-                    {cartItems.map((it) => {
+                  {(() => {
+                    const { sets, sueltos } = agruparPorSet(cartItems, (it) => it.product.set_etiqueta);
+                    const precioLinea = (it: CartItem) => Number(it.product.precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0) * (it.qty || 1);
+                    const fila = (it: CartItem, momento?: { num: string; texto: string }) => {
                       const base = Number((it.product as any).precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0);
                       const useConv = tasaPublic && typeof tasaPublic.monto === 'number' && tasaPublic.monto > 0;
                       const priceDisplay = useConv
                         ? `${tasaPublic.simbolo || 'USD'} ${Number(base * Number(tasaPublic.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : `$${Number(base).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-                      const displayTamano = (it.product as any)?.tamano_nombre ?? (it.product as any)?.tamano?.nombre ?? (it.product as any)?.tamano_nombre;
+                      const nombreTamano = (it.product as any)?.tamano_nombre ?? (it.product as any)?.tamano?.nombre ?? (it.product as any)?.tamano_nombre;
+                      // Solo el tamaño ("30 ml"), no el nombre completo de la presentación
+                      const displayTamano = nombreTamano ? presentationLabel(String(nombreTamano)) : null;
 
                       return (
                         <div key={it.key} className="group relative flex gap-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
@@ -921,9 +926,16 @@ export default function Hero() {
                           <div className="flex-1 min-w-0 flex flex-col justify-between">
                             <div>
                               <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                {momento && (
+                                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#57534e]">
+                                    <span className="mr-1 font-bell-mt text-xs normal-case tracking-normal text-[#b08a57]">{momento.num}</span>{momento.texto}
+                                  </p>
+                                )}
                                 <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
                                   {it.product.name}
                                 </h3>
+                                </div>
                                 <button
                                   onClick={() => removeItem(it.key)}
                                   className="text-gray-300 hover:text-red-500 p-1 -mt-1 -mr-1 rounded-md hover:bg-red-50 transition-colors"
@@ -963,8 +975,48 @@ export default function Hero() {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    };
+                    return (
+                      <div className="space-y-4">
+                        {sets.map((grupo) => {
+                          // Dentro del set: día, toda ocasión y noche, en ese orden
+                          const orden = (it: CartItem) => { const m = momentoDe(it.product); const i = MOMENTOS_SET.findIndex((x) => x.v === m); return i < 0 ? 9 : i; };
+                          const lineas = [...grupo.lineas].sort((a, b) => orden(a) - orden(b));
+                          return (
+                            <section key={grupo.etiqueta} className="rounded-2xl border border-[#ece6de] bg-[#faf8f5] p-2.5" aria-label={NOMBRE_SET[grupo.etiqueta]}>
+                              <div className="flex items-baseline justify-between px-1.5 pb-2 pt-1">
+                                <p className="text-[11.5px] font-bold uppercase tracking-[0.18em] text-[#57534e]">
+                                  {NOMBRE_SET[grupo.etiqueta]}
+                                  <span className="ml-2 text-xs font-normal normal-case tracking-normal text-[#78716c]">{lineas.length} perfumes</span>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => lineas.forEach((it) => removeItem(it.key))}
+                                  className="text-xs text-[#78716c] underline underline-offset-[3px] hover:text-[#1c1917]"
+                                >
+                                  Quitar set
+                                </button>
+                              </div>
+                              <div className="space-y-2">
+                                {lineas.map((it) => {
+                                  const i = orden(it);
+                                  return fila(it, i < 3 ? { num: `0${i + 1}`, texto: ['Día', 'Toda ocasión', 'Noche'][i] } : undefined);
+                                })}
+                              </div>
+                              <div className="flex justify-between px-1.5 pb-0.5 pt-2.5 text-xs text-[#78716c]">
+                                <span>Subtotal del set</span>
+                                <span className="font-semibold text-[#1c1917]">{formatMonto(lineas.reduce((t, it) => t + precioLinea(it), 0))}</span>
+                              </div>
+                            </section>
+                          );
+                        })}
+                        {sets.length > 0 && sueltos.length > 0 && (
+                          <p className="px-1 pt-1 text-[11.5px] font-bold uppercase tracking-[0.18em] text-[#57534e]">Otros perfumes</p>
+                        )}
+                        {sueltos.map((it) => fila(it))}
+                      </div>
+                    );
+                  })()}
 
                   {mostrarMayor && configMayor && mayor.siguiente && !deliveryReview && (
                     <SugerenciasDescuentoMayor
@@ -1048,6 +1100,9 @@ export default function Hero() {
                           };
                         });
 
+                        // Etiqueta del set en cada línea (para mostrar el pedido agrupado)
+                        const etiquetasSet = etiquetasParaEnviar(cartItems, (it) => it.product.set_etiqueta);
+                        productosSnapshot.forEach((p, i) => { const e = etiquetasSet.get(cartItems[i]); if (e) Object.assign(p, { set_etiqueta: e }); });
                         const payload = {
                           cliente_id: clienteIdActual ?? undefined,
                           nombre_cliente: nombreClienteFinal,

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { lineasConSets, NOMBRE_SET, type EtiquetaSet } from '@/lib/setsPedido';
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -928,7 +929,8 @@ export default function Pedidos() {
       return;
     }
 
-    const productLines = products.map((product: any) => {
+    // Agrupados por Set toda ocasión si el pedido trae sets (igual que el WhatsApp del cliente)
+    const productLines = lineasConSets(products, (product: any) => product.set_etiqueta, (product: any) => {
       const name = String(
         product.producto_nombre
         || product.nombre_producto
@@ -2480,6 +2482,10 @@ export default function Pedidos() {
                             </td>
                             <td className="py-2 pr-2 align-top">
                               <div className="font-medium">{it.producto_nombre || it.nombre || '-'}</div>
+                              {(it.set_etiqueta === 'mujer' || it.set_etiqueta === 'hombre') && (
+                                // Vino del Set toda ocasión de la tienda
+                                <span className="mt-0.5 inline-block rounded-full border border-[#b08a57]/50 px-2 py-0.5 text-[10.5px] font-semibold text-[#7a5c33]">{NOMBRE_SET[it.set_etiqueta as EtiquetaSet]}</span>
+                              )}
                               <div className="text-xs text-muted-foreground mt-1">
                                 {(() => {
                                   // Mostrar componentes asociados a la línea (si vienen) y/o componentes de la orden de producción referenciada

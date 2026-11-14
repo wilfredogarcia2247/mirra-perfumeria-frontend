@@ -22,7 +22,9 @@ function makeKey(product: Product) {
   const fid = (product as any)?.formula?.id ?? (product as any)?.formula_id ?? '';
   const tid = (product as any)?.tamano?.id ?? (product as any)?.tamano_id ?? '';
   const suffix = fid || tid || '';
-  return `${pid}:${suffix}`;
+  // Un perfume que vino de un set va en su propia línea (aunque también esté suelto)
+  const set = product?.set_etiqueta ? `:set-${product.set_etiqueta}` : '';
+  return `${pid}:${suffix}${set}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -158,7 +160,8 @@ export function useCart() {
       if (cambioPrecio) cambios.precios.push(nombre);
       if (seAgoto) cambios.agotados.push(nombre);
       cambio = true;
-      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio } as Product };
+      // (se conserva la etiqueta del set, si la tiene)
+      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio, set_etiqueta: viejo.set_etiqueta } as Product };
     });
     if (cambio) setItems(next);
     return cambios;

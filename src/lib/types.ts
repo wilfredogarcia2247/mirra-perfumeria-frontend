@@ -23,6 +23,10 @@ export interface Product {
   marca_obj?: any;
   // Ficha del perfume (notas, para quién...), solo si está revisada
   ficha?: import('./fichaPerfume').FichaPerfume | null;
+  // En el carrito: vino del Set toda ocasión para ella ('mujer') o para él ('hombre')
+  set_etiqueta?: 'mujer' | 'hombre';
+  // Precio del tamaño elegido al agregarlo al carrito
+  precio_snapshot?: number;
 }
 
 export type ProductListResponse =
