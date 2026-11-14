@@ -197,7 +197,7 @@ function revolver<T>(lista: T[]): T[] {
 
 // Una reseña del carrusel. Google exige mostrar nombre (con enlace al perfil), foto,
 // fecha, el texto sin cambios, enlace a la reseña y "Reportar".
-function DiapositivaResena({ r }: { r: ResenaGoogle }) {
+function DiapositivaResena({ r, alAbrir }: { r: ResenaGoogle; alAbrir: (abierta: boolean) => void }) {
   const textoRef = useRef<HTMLParagraphElement>(null);
   const [abierta, setAbierta] = useState(false);
   const [cortada, setCortada] = useState(false);
@@ -224,7 +224,13 @@ function DiapositivaResena({ r }: { r: ResenaGoogle }) {
         {r.texto}
       </p>
       {(cortada || abierta) && (
-        <button type="button" onClick={() => setAbierta((a) => !a)} className="pt-1 text-[12.5px] font-semibold text-[#8b6439]">
+        <button
+          type="button"
+          onClick={() => {
+            setAbierta(!abierta);
+            alAbrir(!abierta);
+          }}
+          className="pt-1 text-[12.5px] font-semibold text-[#8b6439]">
           {abierta ? 'Ver menos' : 'Ver más'}
         </button>
       )}
@@ -259,10 +265,51 @@ function DiapositivaResena({ r }: { r: ResenaGoogle }) {
   );
 }
 
-// Carrusel de reseñas de Google en franja crema: se desliza con el dedo o con las flechas
+const AVANCE_MS = 5000; // cada cuánto pasa sola a la siguiente reseña
+const PAUSA_MS = 10000; // tras tocar el carrusel, cuánto espera para volver a avanzar sola
+
+// Carrusel de reseñas de Google en franja crema: se desliza con el dedo, las flechas o los
+// puntos, y avanza solo cada 5 s mientras está a la vista. Si el cliente lo toca, se mueve al
+// instante y el avance automático espera 10 s sin toques; con "Ver más" abierto no avanza.
 function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
+  const cajaRef = useRef<HTMLDivElement>(null);
   const pistaRef = useRef<HTMLDivElement>(null);
   const [actual, setActual] = useState(0);
+  const [aLaVista, setALaVista] = useState(false);
+  const [pestanaActiva, setPestanaActiva] = useState(() => typeof document === 'undefined' || !document.hidden);
+  const [pausado, setPausado] = useState(false);
+  const [abiertas, setAbiertas] = useState(0);
+  const [sinMovimiento] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  );
+  const reanudarRef = useRef<number | undefined>(undefined);
+
+  // ¿Se ve la franja en pantalla? ¿La pestaña está abierta?
+  useEffect(() => {
+    const caja = cajaRef.current;
+    if (!caja || typeof IntersectionObserver === 'undefined') {
+      setALaVista(true);
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => setALaVista(e.isIntersecting), { threshold: 0.5 });
+    io.observe(caja);
+    const alCambiarPestana = () => setPestanaActiva(!document.hidden);
+    document.addEventListener('visibilitychange', alCambiarPestana);
+    return () => {
+      io.disconnect();
+      document.removeEventListener('visibilitychange', alCambiarPestana);
+    };
+  }, []);
+  useEffect(() => () => window.clearTimeout(reanudarRef.current), []);
+
+  // El cliente tocó el carrusel: se detiene y vuelve a avanzar 10 s después del último toque
+  const alTocar = () => {
+    setPausado(true);
+    window.clearTimeout(reanudarRef.current);
+    reanudarRef.current = window.setTimeout(() => setPausado(false), PAUSA_MS);
+  };
+
+  const corriendo = resenas.length > 1 && aLaVista && pestanaActiva && !pausado && abiertas === 0 && !sinMovimiento;
 
   const alDeslizar = () => {
     const p = pistaRef.current;
@@ -274,10 +321,19 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
     const destino = Math.max(0, Math.min(resenas.length - 1, i));
     p.scrollTo({ left: destino * p.clientWidth, behavior: 'smooth' });
   };
+  // Avance automático (después de la última vuelve a la primera)
+  useEffect(() => {
+    if (!corriendo) return;
+    const t = window.setTimeout(() => irA((actual + 1) % resenas.length), AVANCE_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corriendo, actual, resenas.length]);
+
   const flecha = 'flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#e2cfb4] bg-white text-[#8b6439] transition active:scale-95 disabled:opacity-40';
 
   return (
     <div
+      ref={cajaRef}
       className="-mx-4 mt-3 pb-5 pt-2 sm:mx-0 sm:rounded-[18px]"
       style={{ background: 'linear-gradient(180deg,#faf4ea,#f1e4d0)' }}
       aria-roledescription="carrusel"
@@ -286,15 +342,18 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
       <div
         ref={pistaRef}
         onScroll={alDeslizar}
+        onPointerDown={alTocar}
+        onTouchStart={alTocar}
+        onWheel={alTocar}
         className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {resenas.map((r, i) => (
-          <DiapositivaResena key={`${r.autor}-${i}`} r={r} />
+          <DiapositivaResena key={`${r.autor}-${i}`} r={r} alAbrir={(a) => setAbiertas((n) => Math.max(0, n + (a ? 1 : -1)))} />
         ))}
       </div>
       {resenas.length > 1 && (
         <div className="mt-3 flex items-center justify-center gap-3.5">
-          <button type="button" className={flecha} onClick={() => irA(actual - 1)} disabled={actual === 0} aria-label="Reseña anterior">
+          <button type="button" className={flecha} onClick={() => { alTocar(); irA(actual - 1); }} disabled={actual === 0} aria-label="Reseña anterior">
             <ChevronLeft className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-1.5">
@@ -302,15 +361,23 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
               <button
                 key={i}
                 type="button"
-                onClick={() => irA(i)}
+                onClick={() => { alTocar(); irA(i); }}
                 aria-label={`Ver reseña ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all ${i === actual ? 'w-[18px] bg-[#CA9E67]' : 'w-1.5 bg-[#e2d3bf]'}`}
               />
             ))}
           </div>
-          <button type="button" className={flecha} onClick={() => irA(actual + 1)} disabled={actual === resenas.length - 1} aria-label="Reseña siguiente">
+          <button type="button" className={flecha} onClick={() => { alTocar(); irA(actual + 1); }} disabled={actual === resenas.length - 1} aria-label="Reseña siguiente">
             <ChevronRight className="h-4 w-4" />
           </button>
+        </div>
+      )}
+      {resenas.length > 1 && !sinMovimiento && (
+        // Rayita que se llena hasta que pasa a la siguiente (vacía mientras está en pausa)
+        <div className="mx-auto mt-2.5 h-[3px] w-20 overflow-hidden rounded-full bg-[#eadfce]" aria-hidden="true">
+          {corriendo && (
+            <span key={actual} className="block h-full rounded-full bg-[#CA9E67]" style={{ animation: `llenar-barra ${AVANCE_MS}ms linear forwards` }} />
+          )}
         </div>
       )}
       <p className="mt-2.5 text-center text-[11px] text-[#8a7560]">
