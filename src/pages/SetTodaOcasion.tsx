@@ -113,7 +113,7 @@ const Etiqueta = ({ i, texto }: { i: number; texto: string }) => (
 export default function SetTodaOcasion() {
   const navigate = useNavigate();
   const esPC = useEsPC();
-  const { count, addItem, items } = useCart();
+  const { count, addItem, items, removeItem, updateQty } = useCart();
   const [pulso, setPulso] = useState(0);
   const [agregados, setAgregados] = useState<Partial<Record<ParaSet, string[]>>>(leerAgregados);
   const [productos, setProductos] = useState<Product[] | null>(null);
@@ -243,7 +243,8 @@ export default function SetTodaOcasion() {
   const enCarrito = new Set(items.map((it) => it.key));
   const firma = lineas.map((l) => claveCarrito(l.producto, l.pres!.tamano?.id));
   const estaEnCarrito = (claves?: string[]) => !!claves?.length && claves.every((k) => enCarrito.has(k));
-  const yaAgregado = firma.length > 0 && estaEnCarrito(agregados[para]) && agregados[para]!.join('|') === firma.join('|');
+  const setEnCarrito = estaEnCarrito(agregados[para]); // el set de esta pestaña está en el carrito
+  const yaAgregado = firma.length > 0 && setEnCarrito && agregados[para]!.join('|') === firma.join('|');
   const otro: ParaSet = para === 'mujer' ? 'hombre' : 'mujer';
   const otroAgregado = estaEnCarrito(agregados[otro]);
   const quien = (p: ParaSet) => (p === 'mujer' ? 'ella' : 'él');
@@ -254,9 +255,26 @@ export default function SetTodaOcasion() {
     for (const l of lineas) {
       addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined } as Product, 1);
     }
-    const nuevos = { ...agregados, [para]: firma };
+    guardarAgregados({ ...agregados, [para]: firma });
+    setPulso((n) => n + 1);
+  };
+  const guardarAgregados = (nuevos: Partial<Record<ParaSet, string[]>>) => {
     setAgregados(nuevos);
     try { sessionStorage.setItem(CLAVE_AGREGADOS, JSON.stringify(nuevos)); } catch { /* sin almacenamiento */ }
+  };
+
+  // Quita del carrito solo lo que agregó el set de esta pestaña: si un perfume ya estaba
+  // antes (más de 1 unidad), le resta 1 y deja el resto.
+  const quitarSet = () => {
+    for (const clave of agregados[para] ?? []) {
+      const linea = items.find((it) => it.key === clave);
+      if (!linea) continue;
+      if (linea.qty > 1) updateQty(clave, linea.qty - 1);
+      else removeItem(clave);
+    }
+    const nuevos = { ...agregados };
+    delete nuevos[para];
+    guardarAgregados(nuevos);
     setPulso((n) => n + 1);
   };
   const irAlCarrito = () => navigate('/', { state: { abrirCarrito: true } });
@@ -286,11 +304,12 @@ export default function SetTodaOcasion() {
     </div>
   );
 
-  // Confirmación después de agregar: armar el otro set o ir al carrito
-  const confirmacion = yaAgregado && (
+  // Mientras el set de esta pestaña esté en el carrito: armar el otro, ver el carrito o quitarlo
+  const confirmacion = setEnCarrito && (
     <div className="mb-3 rounded-xl bg-[#f3eee8] px-3.5 py-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300" role="status">
       <p className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[#1c1917]">
-        <Check className="h-4 w-4 text-[#b08a57]" /> Set para {quien(para)} agregado
+        <Check className="h-4 w-4 text-[#b08a57]" />
+        {yaAgregado ? `Set para ${quien(para)} agregado` : `Tu set para ${quien(para)} está en el carrito`}
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
         {!otroAgregado && (
@@ -299,6 +318,7 @@ export default function SetTodaOcasion() {
           </button>
         )}
         <button type="button" onClick={irAlCarrito} className="text-[#57534e] underline underline-offset-[3px]">Ver carrito</button>
+        <button type="button" onClick={quitarSet} className="text-[#57534e] underline underline-offset-[3px] hover:text-[#1c1917]">Quitar</button>
       </div>
     </div>
   );
@@ -447,7 +467,7 @@ export default function SetTodaOcasion() {
 
       <Footer />
       {/* Espacio para que la barra fija de abajo no tape el final del pie de página */}
-      {!esPC && lineas.length > 0 && <div className={yaAgregado ? "h-52" : "h-32"} aria-hidden="true" />}
+      {!esPC && lineas.length > 0 && <div className={setEnCarrito ? "h-52" : "h-32"} aria-hidden="true" />}
     </div>
   );
 }
