@@ -309,13 +309,17 @@ export default function Hero() {
   // Todos / Hombre / Mujer y al final Día / Toda ocasión / Noche.
   const filtrosRapidos = (() => {
     const slugsDe = (p: Product) => (p.categories && p.categories.length > 0 ? p.categories : [p.category || '']).map(slugifyCategory);
-    const lista: { slug: string; label: string; set?: boolean }[] = [{ slug: 'all', label: 'Todos' }];
+    const lista: { slug: string; label: string; set?: boolean; separar?: boolean }[] = [{ slug: 'all', label: 'Todos' }];
     if (catalogProducts.some((p) => slugsDe(p).includes('hombre'))) lista.push({ slug: 'hombre', label: 'Hombre' });
     if (catalogProducts.some((p) => slugsDe(p).includes('mujer'))) lista.push({ slug: 'mujer', label: 'Mujer' });
+    let primero = true;
     for (const m of FILTROS_MOMENTO) {
-      if (catalogProducts.some((p) => momentoDe(p) === m.momento)) lista.push({ slug: m.slug, label: m.label });
+      if (!catalogProducts.some((p) => momentoDe(p) === m.momento)) continue;
+      // Una rayita separa los de categoría de los del momento del día
+      lista.push({ slug: m.slug, label: m.label, separar: primero });
+      primero = false;
     }
-    if (conSet) lista.unshift({ slug: 'set', label: '🎁 Set toda ocasión', set: true });
+    if (conSet) lista.unshift({ slug: 'set', label: 'Set toda ocasión', set: true });
     return lista.length > 1 ? lista : [];
   })();
 
@@ -529,7 +533,7 @@ export default function Hero() {
                       key={f.slug}
                       type="button"
                       onClick={() => navigate(RUTA_SET)}
-                      className="btn-dorado shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[0.98]"
+                      className="shrink-0 rounded-full border-[1.5px] border-[#b08a57] bg-white px-4 py-2 text-sm font-semibold text-[#7a5c33] transition hover:bg-[#fbf7f1]"
                     >
                       {f.label}
                     </button>
@@ -537,8 +541,9 @@ export default function Hero() {
                 }
                 const activo = selectedCategory.toLowerCase() === f.slug;
                 return (
+                  <React.Fragment key={f.slug}>
+                  {f.separar && <span className="my-auto h-6 w-px shrink-0 bg-[#e8dccb]" aria-hidden="true" />}
                   <button
-                    key={f.slug}
                     type="button"
                     role="tab"
                     aria-selected={activo}
@@ -547,6 +552,7 @@ export default function Hero() {
                   >
                     {f.label}
                   </button>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -570,7 +576,7 @@ export default function Hero() {
         )}
 
         {conSet && (
-          <AvisoSetTodaOcasion bloqueado={isCartOpen || isCheckoutOpen || sheetProduct !== null || pedidoRecibido !== null} />
+          <AvisoSetTodaOcasion productos={catalogProducts} bloqueado={isCartOpen || isCheckoutOpen || sheetProduct !== null || pedidoRecibido !== null} />
         )}
 
         {sheetProduct && (

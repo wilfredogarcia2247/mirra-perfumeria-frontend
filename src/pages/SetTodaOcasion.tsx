@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, RefreshCw, Shuffle } from 'lucide-react';
+import { Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import PildorasTamano from '@/components/PildorasTamano';
 import useCart from '@/hooks/use-cart';
 import { getCatalogoPaginated, getCachedTasaActiva } from '@/integrations/api';
 import { productoDesdeCatalogo } from '@/lib/catalogoPublico';
@@ -33,84 +34,60 @@ const leerPara = (): ParaSet => {
   }
 };
 
-// Un perfume del set: momento, 🔄 Cambiar, foto y nombre, y sus presentaciones
-function Puesto({
-  momento,
-  eleccion,
-  hayOtros,
-  tasa,
-  animar,
-  alCambiar,
-  alElegirTam,
-}: {
-  momento: (typeof MOMENTOS_SET)[number];
-  eleccion: Eleccion;
-  hayOtros: boolean;
-  tasa: Tasa;
-  animar: number;
-  alCambiar: () => void;
-  alElegirTam: (i: number) => void;
-}) {
-  const { producto, tam } = eleccion;
-  const pres = presentacionesConPrecio(producto);
-  const ficha = producto.ficha ? normalizarFicha(producto.ficha) : null;
+const nombreMomento = (m: MomentoSet) => (m === 'ambos' ? 'Toda ocasión' : m === 'dia' ? 'Día' : 'Noche');
+
+// PC y tablet horizontal (desde 1024 px): tres columnas y resumen al lado
+function useEsPC() {
+  const consulta = '(min-width: 1024px)';
+  const [es, setEs] = useState(() => typeof window !== 'undefined' && window.matchMedia(consulta).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(consulta);
+    const alCambiar = () => setEs(mq.matches);
+    mq.addEventListener('change', alCambiar);
+    return () => mq.removeEventListener('change', alCambiar);
+  }, []);
+  return es;
+}
+
+// Foto del perfume; si no carga, una de muestra (como las tarjetas de la tienda)
+function Foto({ producto, className }: { producto: Product; className: string }) {
   return (
-    <div
-      key={`${producto.id}-${animar}`}
-      className="animate-in fade-in-0 zoom-in-95 rounded-2xl border border-[#f1e6d6] bg-white p-3 shadow-[0_6px_16px_rgba(90,59,34,0.08)] duration-300"
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="rounded-full bg-[#fbf4ea] px-2.5 py-1 text-xs font-bold text-[#8b6439]">
-          {momento.icono} {momento.label}
-        </span>
-        {hayOtros && (
-          <button
-            type="button"
-            onClick={alCambiar}
-            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#e8d9c5] bg-white px-3 py-1.5 text-xs font-bold text-[#8b6439] transition active:scale-95"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Cambiar
-          </button>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        <img
-          src={getImageUrl(producto)}
-          alt=""
-          loading="lazy"
-          // Si la foto no carga, una de muestra (como las tarjetas de la tienda)
-          onError={(e) => {
-            if (!e.currentTarget.src.includes('/asset/muestra')) e.currentTarget.src = '/asset/muestra1.jpeg';
-          }}
-          className="h-[72px] w-[72px] shrink-0 rounded-xl bg-[#f5eee6] object-cover"
-        />
-        <div className="min-w-0">
-          <p className="font-bell-mt text-[15px] font-semibold leading-tight text-gray-900">{producto.name}</p>
-          {ficha?.inspirado_en && <p className="mt-0.5 text-xs text-gray-500">Inspirado en {ficha.inspirado_en}</p>}
-        </div>
-      </div>
-      <div className={`mt-2.5 grid gap-1.5 ${pres.length === 1 ? 'grid-cols-1' : pres.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-        {pres.map((p, i) => (
-          <button
-            key={p.tamano?.id ?? i}
-            type="button"
-            onClick={() => alElegirTam(i)}
-            aria-pressed={i === tam}
-            className={`rounded-xl border-[1.5px] px-1 py-1.5 text-[13px] font-bold transition ${i === tam ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
-          >
-            {p.label}
-            <span className="mt-0.5 block text-[11px] font-semibold text-[#8b6439]">{formatPrecio(p.precio, tasa)}</span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <img
+      src={getImageUrl(producto)}
+      alt=""
+      loading="lazy"
+      onError={(e) => {
+        if (!e.currentTarget.src.includes('/asset/muestra')) e.currentTarget.src = '/asset/muestra1.jpeg';
+      }}
+      className={className}
+    />
   );
 }
 
+const Cambiar = ({ onClick, texto = 'Cambiar' }: { onClick: () => void; texto?: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="group inline-flex shrink-0 items-center gap-1.5 text-[12.5px] text-[#78716c] transition hover:text-[#1c1917]"
+  >
+    <RotateCw className="h-3.5 w-3.5 transition-transform duration-500 group-hover:rotate-180" /> {texto}
+  </button>
+);
+
+// "01 DÍA": el número en dorado fino, el momento en gris
+const Etiqueta = ({ i, texto }: { i: number; texto: string }) => (
+  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#57534e]">
+    <span className="mr-1.5 font-bell-mt text-[13px] normal-case tracking-normal text-[#b08a57]">0{i + 1}</span>
+    {texto}
+  </span>
+);
+
 // Página "Set toda ocasión": tres perfumes al azar (día, toda ocasión y noche) para ella o
 // para él; cada uno se cambia, se elige su tamaño y "Comprar set" agrega los tres al carrito.
+// Teléfono y tablet vertical: una lista; PC: tres columnas con el resumen fijo a la derecha.
 export default function SetTodaOcasion() {
   const navigate = useNavigate();
+  const esPC = useEsPC();
   const { count, addItem } = useCart();
   const [productos, setProductos] = useState<Product[] | null>(null);
   const [tasa, setTasa] = useState<Tasa>(null);
@@ -165,12 +142,6 @@ export default function SetTodaOcasion() {
     setVuelta((v) => ms.reduce((acc, m) => ({ ...acc, [m]: (acc[m] ?? 0) + 1 }), { ...v }));
 
   // Al cargar y al cambiar Para ella / Para él: sortear los tres
-  const sortearTodos = () => {
-    const nuevas: Elecciones = {};
-    for (const m of MOMENTOS_SET) nuevas[m.v] = nuevaEleccion(m.v, elecciones[m.v]?.producto.id);
-    setElecciones(nuevas);
-    marcarCambio(MOMENTOS_SET.map((m) => m.v));
-  };
   useEffect(() => {
     if (!productos) return;
     const nuevas: Elecciones = {};
@@ -179,6 +150,12 @@ export default function SetTodaOcasion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opciones]);
 
+  const sortearTodos = () => {
+    const nuevas: Elecciones = {};
+    for (const m of MOMENTOS_SET) nuevas[m.v] = nuevaEleccion(m.v, elecciones[m.v]?.producto.id);
+    setElecciones(nuevas);
+    marcarCambio(MOMENTOS_SET.map((m) => m.v));
+  };
   const elegirPara = (p: ParaSet) => {
     setPara(p);
     try { localStorage.setItem(CLAVE_PARA, p); } catch { /* sin almacenamiento */ }
@@ -193,9 +170,10 @@ export default function SetTodaOcasion() {
   const puestos = MOMENTOS_SET.filter((m) => elecciones[m.v]);
   const lineas = puestos.map((m) => {
     const el = elecciones[m.v]!;
-    return { producto: el.producto, pres: presentacionesConPrecio(el.producto)[el.tam] };
+    return { momento: m, producto: el.producto, pres: presentacionesConPrecio(el.producto)[el.tam] };
   }).filter((l) => l.pres);
   const total = lineas.reduce((s, l) => s + Number(l.pres!.precio || 0), 0);
+  const hayOtros = (m: MomentoSet) => (opciones[m]?.length ?? 0) > 1;
 
   const comprar = () => {
     if (lineas.length === 0) return;
@@ -206,88 +184,161 @@ export default function SetTodaOcasion() {
     navigate('/', { state: { abrirCarrito: true } });
   };
 
-  const tab = (v: ParaSet, texto: string) => (
+  const inspirado = (p: Product) => (p.ficha ? normalizarFicha(p.ficha).inspirado_en : null);
+  const entra = 'animate-in fade-in-0 slide-in-from-bottom-1 duration-500';
+
+  const pestanas = (
+    <div className="inline-flex gap-6 border-b border-[#ece6de]" role="tablist" aria-label="¿Para quién es el set?">
+      {([['mujer', 'Para ella'], ['hombre', 'Para él']] as [ParaSet, string][]).map(([v, t]) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={para === v}
+          onClick={() => elegirPara(v)}
+          className={`relative pb-2.5 text-sm transition ${para === v ? 'font-semibold text-[#1c1917] after:absolute after:inset-x-0 after:-bottom-px after:h-[1.5px] after:bg-[#1c1917]' : 'text-[#78716c] hover:text-[#1c1917]'}`}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+
+  const comprarBoton = (
     <button
       type="button"
-      role="tab"
-      aria-selected={para === v}
-      onClick={() => elegirPara(v)}
-      className={`rounded-[10px] py-2.5 text-sm font-bold transition ${para === v ? 'bg-white text-[#3b2a1a] shadow-sm' : 'text-[#6f5a44]'}`}
+      onClick={comprar}
+      className="w-full rounded-[10px] bg-[#1c1917] py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.99]"
     >
-      {texto}
+      Comprar set
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-[#f6f4f1]">
+    <div className="min-h-screen bg-[#faf8f5]">
       <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
 
       <main
-        className="mx-auto max-w-xl px-4 pb-10"
-        style={{ paddingTop: altoMenu != null ? `${altoMenu + 18}px` : '7rem' }}
+        className="mx-auto max-w-xl px-4 pb-10 lg:max-w-7xl lg:px-8 lg:pb-16"
+        style={{ paddingTop: altoMenu != null ? `${altoMenu + (esPC ? 36 : 22)}px` : '7rem' }}
       >
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a97c45]">Set toda ocasión</p>
-        <h1 className="mt-1 font-bell-mt text-[26px] font-semibold leading-tight text-gray-900 sm:text-3xl">Tu perfume para cada momento</h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
-          Te sugerimos tres al azar: uno para el día, uno para toda ocasión y uno para la noche. Cambia el que no te guste o sortea los tres otra vez.
-        </p>
+        <div className={esPC ? 'grid grid-cols-[1fr_280px] items-start gap-9' : ''}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b08a57]">Set toda ocasión</p>
+            <h1 className="mt-1.5 font-bell-mt text-[26px] font-normal leading-tight text-[#1c1917] lg:text-[34px]">Tu perfume para cada momento</h1>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[#78716c] lg:text-[14.5px]">
+              Tres sugerencias al azar. Cambia la que no te guste o sortea las tres otra vez.
+            </p>
 
-        <div className="mt-4 grid grid-cols-2 rounded-xl bg-[#efe7dc] p-1" role="tablist" aria-label="¿Para quién es el set?">
-          {tab('mujer', '👩 Para ella')}
-          {tab('hombre', '👨 Para él')}
-        </div>
-
-        {productos == null ? (
-          <div className="flex h-48 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#a97c45]" /></div>
-        ) : puestos.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-[#f1e6d6] bg-white p-5 text-center">
-            <p className="text-sm text-gray-600">Por ahora no tenemos sugerencias para este set.</p>
-            <Link to="/" className="mt-3 inline-block font-semibold text-[#8b6439] underline">Ver todos los perfumes</Link>
-          </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={sortearTodos}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-[#e8d9c5] bg-white py-2.5 text-sm font-bold text-[#8b6439] transition active:scale-[0.98]"
-            >
-              <Shuffle className="h-4 w-4" /> Cambiar los {puestos.length}
-            </button>
-            <div className="mt-3 space-y-2.5">
-              {puestos.map((m) => (
-                <Puesto
-                  key={m.v}
-                  momento={m}
-                  eleccion={elecciones[m.v]!}
-                  hayOtros={(opciones[m.v]?.length ?? 0) > 1}
-                  tasa={tasa}
-                  animar={vuelta[m.v] ?? 0}
-                  alCambiar={() => cambiarUno(m.v)}
-                  alElegirTam={(i) => elegirTam(m.v, i)}
-                />
-              ))}
+            <div className="mt-5 flex items-end justify-between gap-3">
+              {pestanas}
+              {puestos.some((m) => hayOtros(m.v)) && <Cambiar onClick={sortearTodos} texto={puestos.length === 3 ? 'Cambiar los tres' : 'Cambiar todos'} />}
             </div>
-          </>
-        )}
+
+            {productos == null ? (
+              <div className="flex h-48 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-[#b08a57]" /></div>
+            ) : puestos.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-[#ece6de] bg-white p-6 text-center">
+                <p className="text-sm text-[#57534e]">Por ahora no tenemos sugerencias para este set.</p>
+                <Link to="/" className="mt-3 inline-block text-sm font-semibold text-[#1c1917] underline underline-offset-4">Ver todos los perfumes</Link>
+              </div>
+            ) : esPC ? (
+              // PC: tres columnas con foto grande
+              <div className="mt-6 grid grid-cols-3 gap-6">
+                {puestos.map((m) => {
+                  const el = elecciones[m.v]!;
+                  return (
+                    <div key={m.v} className="group">
+                      <div className="mb-2.5"><Etiqueta i={MOMENTOS_SET.indexOf(m)} texto={nombreMomento(m.v)} /></div>
+                      <div key={`${el.producto.id}-${vuelta[m.v] ?? 0}`} className={entra}>
+                        <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-[#f3eee8]">
+                          <Foto producto={el.producto} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
+                        </div>
+                        <div className="mt-3.5 flex items-start justify-between gap-3">
+                          <p className="font-bell-mt text-[17px] leading-snug text-[#1c1917]">{el.producto.name}</p>
+                          {hayOtros(m.v) && <Cambiar onClick={() => cambiarUno(m.v)} />}
+                        </div>
+                        {inspirado(el.producto) && <p className="mt-0.5 text-[12.5px] text-[#78716c]">Inspirado en {inspirado(el.producto)}</p>}
+                        <div className="mt-3">
+                          <PildorasTamano presentaciones={presentacionesConPrecio(el.producto)} elegida={el.tam} onElegir={(t) => elegirTam(m.v, t)} tasa={tasa} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Teléfono y tablet vertical: lista
+              <div className="mt-4">
+                {puestos.map((m) => {
+                  const el = elecciones[m.v]!;
+                  const clave = `${el.producto.id}-${vuelta[m.v] ?? 0}`;
+                  return (
+                    <div key={m.v} className="grid grid-cols-[76px_1fr] gap-x-3.5 gap-y-3 border-t border-[#ece6de] py-4">
+                      <div key={clave} className={entra}>
+                        <Foto producto={el.producto} className="h-[95px] w-[76px] rounded-[10px] bg-[#f3eee8] object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <Etiqueta i={MOMENTOS_SET.indexOf(m)} texto={nombreMomento(m.v)} />
+                          {hayOtros(m.v) && <Cambiar onClick={() => cambiarUno(m.v)} />}
+                        </div>
+                        <div key={clave} className={entra}>
+                          <p className="mt-1 font-bell-mt text-[15px] leading-snug text-[#1c1917]">{el.producto.name}</p>
+                          {inspirado(el.producto) && <p className="text-xs text-[#78716c]">Inspirado en {inspirado(el.producto)}</p>}
+                        </div>
+                      </div>
+                      {/* Tamaños con todo el ancho, para que quepan en una fila */}
+                      <div className="col-span-2">
+                        <PildorasTamano presentaciones={presentacionesConPrecio(el.producto)} elegida={el.tam} onElegir={(t) => elegirTam(m.v, t)} tasa={tasa} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {esPC && lineas.length > 0 && (
+            // PC: resumen fijo a la derecha
+            <aside className="sticky rounded-2xl border border-[#ece6de] bg-white p-6" style={{ top: `${(altoMenu ?? 100) + 20}px` }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b08a57]">Tu set</p>
+              <p className="mb-3.5 mt-1.5 font-bell-mt text-[21px] text-[#1c1917]">{lineas.length === 3 ? 'Tres perfumes' : `${lineas.length} perfumes`}</p>
+              {lineas.map((l) => (
+                <div key={l.momento.v} className="flex justify-between gap-3 border-t border-[#ece6de] py-2.5 text-[13px]">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-[#1c1917]">{l.producto.name}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[#78716c]">{nombreMomento(l.momento.v)} · {l.pres!.label}</p>
+                  </div>
+                  <span className="shrink-0 text-[#1c1917]">{formatPrecio(l.pres!.precio, tasa)}</span>
+                </div>
+              ))}
+              <div className="mb-4 mt-1 flex items-baseline justify-between border-t border-[#1c1917] pt-3.5">
+                <span className="text-[13px] text-[#78716c]">Total</span>
+                <strong className="text-xl font-semibold text-[#1c1917]">{formatPrecio(total, tasa)}</strong>
+              </div>
+              {comprarBoton}
+            </aside>
+          )}
+        </div>
       </main>
 
-      {lineas.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#f0e8de] bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_18px_rgba(0,0,0,0.06)]">
+      {!esPC && lineas.length > 0 && (
+        // Teléfono: total y botón fijos abajo
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#ece6de] bg-white px-4 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto max-w-xl">
-            <div className="mb-2 flex items-baseline justify-between text-sm">
-              <span className="text-gray-600">Total del set ({lineas.length} perfumes)</span>
-              <strong className="text-gray-900">{formatPrecio(total, tasa)}</strong>
+            <div className="mb-2.5 flex items-baseline justify-between text-[13px] text-[#78716c]">
+              <span>Total del set</span>
+              <strong className="text-[15px] font-semibold text-[#1c1917]">{formatPrecio(total, tasa)}</strong>
             </div>
-            <button type="button" onClick={comprar} className="btn-dorado w-full rounded-xl py-3.5 text-[15px] font-bold transition active:scale-[0.98]">
-              Comprar set · {formatPrecio(total, tasa)}
-            </button>
+            {comprarBoton}
           </div>
         </div>
       )}
 
       <Footer />
       {/* Espacio para que la barra fija de abajo no tape el final del pie de página */}
-      {lineas.length > 0 && <div className="h-28" aria-hidden="true" />}
+      {!esPC && lineas.length > 0 && <div className="h-32" aria-hidden="true" />}
     </div>
   );
 }

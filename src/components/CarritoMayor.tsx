@@ -241,8 +241,10 @@ export function SugerenciasDescuentoMayor({
             </div>
             <div className="flex flex-1 flex-col p-2">
               <p className="line-clamp-2 text-xs font-semibold leading-tight text-gray-900">{s.product.name}</p>
-              <p className="mt-1 text-[11px] text-gray-500">{s.etiqueta}</p>
-              <p className="text-xs font-bold text-copper-700">{formatPrice(s.precio)}</p>
+              {/* Tamaño y precio en una sola línea */}
+              <p className="mt-1 whitespace-nowrap text-[11px] text-gray-500">
+                {s.etiqueta} · <span className="font-bold text-copper-700">{formatPrice(s.precio)}</span>
+              </p>
               <button
                 type="button"
                 onClick={() => onAgregar(s.item)}

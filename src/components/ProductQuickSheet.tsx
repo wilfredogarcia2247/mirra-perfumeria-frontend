@@ -5,6 +5,7 @@ import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
 import AvisameForm from '@/components/AvisameForm';
+import PildorasTamano from '@/components/PildorasTamano';
 import { useBloquearScroll } from "@/hooks/useBloquearScroll";
 import { compartirPerfume } from '@/lib/compartir';
 import { FAMILIAS, MOMENTO, PARA, etiqueta, fichaTieneDatos, normalizarFicha } from '@/lib/fichaPerfume';
@@ -218,19 +219,9 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           {product.agotado ? (
             <AvisameForm productoId={product.id} productoNombre={product.name} />
           ) : presentaciones.length > 0 ? (
-            <div className={`mb-2.5 grid gap-2 ${presentaciones.length === 1 ? 'grid-cols-1' : presentaciones.length === 2 ? 'grid-cols-2' : presentaciones.length === 4 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3'}`}>
-              {presentaciones.map((p, i) => (
-                <button
-                  key={p.tamano?.id ?? i}
-                  type="button"
-                  onClick={() => setElegida(i)}
-                  aria-pressed={i === elegida}
-                  className={`rounded-xl border-[1.5px] px-1 py-2 sm:py-1.5 text-sm font-bold transition ${i === elegida ? 'border-[#CA9E67] bg-[#fbf4ea] text-gray-900' : 'border-[#e8d9c5] bg-white text-gray-800'}`}
-                >
-                  {p.label || 'Presentación'}
-                  <span className="mt-0.5 block text-[11px] font-semibold text-[#8b6439]">{formatPrecio(p.precio, tasa) ?? 'Consultar'}</span>
-                </button>
-              ))}
+            // Tamaño y precio en una sola línea: "30 ml · VES 45,90"
+            <div className="mb-3">
+              <PildorasTamano presentaciones={presentaciones} elegida={elegida} onElegir={setElegida} tasa={tasa} grande />
             </div>
           ) : (
             <p className="mb-3 text-center text-sm text-gray-500">Este producto no tiene presentaciones disponibles.</p>

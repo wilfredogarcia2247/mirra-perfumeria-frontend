@@ -19,9 +19,9 @@ export const MOMENTOS_SET: { v: MomentoSet; label: string; icono: string }[] = [
 // Filtros de la tienda por momento (/categoria/dia, /categoria/toda-ocasion, /categoria/noche)
 // titulo: va en el título de la lista (que pone mayúscula a cada palabra); frase: en el texto de abajo
 export const FILTROS_MOMENTO: { slug: string; label: string; titulo: string; frase: string; momento: MomentoSet }[] = [
-  { slug: 'dia', label: '☀️ Día', titulo: 'Día', frase: 'para el día', momento: 'dia' },
-  { slug: 'toda-ocasion', label: '✨ Toda ocasión', titulo: 'Toda ocasión', frase: 'para toda ocasión', momento: 'ambos' },
-  { slug: 'noche', label: '🌙 Noche', titulo: 'Noche', frase: 'para la noche', momento: 'noche' },
+  { slug: 'dia', label: 'Día', titulo: 'Día', frase: 'para el día', momento: 'dia' },
+  { slug: 'toda-ocasion', label: 'Toda ocasión', titulo: 'Toda ocasión', frase: 'para toda ocasión', momento: 'ambos' },
+  { slug: 'noche', label: 'Noche', titulo: 'Noche', frase: 'para la noche', momento: 'noche' },
 ];
 
 export const RUTA_SET = '/set-toda-ocasion';
