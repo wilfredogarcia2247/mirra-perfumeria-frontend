@@ -143,8 +143,11 @@ export async function getPedidos() {
   return apiFetch(`/pedidos-venta`);
 }
 
-export async function getPedidosResumenReportes(fechaInicio?: string, fechaFin?: string) {
+export type ReporteResumen = 'ventas-periodo' | 'productos-favoritos' | 'pedidos-estado' | 'compras' | 'ticket-promedio';
+
+export async function getPedidosResumenReportes(reporte: ReporteResumen, fechaInicio?: string, fechaFin?: string) {
   const params = new URLSearchParams();
+  params.set('reporte', reporte);
   if (fechaInicio) params.set('fecha_inicio', fechaInicio);
   if (fechaFin) params.set('fecha_fin', fechaFin);
   const qs = params.toString() ? `?${params.toString()}` : '';
