@@ -1514,7 +1514,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const err = new Error(txt || res.statusText);
     (err as any).status = res.status;
     if (res.status === 401) {
-      try { localStorage.removeItem('jwt_token'); } catch (e) { }
+      try { localStorage.removeItem('jwt_token'); localStorage.removeItem('user_permissions'); } catch (e) { }
       // Si la 401 ocurre en el panel, redirigimos al login para re-autenticar.
       // En la tienda pública (inicio, categorías, nosotros, rastreo) NUNCA
       // mandamos al cliente al login: antes pasaba en /categoria/... al enviar el pedido.
@@ -1524,6 +1524,9 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
           const isTiendaPublica = path === '/'
             || path.startsWith('/categoria/')
             || path === '/about'
+            || path === '/comunidad'
+            || path === '/terminos'
+            || path === '/privacidad'
             || path === '/rastreo'
             || path === '/login';
           if (!isTiendaPublica) {
@@ -1590,6 +1593,39 @@ export async function getDescuentoMayorPublic(): Promise<ConfigDescuentoMayor> {
   const response = await fetch(`${API_URL}/descuento-mayor/activo`);
   if (!response.ok) throw new Error('No se pudo cargar el descuento al mayor');
   return response.json();
+}
+
+// Nota, total y resumen (Gemini) de las reseñas de Google Maps (página Comunidad). null = sin datos.
+export type ResumenGoogle = { texto: string; aviso: string; reportar: string | null };
+export type ResenaGoogle = {
+  autor: string;
+  perfil: string | null;
+  foto: string | null;
+  estrellas: number;
+  texto: string;
+  hace: string;
+  enlace: string | null;
+  reportar: string | null;
+};
+export type ResenasGoogle = {
+  nota: number | null;
+  total: number;
+  enlace: string | null;
+  resumen: ResumenGoogle | null;
+  // Hasta 5 reseñas que elige Google; puede faltar si el servidor es viejo
+  resenas?: ResenaGoogle[];
+};
+
+export async function getResenasGoogle(): Promise<ResenasGoogle | null> {
+  try {
+    const response = await fetch(`${API_URL}/resenas-google`);
+    if (!response.ok) return null;
+    const datos = await response.json();
+    if (!datos || typeof datos !== 'object') return null;
+    return datos;
+  } catch {
+    return null;
+  }
 }
 
 export async function getDescuentoMayorConfig(): Promise<ConfigDescuentoMayor> {
@@ -1723,6 +1759,8 @@ export async function login(email: string, password: string) {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   if (data.token) {
+    // Permisos guardados de la sesión anterior (quizás de otra persona en la misma tablet): fuera
+    try { localStorage.removeItem("user_permissions"); } catch (e) { /* noop */ }
     localStorage.setItem("jwt_token", data.token);
   }
   return data;

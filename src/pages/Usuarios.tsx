@@ -23,6 +23,7 @@ export default function Usuarios() {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [permisosModalOpen, setPermisosModalOpen] = useState(false);
   const [availableModules, setAvailableModules] = useState<Array<string | { key: string; label?: string }>>([]);
+  const [grupos, setGrupos] = useState<Array<{ grupo: string; items: Array<{ key: string; label?: string }> }>>([]);
 
   const { token } = useAuth();
 
@@ -54,14 +55,17 @@ export default function Usuarios() {
   async function loadAvailableModules() {
     try {
       const res = await apiFetch('/users/available-modulos');
-      // backend may return array of strings or objects
-      if (Array.isArray(res)) {
+      // backend devuelve { available_modulos: [...], grupos: [{grupo, items:[{key,label}]}] }
+      if (res && Array.isArray(res.available_modulos)) {
+        setAvailableModules(res.available_modulos as any);
+      } else if (Array.isArray(res)) {
         setAvailableModules(res as any);
       } else if (res && Array.isArray(res.data)) {
         setAvailableModules(res.data as any);
       } else {
         setAvailableModules([]);
       }
+      if (res && Array.isArray(res.grupos)) setGrupos(res.grupos as any);
     } catch (e) {
       console.debug('Could not load available modules', e);
       setAvailableModules([]);
@@ -201,6 +205,7 @@ export default function Usuarios() {
         }
         setPermisos(p);
         if (Array.isArray(data.available_modulos) && data.available_modulos.length > 0) setAvailableModules(data.available_modulos as any);
+        if (Array.isArray(data.grupos) && data.grupos.length > 0) setGrupos(data.grupos as any);
       } else {
         let p = data || {};
         if (Array.isArray(p)) {
@@ -279,8 +284,8 @@ export default function Usuarios() {
         for (const k of newPerms) map[k] = true;
         newPerms = map;
       }
+      // (son los permisos del usuario editado: no guardarlos como los del admin en este navegador)
       setPermisos(newPerms || {});
-      try { localStorage.setItem('user_permissions', JSON.stringify(newPerms || {})); } catch (e) { /* noop */ }
       alert('Permisos guardados');
       setPermisosModalOpen(false);
       return;
@@ -444,20 +449,55 @@ export default function Usuarios() {
               <DialogTitle>Permisos — {selectedUser?.nombre || selectedUser?.email || selectedUser?.id}</DialogTitle>
               <DialogDescription>Asignar permisos por módulo al usuario.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-1 mt-2 max-h-72 overflow-y-auto pr-1">
-              {(availableModules && availableModules.length > 0 ? availableModules : ['dashboard', 'tasas_cambio', 'bancos', 'marcas', 'categorias', 'almacenes', 'productos', 'formulas', 'pedidos', 'usuarios']).map((m) => {
-                const key = typeof m === 'string' ? m : (m as any).key;
-                const label = typeof m === 'string' ? (m as string).replace('_', ' ') : ((m as any).label || (m as any).key.replace('_', ' '));
+            <div className="space-y-3 mt-2 max-h-[60vh] overflow-y-auto pr-1">
+              {(grupos && grupos.length > 0
+                ? grupos
+                : [{
+                    grupo: 'Permisos',
+                    items: (availableModules.length > 0
+                      ? availableModules
+                      : ['dashboard', 'tasas_cambio', 'bancos', 'marcas', 'categorias', 'almacenes', 'productos', 'formulas', 'pedidos', 'usuarios']
+                    ).map((m: any) => (typeof m === 'string' ? { key: m } : m)),
+                  }]
+              ).map((g) => {
+                const items = g.items || [];
+                const allOn = items.length > 0 && items.every((it: any) => !!permisos?.[it.key]);
                 return (
-                  <label key={String(key)} className="flex items-center justify-between gap-3 rounded-lg px-2 py-3 hover:bg-muted/50 cursor-pointer min-h-[44px]">
-                    <span className="capitalize text-sm">{label}</span>
-                    <input
-                      type="checkbox"
-                      className="h-5 w-5 rounded accent-primary"
-                      checked={!!permisos?.[key]}
-                      onChange={(e) => setPermisos((p: any) => ({ ...(p || {}), [key]: e.target.checked }))}
-                    />
-                  </label>
+                  <div key={g.grupo} className="rounded-lg border border-border/60 overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 px-3 py-2 bg-muted/40">
+                      <span className="text-sm font-semibold">{g.grupo}</span>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        Todo
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-primary"
+                          checked={allOn}
+                          onChange={(e) => setPermisos((p: any) => {
+                            const np = { ...(p || {}) };
+                            for (const it of items) np[it.key] = e.target.checked;
+                            return np;
+                          })}
+                        />
+                      </label>
+                    </div>
+                    <div className="divide-y divide-border/40">
+                      {items.map((it: any) => {
+                        const key = it.key;
+                        const label = it.label || String(key).replace(/_/g, ' ');
+                        return (
+                          <label key={key} className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer min-h-[44px]">
+                            <span className="text-sm">{label}</span>
+                            <input
+                              type="checkbox"
+                              className="h-5 w-5 rounded accent-primary"
+                              checked={!!permisos?.[key]}
+                              onChange={(e) => setPermisos((p: any) => ({ ...(p || {}), [key]: e.target.checked }))}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>

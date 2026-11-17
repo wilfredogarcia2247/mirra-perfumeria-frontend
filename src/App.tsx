@@ -19,6 +19,9 @@ import Bancos from "./pages/Bancos";
 import Marcas from "./pages/Marcas";
 import Pagos from "./pages/Pagos";
 import AboutUs from "./pages/AboutUs";
+import Comunidad from "./pages/Comunidad";
+import SetTodaOcasion from "./pages/SetTodaOcasion";
+import { Terminos, Privacidad } from "./pages/Legal";
 import Almacenes from "./pages/Almacenes";
 import Categorias from "./pages/Categorias";
 import CintilloMensajes from "./pages/CintilloMensajes";
@@ -56,7 +59,11 @@ const App = () => (
             <Route path="/" element={<Hero />} />
             <Route path="/categoria/:categorySlug" element={<Hero />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/comunidad" element={<Comunidad />} />
+            <Route path="/set-toda-ocasion" element={<SetTodaOcasion />} />
             <Route path="/rastreo" element={<Rastreo />} />
+            <Route path="/terminos" element={<Terminos />} />
+            <Route path="/privacidad" element={<Privacidad />} />
           </Route>
           <Route path="/login" element={<Login />} />
           <Route path="/p/:slug" element={<AbrirPerfume />} />
@@ -89,11 +96,11 @@ const App = () => (
               <Route path="/formulas" element={<Formulas />} />
             </Route>
 
-            <Route element={<ModuleProtectedRoute moduleKey="almacenes" />}>
+            <Route element={<ModuleProtectedRoute moduleKey="produccion" />}>
               <Route path="/produccion" element={<Produccion />} />
             </Route>
 
-            <Route element={<ModuleProtectedRoute moduleKey="tamanos" />}>
+            <Route element={<ModuleProtectedRoute moduleKey="formulas" />}>
               <Route path="/tamanos" element={<Tamanos />} />
             </Route>
 
@@ -101,7 +108,7 @@ const App = () => (
               <Route path="/pedidos" element={<Pedidos />} />
             </Route>
 
-            <Route element={<ModuleProtectedRoute moduleKey="dashboard" />}>
+            <Route element={<ModuleProtectedRoute moduleKey="reportes" />}>
               <Route path="/reportes" element={<Reportes />} />
               <Route path="/reportes/:tipo" element={<Reportes />} />
             </Route>
@@ -114,13 +121,23 @@ const App = () => (
               <Route path="/usuarios" element={<Usuarios />} />
             </Route>
 
-            <Route element={<ModuleProtectedRoute moduleKey="usuarios" />}>
-              {/* /admin/whatsapp quitado: WhatsApp (WAHA) desactivado */}
+            {/* /admin/whatsapp quitado: WhatsApp (WAHA) desactivado */}
+            <Route element={<ModuleProtectedRoute moduleKey="cintillo" />}>
               <Route path="/admin/cintillo" element={<CintilloMensajes />} />
+            </Route>
+            <Route element={<ModuleProtectedRoute moduleKey="sucursales" />}>
               <Route path="/admin/sucursales" element={<Sucursales />} />
+            </Route>
+            <Route element={<ModuleProtectedRoute moduleKey="destacados" />}>
               <Route path="/admin/marketing/destacados" element={<MarketingSection title="Destacados" />} />
+            </Route>
+            <Route element={<ModuleProtectedRoute moduleKey="cupones" />}>
               <Route path="/admin/marketing/cupones" element={<Cupones />} />
+            </Route>
+            <Route element={<ModuleProtectedRoute moduleKey="descuento_mayor" />}>
               <Route path="/admin/marketing/descuento-mayor" element={<DescuentoMayor />} />
+            </Route>
+            <Route element={<ModuleProtectedRoute moduleKey="avisos" />}>
               <Route path="/admin/marketing/avisos" element={<AvisosLlegada />} />
             </Route>
 

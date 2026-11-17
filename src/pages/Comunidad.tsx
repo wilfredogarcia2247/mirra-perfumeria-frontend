@@ -1,0 +1,635 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import useCart from '@/hooks/use-cart';
+import { getResenasGoogle, type ResenaGoogle, type ResenasGoogle, type ResumenGoogle } from '@/integrations/api';
+
+// Enlaces de Mirra (una sola sucursal por ahora)
+const RESENA_ESCRIBIR = 'https://g.page/r/CWbLem6JvMceEBM/review';
+const WHATSAPP = 'https://wa.me/584141454086';
+// Ficha de Maps abierta en la pestaña de Reseñas (!9m1!1b1)
+const VER_RESENAS = 'https://www.google.com/maps/place/Mirra+Perfumeria/@10.6599868,-71.6670047,702m/data=!3m1!1e3!4m8!3m7!1s0x8e8999ecc14f62d9:0x1ec7bc896e7acb66!8m2!3d10.6599868!4d-71.6670047!9m1!1b1!16s%2Fg%2F11ynk58hcc';
+// Abre Maps directo en modo ruta, desde donde esté el cliente (sin punto de salida fijo)
+const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Mirra+Perfumeria,+Local+%234,+Diagonal+al+Restaurant+Yangtze,+Centro+Comercial+Aviur,+Maracaibo+4001,+Zulia';
+
+const SOMBRA = 'shadow-[0_8px_22px_rgba(90,59,34,0.13),0_2px_5px_rgba(90,59,34,0.08)]';
+
+const REDES = [
+  {
+    nombre: 'Instagram',
+    detalle: '@mirraperfumeria.ve',
+    url: 'https://www.instagram.com/mirraperfumeria.ve',
+    fondo: 'linear-gradient(45deg,#f9a03f,#d6266d 55%,#7b3fbf)',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} className="h-[23px] w-[23px]" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.5" cy="6.5" r="1" fill="#fff" />
+      </svg>
+    ),
+  },
+  {
+    nombre: 'TikTok',
+    detalle: '@mirraperfumeria',
+    url: 'https://www.tiktok.com/@mirraperfumeria',
+    fondo: 'linear-gradient(135deg,#25f4ee -40%,#111 45%,#111 60%,#fe2c55 160%)',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+        <path d="M12.5 0h3.9c.1 1.2.6 2.3 1.5 3.1.9.8 2.1 1.3 3.4 1.3v4.1c-1.4 0-2.9-.4-4.2-1v8.4c-.1 1.4-.5 2.8-1.3 3.9-1.3 1.9-3.6 3.2-5.9 3.2-1.4.1-2.9-.3-4.1-1C3.8 20.9 2.4 18.7 2.2 16.4c0-.5 0-1 0-1.5.2-1.9 1.1-3.7 2.6-5 1.7-1.4 4-2.1 6.2-1.7v4.4c-1-.3-2.2-.2-3 .4-.6.4-1.1 1-1.4 1.7-.2.5-.1 1.1-.1 1.6.2 1.6 1.8 3 3.5 2.9 1.1 0 2.2-.7 2.8-1.6.2-.3.4-.7.4-1.1.1-1.8.1-3.6.1-5.4V0z" />
+      </svg>
+    ),
+  },
+  {
+    nombre: 'Facebook',
+    detalle: 'Mirra Perfumería',
+    url: 'https://www.facebook.com/mirraperfumeriave',
+    fondo: 'linear-gradient(180deg,#3b8bff,#1466d8)',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+        <path d="M14 8V6.3c0-.8.2-1.3 1.4-1.3H17V2.1C16.7 2 15.8 2 14.7 2 12.4 2 11 3.4 11 5.9V8H8.5v3H11v11h3V11h2.6l.4-3H14z" />
+      </svg>
+    ),
+  },
+  {
+    nombre: 'WhatsApp',
+    detalle: '0414-145-40-86 · Escríbenos',
+    url: WHATSAPP,
+    fondo: 'linear-gradient(180deg,#3ccf74,#1a9e50)',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+      </svg>
+    ),
+  },
+];
+
+// Las respuestas del mínimo de 7 ml y del descuento al mayor siguen las reglas de src/lib (si cambian allá, cambiar aquí)
+const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
+  {
+    p: '¿Cómo compro por la página?',
+    r: (
+      <ol className="list-decimal space-y-1 pl-4">
+        <li>Agrega tus perfumes al carrito y toca <b>“Finalizar compra”</b>.</li>
+        <li>Llena tus datos de entrega y toca <b>“Confirmar pedido”</b>.</li>
+        <li>Se abre WhatsApp con tu pedido: toca <b>Enviar</b> para que nos llegue.</li>
+      </ol>
+    ),
+  },
+  {
+    p: '¿Los perfumes son originales?',
+    r: 'Creamos nuestras fragancias inspiradas en tus aromas favoritos, con una base de aceite de alta concentración.',
+  },
+  {
+    p: '¿Cuánto dura el perfume?',
+    r: 'Depende de cómo lo uses y de cuántas atomizaciones apliques. Por ejemplo, no dura igual si vas en moto al aire libre que si estás en una oficina.',
+  },
+  {
+    p: '¿Qué formas de pago aceptan?',
+    r: 'Pago móvil, efectivo, punto de venta y plataformas digitales. Al enviar tu pedido por WhatsApp te pasamos los datos para pagar.',
+  },
+  {
+    p: '¿Cuánto tarda mi pedido?',
+    r: 'Por lo general lo armamos el mismo día y lo enviamos al día siguiente. Según la ciudad, llega de 1 a 2 días después de enviado.',
+  },
+  {
+    p: '¿Cómo sé dónde va mi envío?',
+    r: (
+      <>
+        Si lo enviamos por MRW, síguelo con tu número de guía en{' '}
+        <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.
+        Si es delivery, te avisamos por WhatsApp.
+      </>
+    ),
+  },
+  {
+    p: '¿Hay un mínimo para los de 7 ml?',
+    r: 'Sí: los de 7 ml se piden desde 4 unidades. Si en el pedido llevas un perfume de 30 ml o más, puedes llevar los de 7 ml que quieras.',
+  },
+  {
+    p: '¿Tienen descuento al mayor?',
+    r: 'Sí: 10% desde 4 perfumes y 15% desde 24 perfumes, en tamaños de 30 a 100 ml. Si tienes un cupón, se aplica el descuento más alto.',
+  },
+  {
+    p: '¿Qué pasa si un perfume está agotado?',
+    r: 'Toca “Avísame cuando llegue” en el perfume, deja tu nombre y teléfono, y te avisamos cuando vuelva.',
+  },
+  {
+    p: '¿Hacen cambios?',
+    r: (
+      <>
+        Sí, si tu perfume llegó con el frasco partido o derramado, te lo cambiamos.{' '}
+        <Link to="/terminos#cambios" className="font-semibold text-[#8b6439] underline underline-offset-2">Ver condiciones</Link>.
+      </>
+    ),
+  },
+];
+
+function Titulo({ children, sub }: { children: React.ReactNode; sub: string }) {
+  return (
+    <>
+      <h2 className="font-bell-mt text-[23px] font-semibold text-gray-900 sm:text-3xl">{children}</h2>
+      <div className="mt-2 h-[3px] w-9 rounded-full bg-gradient-to-r from-[#CA9E67] to-[#e7c793]" />
+      <p className="mb-4 mt-2.5 text-[13px] leading-relaxed text-gray-500 sm:text-sm">{sub}</p>
+    </>
+  );
+}
+
+const formatoNota = (n: number) => n.toLocaleString('es-VE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+function Estrellas({ valor, className = '' }: { valor: number; className?: string }) {
+  const llenas = Math.round(valor);
+  return (
+    <span className={`tracking-[1px] ${className}`} aria-label={`${formatoNota(valor)} de 5 estrellas`}>
+      <span className="text-[#f5b301]">{'★'.repeat(llenas)}</span>
+      <span className="text-gray-300">{'★'.repeat(Math.max(0, 5 - llenas))}</span>
+    </span>
+  );
+}
+
+function LogoGoogle({ className = '' }: { className?: string }) {
+  return (
+    <span className={`font-[Arial,sans-serif] font-bold ${className}`}>
+      <span className="text-[#4285F4]">G</span><span className="text-[#EA4335]">o</span><span className="text-[#FBBC05]">o</span>
+      <span className="text-[#4285F4]">g</span><span className="text-[#34A853]">l</span><span className="text-[#EA4335]">e</span>
+    </span>
+  );
+}
+
+// Página de ayuda de Google sobre los resúmenes (enlace exigido por Google junto al resumen)
+const ACERCA_RESUMEN = 'https://support.google.com/local-listings/answer/9851099';
+
+// Resumen que escribe Gemini con las reseñas de Google. Google exige: título "Resumen de reseñas",
+// el aviso debajo del texto, "Acerca de este resumen", "Reportar" y un enlace a las reseñas ("Ver todas").
+function TarjetaResumen({ resumen }: { resumen: ResumenGoogle }) {
+  return (
+    <div className={`mt-3 rounded-[18px] border border-[#f1e6d6] bg-white px-4 pb-3.5 pt-4 ${SOMBRA}`}>
+      <div className="flex items-center gap-2">
+        <span className="h-5 font-[Georgia,serif] text-[44px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a97c45]">Resumen de reseñas</p>
+      </div>
+      <p className="mt-2.5 text-[13.5px] leading-relaxed text-gray-700">{resumen.texto}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-gray-400">
+        <span className="w-full sm:w-auto">✦ {resumen.aviso}</span>
+        <span aria-hidden="true" className="hidden sm:inline">·</span>
+        <a href={ACERCA_RESUMEN} target="_blank" rel="noopener noreferrer" className="underline">Acerca de este resumen</a>
+        {resumen.reportar && (
+          <>
+            <span aria-hidden="true">·</span>
+            <a href={resumen.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Mezcla el orden (cada visita muestra otra reseña primero)
+function revolver<T>(lista: T[]): T[] {
+  const a = lista.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Una reseña del carrusel. Google exige mostrar nombre (con enlace al perfil), foto,
+// fecha, el texto sin cambios, enlace a la reseña y "Reportar".
+function DiapositivaResena({ r, alAbrir }: { r: ResenaGoogle; alAbrir: (abierta: boolean) => void }) {
+  const textoRef = useRef<HTMLParagraphElement>(null);
+  const [abierta, setAbierta] = useState(false);
+  const [cortada, setCortada] = useState(false);
+  const [sinFoto, setSinFoto] = useState(!r.foto);
+
+  useEffect(() => {
+    const p = textoRef.current;
+    if (p && !abierta) setCortada(p.scrollHeight > p.clientHeight + 2);
+  }, [r.texto, abierta]);
+
+  const nombre = r.perfil ? (
+    <a href={r.perfil} target="_blank" rel="noopener noreferrer" className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</a>
+  ) : (
+    <span className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</span>
+  );
+
+  return (
+    <div className="flex w-full shrink-0 snap-center flex-col items-center justify-center px-7 pt-4 text-center">
+      <span className="h-[26px] font-[Georgia,serif] text-[58px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
+      <p
+        ref={textoRef}
+        className={`mt-2 font-[Georgia,serif] text-base italic leading-[1.55] text-[#3b2a1a] ${abierta ? '' : 'line-clamp-5'}`}
+      >
+        {r.texto}
+      </p>
+      {(cortada || abierta) && (
+        <button
+          type="button"
+          onClick={() => {
+            setAbierta(!abierta);
+            alAbrir(!abierta);
+          }}
+          className="pt-1 text-[12.5px] font-semibold text-[#8b6439]">
+          {abierta ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+      <div className="mt-3.5 flex max-w-full items-center gap-2.5 text-left">
+        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[1.5px] border-[#CA9E67] bg-[#f5eee6] text-sm font-bold text-[#8b6439]">
+          {sinFoto ? (
+            r.autor.charAt(0).toUpperCase()
+          ) : (
+            <img src={r.foto!} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" onError={() => setSinFoto(true)} />
+          )}
+        </span>
+        <div className="min-w-0">
+          {nombre}
+          <span className="text-[11px] text-[#8a7560]">
+            <span className="tracking-[1px] text-[#f5b301]" aria-label={`${r.estrellas} de 5 estrellas`}>{'★'.repeat(Math.round(r.estrellas))}</span>
+            {r.hace && ` · ${r.hace}`}
+          </span>
+        </div>
+      </div>
+      {(r.enlace || r.reportar) && (
+        <p className="mt-2 text-[11px] text-[#8a7560]">
+          {r.enlace && (
+            <a href={r.enlace} target="_blank" rel="noopener noreferrer" className="underline">
+              Ver en <span className="font-[Arial,sans-serif] font-bold">Google</span>
+            </a>
+          )}
+          {r.enlace && r.reportar && ' · '}
+          {r.reportar && <a href={r.reportar} target="_blank" rel="noopener noreferrer" className="underline">Reportar</a>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const AVANCE_MS = 5000; // cada cuánto pasa sola a la siguiente reseña
+const PAUSA_MS = 10000; // tras tocar el carrusel, cuánto espera para volver a avanzar sola
+
+// Carrusel de reseñas de Google en franja crema: se desliza con el dedo, las flechas o los
+// puntos, y avanza solo cada 5 s mientras está a la vista. Si el cliente lo toca, se mueve al
+// instante y el avance automático espera 10 s sin toques; con "Ver más" abierto no avanza.
+function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
+  const cajaRef = useRef<HTMLDivElement>(null);
+  const pistaRef = useRef<HTMLDivElement>(null);
+  const [actual, setActual] = useState(0);
+  const [aLaVista, setALaVista] = useState(false);
+  const [pestanaActiva, setPestanaActiva] = useState(() => typeof document === 'undefined' || !document.hidden);
+  const [pausado, setPausado] = useState(false);
+  const [abiertas, setAbiertas] = useState(0);
+  const [sinMovimiento] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  );
+  const reanudarRef = useRef<number | undefined>(undefined);
+
+  // ¿Se ve la franja en pantalla? ¿La pestaña está abierta?
+  useEffect(() => {
+    const caja = cajaRef.current;
+    if (!caja || typeof IntersectionObserver === 'undefined') {
+      setALaVista(true);
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => setALaVista(e.isIntersecting), { threshold: 0.5 });
+    io.observe(caja);
+    const alCambiarPestana = () => setPestanaActiva(!document.hidden);
+    document.addEventListener('visibilitychange', alCambiarPestana);
+    return () => {
+      io.disconnect();
+      document.removeEventListener('visibilitychange', alCambiarPestana);
+    };
+  }, []);
+  useEffect(() => () => window.clearTimeout(reanudarRef.current), []);
+
+  // El cliente tocó el carrusel: se detiene y vuelve a avanzar 10 s después del último toque
+  const alTocar = () => {
+    setPausado(true);
+    window.clearTimeout(reanudarRef.current);
+    reanudarRef.current = window.setTimeout(() => setPausado(false), PAUSA_MS);
+  };
+
+  const corriendo = resenas.length > 1 && aLaVista && pestanaActiva && !pausado && abiertas === 0 && !sinMovimiento;
+
+  const alDeslizar = () => {
+    const p = pistaRef.current;
+    if (p && p.clientWidth) setActual(Math.min(resenas.length - 1, Math.round(p.scrollLeft / p.clientWidth)));
+  };
+  const irA = (i: number) => {
+    const p = pistaRef.current;
+    if (!p) return;
+    const destino = Math.max(0, Math.min(resenas.length - 1, i));
+    p.scrollTo({ left: destino * p.clientWidth, behavior: 'smooth' });
+  };
+  // Avance automático (después de la última vuelve a la primera)
+  useEffect(() => {
+    if (!corriendo) return;
+    const t = window.setTimeout(() => irA((actual + 1) % resenas.length), AVANCE_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corriendo, actual, resenas.length]);
+
+  const flecha = 'flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#e2cfb4] bg-white text-[#8b6439] transition active:scale-95 disabled:opacity-40';
+
+  return (
+    <div
+      ref={cajaRef}
+      className="-mx-4 mt-3 pb-5 pt-2 sm:mx-0 sm:rounded-[18px]"
+      style={{ background: 'linear-gradient(180deg,#faf4ea,#f1e4d0)' }}
+      aria-roledescription="carrusel"
+      aria-label="Reseñas de Google"
+    >
+      <div
+        ref={pistaRef}
+        onScroll={alDeslizar}
+        onPointerDown={alTocar}
+        onTouchStart={alTocar}
+        onWheel={alTocar}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {resenas.map((r, i) => (
+          <DiapositivaResena key={`${r.autor}-${i}`} r={r} alAbrir={(a) => setAbiertas((n) => Math.max(0, n + (a ? 1 : -1)))} />
+        ))}
+      </div>
+      {resenas.length > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-3.5">
+          <button type="button" className={flecha} onClick={() => { alTocar(); irA(actual - 1); }} disabled={actual === 0} aria-label="Reseña anterior">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            {resenas.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { alTocar(); irA(i); }}
+                aria-label={`Ver reseña ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${i === actual ? 'w-[18px] bg-[#CA9E67]' : 'w-1.5 bg-[#e2d3bf]'}`}
+              />
+            ))}
+          </div>
+          <button type="button" className={flecha} onClick={() => { alTocar(); irA(actual + 1); }} disabled={actual === resenas.length - 1} aria-label="Reseña siguiente">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {resenas.length > 1 && !sinMovimiento && (
+        // Rayita que se llena hasta que pasa a la siguiente (vacía mientras está en pausa)
+        <div className="mx-auto mt-2.5 h-[3px] w-20 overflow-hidden rounded-full bg-[#eadfce]" aria-hidden="true">
+          {corriendo && (
+            <span key={actual} className="block h-full rounded-full bg-[#CA9E67]" style={{ animation: `llenar-barra ${AVANCE_MS}ms linear forwards` }} />
+          )}
+        </div>
+      )}
+      <p className="mt-2.5 text-center text-[11px] text-[#8a7560]">
+        Reseñas de <span className="font-[Arial,sans-serif] font-bold">Google</span>
+      </p>
+    </div>
+  );
+}
+
+export default function Comunidad() {
+  const { count } = useCart();
+  const navigate = useNavigate();
+  const [preguntaAbierta, setPreguntaAbierta] = useState<number | null>(null);
+
+  // Nota, total y resumen de Google; si no llegan, la sección queda solo con los botones
+  const [google, setGoogle] = useState<ResenasGoogle | null>(null);
+  useEffect(() => {
+    let activo = true;
+    getResenasGoogle().then((d) => { if (activo) setGoogle(d); });
+    return () => { activo = false; };
+  }, []);
+  const nota = google?.nota ?? null;
+  const resumen = google?.resumen ?? null;
+  // Orden mezclado una vez por visita
+  const resenas = useMemo(() => revolver(google?.resenas ?? []), [google]);
+
+  // Alto del menú fijo (igual que en Sobre nosotros): la portada queda debajo y los saltos a cada sección no se esconden
+  const [altoMenu, setAltoMenu] = useState<number | null>(null);
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    const medir = () => {
+      const alto = Math.round(header.getBoundingClientRect().height);
+      setAltoMenu((prev) => (prev == null || window.scrollY <= 10 ? alto : prev));
+    };
+    medir();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
+  const margenSalto = { scrollMarginTop: `${(altoMenu ?? 80) + 8}px` };
+  const seccion = 'px-4 py-7 sm:py-10';
+  const ancho = 'mx-auto max-w-2xl';
+  const btnBase = 'flex items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-center text-sm font-bold transition active:scale-[0.98]';
+  const btnBorde = `${btnBase} border-[1.5px] border-[#e8d9c5] bg-white text-[#8b6439] hover:border-[#CA9E67]`;
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
+
+      {/* Portada oscura */}
+      <div
+        className="relative overflow-hidden px-5 pb-14 text-center text-[#f6ead9]"
+        style={{
+          background: 'radial-gradient(circle at 85% -10%, #8a5e39 0%, #3a2515 65%)',
+          paddingTop: altoMenu != null ? `${altoMenu + 34}px` : '9rem',
+        }}
+      >
+        <span className="pointer-events-none absolute -left-[120px] -top-[90px] h-[260px] w-[260px] rounded-full border border-[#e7c793]/20" />
+        <span className="pointer-events-none absolute -bottom-10 -right-[70px] h-[180px] w-[180px] rounded-full border border-[#e7c793]/20" />
+        <p className="text-[11px] uppercase tracking-[0.28em] text-[#e7c793]">Mirra Perfumería</p>
+        <h1 className="mt-1.5 font-bell-mt text-[34px] font-semibold text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.35)] sm:text-5xl">
+          Nuestra comunidad
+        </h1>
+        <p className="relative mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#e6d5bf] sm:text-base">
+          Lo que dicen nuestros clientes, dónde encontrarnos y lo que necesitas saber antes de comprar.
+        </p>
+        <a
+          href="#resenas"
+          className="relative mt-5 inline-flex items-center gap-2.5 rounded-full border border-[#e7c793]/55 px-[18px] py-2.5 text-sm text-[#f6ead9] shadow-[0_6px_18px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]"
+          style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.05))' }}
+        >
+          {nota != null ? (
+            <>
+              <strong className="text-base font-bold text-white">{formatoNota(nota)}</strong>
+              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
+              <span className="whitespace-nowrap">{google!.total} reseñas en Google</span>
+            </>
+          ) : (
+            <>
+              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
+              <span className="whitespace-nowrap">Ver reseñas en Google</span>
+            </>
+          )}
+        </a>
+      </div>
+      <svg className="relative -mt-[27px] block h-7 w-full" viewBox="0 0 375 28" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 28 C120 0 255 0 375 28 Z" fill="#f9fafb" />
+      </svg>
+
+      {/* Reseñas */}
+      <section id="resenas" className={`${seccion} bg-gray-50`} style={margenSalto}>
+        <div className={ancho}>
+          <Titulo sub="Tu opinión nos ayuda a crecer y a que más personas encuentren su aroma.">Lo que dicen de nosotros</Titulo>
+          <div className={`flex items-center gap-3.5 rounded-[18px] border border-[#f1e6d6] bg-white p-4 ${SOMBRA}`}>
+            {nota != null ? (
+              <div className="shrink-0 text-center">
+                <p className="text-[34px] font-bold leading-none text-gray-900">{formatoNota(nota)}</p>
+                <Estrellas valor={nota} className="text-sm" />
+              </div>
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-2xl" aria-hidden="true">⭐</div>
+            )}
+            <div className="min-w-0">
+              <p className="text-[15px]">
+                <LogoGoogle />
+                <span className="font-[Arial,sans-serif] font-semibold text-gray-600"> Maps</span>
+              </p>
+              <p className="mt-0.5 text-[13px] leading-snug text-gray-600">
+                {nota != null
+                  ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
+                  : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
+              </p>
+            </div>
+          </div>
+          {resenas.length > 0 && <CarruselResenas resenas={resenas} />}
+          {resumen && <TarjetaResumen resumen={resumen} />}
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
+              <PenLine className="h-4 w-4" /> Dejar mi reseña
+            </a>
+            <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
+              Ver todas
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Redes */}
+      <section id="redes" className={`${seccion} bg-white`} style={margenSalto}>
+        <div className={ancho}>
+          <Titulo sub="Promociones, lanzamientos y recomendaciones todas las semanas.">Síguenos</Titulo>
+          <div className={`overflow-hidden rounded-[18px] bg-white ${SOMBRA}`}>
+            {REDES.map((red, i) => (
+              <a
+                key={red.nombre}
+                href={red.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 px-3.5 py-3 transition hover:bg-[#fbf8f4] ${i > 0 ? 'border-t border-[#f3ebe0]' : ''}`}
+              >
+                <span
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] shadow-[0_4px_10px_rgba(0,0,0,0.18)]"
+                  style={{ background: red.fondo }}
+                >
+                  {red.icono}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold text-gray-900">{red.nombre}</span>
+                  <span className="block truncate text-xs text-gray-500">{red.detalle}</span>
+                </span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-[#8b6439]">
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Preguntas frecuentes */}
+      <section id="preguntas" className={`${seccion} bg-gray-50`} style={margenSalto}>
+        <div className={ancho}>
+          <Titulo sub="Toca una pregunta para ver la respuesta.">Preguntas frecuentes</Titulo>
+          <div className="space-y-2.5">
+            {/* Solo una abierta a la vez: al abrir otra, la anterior se cierra; tocar la abierta la cierra */}
+            {PREGUNTAS.map((q, i) => {
+              const abierta = preguntaAbierta === i;
+              return (
+                <div
+                  key={q.p}
+                  className={`rounded-[14px] border bg-white shadow-[0_4px_12px_rgba(90,59,34,0.09)] ${abierta ? 'border-[#e7c793]' : 'border-[#f1e6d6]'}`}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={abierta}
+                    aria-controls={`respuesta-${i}`}
+                    onClick={() => setPreguntaAbierta(abierta ? null : i)}
+                    className="flex w-full items-center justify-between gap-2.5 p-3.5 text-left text-sm font-semibold text-gray-900"
+                  >
+                    {q.p}
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base leading-none ${abierta ? 'bg-[#CA9E67] text-white' : 'bg-[#f5eee6] text-[#8b6439]'}`} aria-hidden="true">
+                      {abierta ? '−' : '+'}
+                    </span>
+                  </button>
+                  {abierta && (
+                    <div id={`respuesta-${i}`} className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Envíos */}
+      <section id="envios" className={`${seccion} bg-white`} style={margenSalto}>
+        <div className={ancho}>
+          <Titulo sub="Te lo llevamos donde estés.">Envíos</Titulo>
+          <div className="grid gap-3">
+            {[
+              { ico: '🛵', t: 'Delivery en Maracaibo y San Francisco', d: <>Te lo llevamos a tu casa o trabajo. El costo depende de la zona; te lo confirmamos por WhatsApp.</> },
+              { ico: '📦', t: 'Envíos nacionales por MRW', d: <>A cualquier ciudad de Venezuela. Sigue tu paquete en <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.</> },
+              { ico: '🏬', t: 'Retiro en tienda', d: <>Retira tu pedido en nuestro local, de lunes a sábado, de 9:00 AM a 6:00 PM.</> },
+            ].map((e) => (
+              <div key={e.t} className={`flex items-center gap-3 rounded-2xl bg-white p-3.5 ${SOMBRA}`}>
+                <span
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[23px] shadow-[inset_0_-2px_0_rgba(139,100,57,0.15)]"
+                  style={{ background: 'linear-gradient(180deg,#f7ead6,#ecd6b5)' }}
+                  aria-hidden="true"
+                >
+                  {e.ico}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900">{e.t}</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-gray-600">{e.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* La tienda */}
+      <section id="tienda" className={`${seccion} bg-gray-50`} style={margenSalto}>
+        <div className={ancho}>
+          <Titulo sub="Ven a probar las fragancias en persona.">Visítanos</Titulo>
+          <div className={`rounded-[18px] bg-white p-4 text-[13px] leading-relaxed text-gray-600 ${SOMBRA}`}>
+            <p className="mb-2 font-bell-mt text-base font-semibold text-gray-900">Mirra Perfumería</p>
+            <p className="flex gap-2">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#CA9E67]" />
+              <span>Urb. Raúl Leoni, C.C. Aviur, local #4. Diagonal al Restaurant Yangtze. Maracaibo.</span>
+            </p>
+            <p className="mt-1.5 flex gap-2">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#CA9E67]" />
+              <span>Lunes a sábado, 9:00 AM a 6:00 PM</span>
+            </p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <a href={COMO_LLEGAR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
+              <Navigation className="h-4 w-4" /> Cómo llegar
+            </a>
+            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className={btnBorde}>
+              Escribirnos
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+    </div>
+  );
+}

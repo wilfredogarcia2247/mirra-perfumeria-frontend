@@ -2,6 +2,8 @@
 // Sigue el mismo orden y estilo que "Copiar pedido" del panel (Pedidos), escrito desde el cliente.
 // Se arma con el pedido que devuelve el servidor (precios reales, cupón, tasa y entrega).
 
+import { lineasConSets } from './setsPedido';
+
 // Número de Mirra que recibe los pedidos (el mismo del botón flotante de WhatsApp): 0414-145.40.86
 export const WHATSAPP_PEDIDOS = '584141454086';
 
@@ -59,7 +61,8 @@ export function mensajePedidoWhatsapp(pedido: any): string {
   const subtotal = redondear(pedido?.total_base ?? total + descuento + descuentoMayor);
   const porcentaje = Number(pedido?.cupon_descuento_porcentaje);
 
-  const lineasProductos = productos.map((p) => {
+  // Agrupados por Set toda ocasión si el pedido trae sets (🎁 Set para ella / Set para él / Otros perfumes)
+  const lineasProductos = lineasConSets(productos, (p) => p.set_etiqueta, (p) => {
     const nombre = String(p.producto_nombre || p.nombre_producto || 'Producto').trim();
     const tamano = tamanoDe(p.formula_nombre) || tamanoDe(p.producto_nombre);
     const cantidad = Number(p.cantidad);

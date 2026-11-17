@@ -23,7 +23,8 @@ function enlaceWhatsapp(telefono: string | null, texto?: string): string | null 
   const d = String(telefono || '').replace(/\D/g, '');
   if (d.length < 10) return null;
   const numero = d.startsWith('58') ? d : d.length === 11 && d.startsWith('0') ? `58${d.slice(1)}` : d.length === 10 ? `58${d}` : d;
-  return `https://wa.me/${numero}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`;
+  // Enlace directo (no wa.me): la redirección de wa.me daña los emojis en WhatsApp Web y escritorio ("�")
+  return `https://api.whatsapp.com/send?phone=${numero}${texto ? `&text=${encodeURIComponent(texto)}` : ''}`;
 }
 
 // Mensaje de "te extrañamos" para clientes que no han vuelto (sin cupón)

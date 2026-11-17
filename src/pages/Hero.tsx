@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
-import { volarAlCarrito, bajarAlCatalogo } from '@/lib/catalog';
+import { volarAlCarrito, bajarAlCatalogo, presentationLabel } from '@/lib/catalog';
+import { agruparPorSet, etiquetasParaEnviar, NOMBRE_SET } from '@/lib/setsPedido';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
 import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
@@ -19,6 +20,11 @@ import Footer from '@/components/Footer';
 import FeaturedShowcase from '@/components/FeaturedShowcase';
 import PortadaCinta from '@/components/PortadaCinta';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { productoDesdeCatalogo, slugifyCategory } from '@/lib/catalogoPublico';
+import { MOMENTOS_FILTRO, MOMENTOS_SET, RUTA_SET, haySet, momentoDe, pasaFiltros, type SeleccionFiltros } from '@/lib/setTodaOcasion';
+import { FAMILIAS } from '@/lib/fichaPerfume';
+import FiltrosTienda from '@/components/FiltrosTienda';
+import { AvisoSetTodaOcasion, FranjaSetTodaOcasion } from '@/components/SetTodaOcasionPromo';
 import { useBloquearScroll } from '@/hooks/useBloquearScroll';
 import CheckoutModal, { CheckoutDeliveryReview } from '@/components/CheckoutModal';
 
@@ -31,25 +37,9 @@ interface CuponPublico {
   colaborador_nombre?: string | null;
 }
 
-function slugifyCategory(name: string) {
-  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-// Nombres de todas las categorías del producto (la API envía `categorias`; `categoria` es la antigua única)
-function categoryNames(item: any): string[] {
-  const list = Array.isArray(item?.categorias) ? item.categorias : [];
-  const names = list.map((c: any) => String(c?.nombre ?? c?.name ?? '')).filter(Boolean);
-  if (names.length > 0) return names;
-  const single = (item?.categoria && (item.categoria.nombre ?? item.categoria.name)) ?? item?.categoria_nombre ?? item?.category ?? '';
-  return single ? [String(single)] : [];
-}
-
-// Texto que ve el cliente: si es de Hombre y de Mujer se muestra "Unisex"
-function categoryLabel(names: string[]) {
-  const slugs = names.map(slugifyCategory);
-  if (slugs.includes('hombre') && slugs.includes('mujer')) return 'Unisex';
-  return names.join(', ');
-}
+// Filtros (familia y momento) guardados en la dirección: ?familia=dulce,citrico&momento=noche
+const leerLista = (valor: string | null, validos: readonly { v: string }[]) =>
+  (valor || '').split(',').filter((v) => validos.some((x) => x.v === v));
 
 export default function Hero() {
   const [fullProducts, setFullProducts] = useState<Product[] | null>(null);
@@ -63,6 +53,16 @@ export default function Hero() {
   const { categorySlug } = useParams();
   const selectedCategory = categorySlug || 'all';
   const [search, setSearch] = useState<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramFamilia = searchParams.get('familia');
+  const paramMomento = searchParams.get('momento');
+  const seleccion: SeleccionFiltros = useMemo(() => ({
+    familias: leerLista(paramFamilia, FAMILIAS),
+    momentos: leerLista(paramMomento, MOMENTOS_FILTRO),
+  }), [paramFamilia, paramMomento]);
+  // Perfumes después de la búsqueda y Hombre/Mujer, antes de los filtros (para contar cada opción)
+  const [baseFiltros, setBaseFiltros] = useState<Product[]>([]);
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const navigate = useNavigate();
   // Ventana con la foto grande para elegir la presentación
   const [sheetProduct, setSheetProduct] = useState<{ product: Product; foto: HTMLImageElement | null } | null>(null);
@@ -156,6 +156,16 @@ export default function Hero() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [irAlCatalogo, location.key]);
 
+  // Llegó desde el carrito de otra página (Comunidad, Nosotros, Rastreo): abrir el carrito aquí
+  const abrirCarrito = Boolean((location.state as { abrirCarrito?: boolean } | null)?.abrirCarrito);
+  useEffect(() => {
+    if (!abrirCarrito) return;
+    setIsCartOpen(true);
+    // Se usa una sola vez: si el cliente recarga la página, el carrito no se vuelve a abrir solo
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirCarrito, location.key]);
+
   const buscarClientePorCedula = async (value: string) => {
     const cedula = value.trim();
     if (!cedula) {
@@ -209,30 +219,7 @@ export default function Hero() {
         // getCatalogoPaginated normaliza a { items, meta }
         const items = Array.isArray(res) ? res : (res?.items ?? res?.data ?? []);
 
-        const productsList: Product[] = (Array.isArray(items) ? items : []).map((item: any) => ({
-          id: item.id ?? item.producto_id ?? 0,
-          name: item.nombre ?? item.name ?? '',
-          image_url: item.image_url ?? item.imagen ?? item.image ?? undefined,
-          featured: Boolean(item.destacado ?? item.featured ?? false),
-          agotado: Boolean(item.agotado),
-          mas_pedido: Boolean(item.mas_pedido),
-          brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
-          categories: categoryNames(item),
-          category: categoryLabel(categoryNames(item)),
-          description: item.descripcion ?? item.description ?? '',
-          price: Number(item.precio_venta ?? item.price ?? 0) || 0,
-          precio_venta: item.precio_venta ?? null,
-          // Attach formulas and tamanos array from catalog (variants). `formulas` is used by the new API
-          formulas: Array.isArray(item.formulas) ? item.formulas : (item.formulas || []),
-          // Prefer explicit `tamanos` when present, otherwise fall back to `formulas` or `sizes`.
-          tamanos: Array.isArray(item.tamanos) ? item.tamanos : (Array.isArray(item.formulas) ? item.formulas : (item.sizes || [])),
-          stock: Number(item.stock ?? item.stock_disponible ?? 0) || 0,
-          // attach raw inventory and full objects for detail views
-          inventario: item.inventario ?? item.inventario_detalle ?? item.inventory ?? undefined,
-          categoria_obj: item.categoria ?? null,
-          ficha: item.ficha ?? null,
-          marca_obj: item.marca ?? null,
-        } as Product));
+        const productsList: Product[] = (Array.isArray(items) ? items : []).map(productoDesdeCatalogo);
 
         if (!mounted) return;
         setCatalogProducts(productsList);
@@ -275,9 +262,12 @@ export default function Hero() {
         return names.map(slugifyCategory).includes(selectedCategory.toLowerCase());
       });
 
-    setFullProducts(categoryFiltered);
-    setTotal(categoryFiltered.length);
-  }, [catalogProducts, search, selectedCategory]);
+    // Filtros de familia y momento (botón Filtros)
+    const conFiltros = categoryFiltered.filter((product) => pasaFiltros(product, seleccion));
+    setBaseFiltros(categoryFiltered);
+    setFullProducts(conFiltros);
+    setTotal(conFiltros.length);
+  }, [catalogProducts, search, selectedCategory, seleccion]);
 
   useEffect(() => {
     setPage(1);
@@ -322,18 +312,36 @@ export default function Hero() {
     return () => ro.disconnect();
   }, []);
 
-  // Filtros rápidos: solo los que tienen perfumes
+  // ¿Hay perfumes con ficha para armar el Set toda ocasión? (si no, no se muestra nada del set)
+  const conSet = useMemo(() => haySet(catalogProducts), [catalogProducts]);
+
+  // Filtros rápidos: solo los que tienen perfumes. Primero el botón del set, luego Todos / Hombre / Mujer.
   const filtrosRapidos = (() => {
     const slugsDe = (p: Product) => (p.categories && p.categories.length > 0 ? p.categories : [p.category || '']).map(slugifyCategory);
-    const lista: { slug: string; label: string }[] = [{ slug: 'all', label: 'Todos' }];
+    const lista: { slug: string; label: string; set?: boolean }[] = [{ slug: 'all', label: 'Todos' }];
     if (catalogProducts.some((p) => slugsDe(p).includes('hombre'))) lista.push({ slug: 'hombre', label: 'Hombre' });
     if (catalogProducts.some((p) => slugsDe(p).includes('mujer'))) lista.push({ slug: 'mujer', label: 'Mujer' });
+    if (conSet) lista.unshift({ slug: 'set', label: 'Set toda ocasión', set: true });
     return lista.length > 1 ? lista : [];
   })();
 
+  // Familia / momento elegidos en "Filtros": se guardan en la dirección (sin volver arriba)
+  function cambiarFiltros(nueva: SeleccionFiltros) {
+    const params = new URLSearchParams(searchParams);
+    if (nueva.familias.length) params.set('familia', nueva.familias.join(',')); else params.delete('familia');
+    if (nueva.momentos.length) params.set('momento', nueva.momentos.join(',')); else params.delete('momento');
+    setSearchParams(params, { replace: true, state: { keepScroll: true } });
+    setPage(1);
+  }
+
   function elegirFiltro(slug: string) {
-    // keepScroll: no volver arriba de la página, el cliente sigue en la lista
-    navigate(slug === 'all' ? '/' : `/categoria/${slug}`, { state: { keepScroll: true } });
+    // keepScroll: no volver arriba de la página, el cliente sigue en la lista.
+    // Se conservan los filtros de familia y momento (?familia=...&momento=...).
+    const filtros = new URLSearchParams();
+    if (paramFamilia) filtros.set('familia', paramFamilia);
+    if (paramMomento) filtros.set('momento', paramMomento);
+    const query = filtros.toString() ? `?${filtros.toString()}` : '';
+    navigate(`${slug === 'all' ? '/' : `/categoria/${slug}`}${query}`, { state: { keepScroll: true } });
     setPage(1);
     subirALaLista();
   }
@@ -499,6 +507,8 @@ export default function Hero() {
         </div>
       )}
 
+      {!loading && conSet && <FranjaSetTodaOcasion productos={catalogProducts} />}
+
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
           <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3 capitalize">
@@ -526,13 +536,30 @@ export default function Hero() {
           {/* Category filter removed from Landing (Hero) */}
         </div>
 
-        {filtrosRapidos.length > 0 && (
-          <div
-            ref={filtrosRef}
-            className="mb-4 py-2.5"
+        <div ref={filtrosRef} className="mb-4 py-2.5">
+          <FiltrosTienda
+            base={baseFiltros}
+            seleccion={seleccion}
+            alCambiar={cambiarFiltros}
+            total={total ?? 0}
+            alVerResultados={subirALaLista}
+            alAbrirCerrar={setFiltrosAbiertos}
           >
+          {filtrosRapidos.length > 0 && (
             <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filtrar perfumes">
               {filtrosRapidos.map((f) => {
+                if (f.set) {
+                  return (
+                    <button
+                      key={f.slug}
+                      type="button"
+                      onClick={() => navigate(RUTA_SET)}
+                      className="shrink-0 rounded-full border-[1.5px] border-[#b08a57] bg-white px-4 py-2 text-sm font-semibold text-[#7a5c33] transition hover:bg-[#fbf7f1]"
+                    >
+                      {f.label}
+                    </button>
+                  );
+                }
                 const activo = selectedCategory.toLowerCase() === f.slug;
                 return (
                   <button
@@ -548,8 +575,9 @@ export default function Hero() {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+          </FiltrosTienda>
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
@@ -565,6 +593,10 @@ export default function Hero() {
               />
             ))}
           </div>
+        )}
+
+        {conSet && (
+          <AvisoSetTodaOcasion productos={catalogProducts} bloqueado={isCartOpen || isCheckoutOpen || filtrosAbiertos || sheetProduct !== null || pedidoRecibido !== null} />
         )}
 
         {sheetProduct && (
@@ -856,15 +888,19 @@ export default function Hero() {
                     />
                   )}
                   {/* Cart Items List */}
-                  <div className="space-y-4">
-                    {cartItems.map((it) => {
+                  {(() => {
+                    const { sets, sueltos } = agruparPorSet(cartItems, (it) => it.product.set_etiqueta, (it) => it.product.set_total);
+                    const precioLinea = (it: CartItem) => Number(it.product.precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0) * (it.qty || 1);
+                    const fila = (it: CartItem, momento?: { num: string; texto: string }) => {
                       const base = Number((it.product as any).precio_snapshot ?? it.product.price ?? it.product.precio_venta ?? 0);
                       const useConv = tasaPublic && typeof tasaPublic.monto === 'number' && tasaPublic.monto > 0;
                       const priceDisplay = useConv
                         ? `${tasaPublic.simbolo || 'USD'} ${Number(base * Number(tasaPublic.monto)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : `$${Number(base).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-                      const displayTamano = (it.product as any)?.tamano_nombre ?? (it.product as any)?.tamano?.nombre ?? (it.product as any)?.tamano_nombre;
+                      const nombreTamano = (it.product as any)?.tamano_nombre ?? (it.product as any)?.tamano?.nombre ?? (it.product as any)?.tamano_nombre;
+                      // Solo el tamaño ("30 ml"), no el nombre completo de la presentación
+                      const displayTamano = nombreTamano ? presentationLabel(String(nombreTamano)) : null;
 
                       return (
                         <div key={it.key} className="group relative flex gap-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
@@ -890,9 +926,16 @@ export default function Hero() {
                           <div className="flex-1 min-w-0 flex flex-col justify-between">
                             <div>
                               <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                {momento && (
+                                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#57534e]">
+                                    <span className="mr-1 font-bell-mt text-xs normal-case tracking-normal text-[#b08a57]">{momento.num}</span>{momento.texto}
+                                  </p>
+                                )}
                                 <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
                                   {it.product.name}
                                 </h3>
+                                </div>
                                 <button
                                   onClick={() => removeItem(it.key)}
                                   className="text-gray-300 hover:text-red-500 p-1 -mt-1 -mr-1 rounded-md hover:bg-red-50 transition-colors"
@@ -932,8 +975,48 @@ export default function Hero() {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    };
+                    return (
+                      <div className="space-y-4">
+                        {sets.map((grupo) => {
+                          // Dentro del set: día, toda ocasión y noche, en ese orden
+                          const orden = (it: CartItem) => { const m = momentoDe(it.product); const i = MOMENTOS_SET.findIndex((x) => x.v === m); return i < 0 ? 9 : i; };
+                          const lineas = [...grupo.lineas].sort((a, b) => orden(a) - orden(b));
+                          return (
+                            <section key={grupo.etiqueta} className="rounded-2xl border border-[#ece6de] bg-[#faf8f5] p-2.5" aria-label={NOMBRE_SET[grupo.etiqueta]}>
+                              <div className="flex items-baseline justify-between px-1.5 pb-2 pt-1">
+                                <p className="text-[11.5px] font-bold uppercase tracking-[0.18em] text-[#57534e]">
+                                  {NOMBRE_SET[grupo.etiqueta]}
+                                  <span className="ml-2 text-xs font-normal normal-case tracking-normal text-[#78716c]">{lineas.length} perfumes</span>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => lineas.forEach((it) => removeItem(it.key))}
+                                  className="text-xs text-[#78716c] underline underline-offset-[3px] hover:text-[#1c1917]"
+                                >
+                                  Quitar set
+                                </button>
+                              </div>
+                              <div className="space-y-2">
+                                {lineas.map((it) => {
+                                  const i = orden(it);
+                                  return fila(it, i < 3 ? { num: `0${i + 1}`, texto: ['Día', 'Toda ocasión', 'Noche'][i] } : undefined);
+                                })}
+                              </div>
+                              <div className="flex justify-between px-1.5 pb-0.5 pt-2.5 text-xs text-[#78716c]">
+                                <span>Subtotal del set</span>
+                                <span className="font-semibold text-[#1c1917]">{formatMonto(lineas.reduce((t, it) => t + precioLinea(it), 0))}</span>
+                              </div>
+                            </section>
+                          );
+                        })}
+                        {sets.length > 0 && sueltos.length > 0 && (
+                          <p className="px-1 pt-1 text-[11.5px] font-bold uppercase tracking-[0.18em] text-[#57534e]">Otros perfumes</p>
+                        )}
+                        {sueltos.map((it) => fila(it))}
+                      </div>
+                    );
+                  })()}
 
                   {mostrarMayor && configMayor && mayor.siguiente && !deliveryReview && (
                     <SugerenciasDescuentoMayor
@@ -1017,6 +1100,9 @@ export default function Hero() {
                           };
                         });
 
+                        // Etiqueta del set en cada línea (para mostrar el pedido agrupado)
+                        const etiquetasSet = etiquetasParaEnviar(cartItems, (it) => it.product.set_etiqueta, (it) => it.product.set_total);
+                        productosSnapshot.forEach((p, i) => { const e = etiquetasSet.get(cartItems[i]); if (e) Object.assign(p, { set_etiqueta: e }); });
                         const payload = {
                           cliente_id: clienteIdActual ?? undefined,
                           nombre_cliente: nombreClienteFinal,
@@ -1303,6 +1389,7 @@ export default function Hero() {
                 )}
 
                 {!isCheckoutOpen ? (
+                  <>
                   <div className="flex gap-3">
                     <button
                       onClick={vaciarCarrito}
@@ -1328,6 +1415,16 @@ export default function Hero() {
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
+                  {/* Debajo de "Confirmar pedido", antes de tocarlo (enlaces en otra pestaña para no perder el pedido) */}
+                  {deliveryReview && (
+                    <p className="mt-2.5 text-center text-[11px] leading-relaxed text-gray-500">
+                      Al enviar tu pedido aceptas los{' '}
+                      <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Términos y condiciones</a>
+                      {' '}y la{' '}
+                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Política de privacidad</a>.
+                    </p>
+                  )}
+                  </>
                 ) : null}
               </div>
             )}

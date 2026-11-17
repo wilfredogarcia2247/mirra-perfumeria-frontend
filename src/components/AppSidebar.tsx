@@ -21,7 +21,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import useCart from "@/hooks/use-cart";
 
-type ModuleKey = 'dashboard' | 'tasas_cambio' | 'bancos' | 'marcas' | 'categorias' | 'almacenes' | 'productos' | 'formulas' | 'pedidos' | 'usuarios' | 'influencer';
+// Clave de permiso por pantalla (ver backend MODULOS). Flexible: string.
+type ModuleKey = string;
 
 interface MenuItem {
   title: string;
@@ -40,7 +41,7 @@ const menuGroups: MenuGroup[] = [
     label: "General",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: Home, module: 'dashboard' },
-      { title: "Reportes", url: "/reportes", icon: BarChart3, module: 'dashboard' },
+      { title: "Reportes", url: "/reportes", icon: BarChart3, module: 'reportes' },
     ],
   },
   {
@@ -69,10 +70,10 @@ const menuGroups: MenuGroup[] = [
   {
     label: "Marketing",
     items: [
-      { title: "Destacados", url: "/admin/marketing/destacados", icon: Star, module: 'usuarios' },
-      { title: "Cupones", url: "/admin/marketing/cupones", icon: TicketPercent, module: 'usuarios' },
-      { title: "Descuento al mayor", url: "/admin/marketing/descuento-mayor", icon: Percent, module: 'usuarios' },
-      { title: "Clientes esperando", url: "/admin/marketing/avisos", icon: Bell, module: 'usuarios' },
+      { title: "Destacados", url: "/admin/marketing/destacados", icon: Star, module: 'destacados' },
+      { title: "Cupones", url: "/admin/marketing/cupones", icon: TicketPercent, module: 'cupones' },
+      { title: "Descuento al mayor", url: "/admin/marketing/descuento-mayor", icon: Percent, module: 'descuento_mayor' },
+      { title: "Clientes esperando", url: "/admin/marketing/avisos", icon: Bell, module: 'avisos' },
       { title: "Mis métricas", url: "/influencer", icon: BarChart3, module: 'influencer' },
     ],
   },
@@ -81,8 +82,8 @@ const menuGroups: MenuGroup[] = [
     items: [
       { title: "Usuarios", url: "/usuarios", icon: Users, module: 'usuarios' },
       // WhatsApp (WAHA) desactivado: se quitó del menú. Para volver: WAHA_ACTIVO=true en el servidor y re-agregar.
-      { title: "Cintillo", url: "/admin/cintillo", icon: Megaphone, module: 'usuarios' },
-      { title: "Sucursales", url: "/admin/sucursales", icon: Store, module: 'usuarios' },
+      { title: "Cintillo", url: "/admin/cintillo", icon: Megaphone, module: 'cintillo' },
+      { title: "Sucursales", url: "/admin/sucursales", icon: Store, module: 'sucursales' },
     ],
   },
 ];
@@ -160,11 +161,9 @@ export function AppSidebar() {
 
   const isItemVisible = (item: MenuItem): boolean => {
     if (isInfluencer) return item.module === 'influencer';
-    if (item.module === 'influencer') return isInfluencer;
-    if (item.module === 'usuarios') {
-      return isAdmin || hasPermission('usuarios');
-    }
-    return hasPermission(item.module);
+    if (item.module === 'influencer') return false; // solo el influencer ve "Mis métricas"
+    if (isAdmin) return true;                        // el admin ve todo
+    return hasPermission(item.module);               // los demás, según su permiso
   };
 
   return (
