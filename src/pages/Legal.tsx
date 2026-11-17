@@ -53,7 +53,7 @@ const TERMINOS: Seccion[] = [
     enIndice: true,
     contenido: (
       <Lista>
-        <li>Los precios están en dólares. Si pagas en bolívares, se calcula con la tasa del día.</li>
+        <li>Todos los precios están expresados en bolívares. Para conocer el monto equivalente en dólares, el cálculo se realiza según la tasa oficial vigente del Banco Central de Venezuela (BCV).</li>
         <li>Aceptamos pago móvil, efectivo, punto de venta y plataformas digitales.</li>
         <li>En la tienda web, si compras perfumes de 7 ml, lleva al menos 4, o agrega uno de 30 ml o más.</li>
         <li>
