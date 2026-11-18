@@ -1109,6 +1109,13 @@ export async function updatePedidoAjustes(id: number, ajustes: any[]) {
   });
 }
 
+export async function applyCouponToPedido(id: number, codigo: string) {
+  return apiFetch(`/pedidos-venta/${id}/cupon`, {
+    method: 'PUT',
+    body: JSON.stringify({ codigo }),
+  });
+}
+
 /**
  * Completar pedido de forma atómica (optimizado)
  * Endpoint: POST /api/pedidos-venta/:id/completar-todo-atomico

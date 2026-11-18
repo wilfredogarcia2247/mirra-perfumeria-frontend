@@ -4,7 +4,7 @@ import { lineasConSets, NOMBRE_SET, type EtiquetaSet } from '@/lib/setsPedido';
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, applyCouponToPedido, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike, Pencil } from 'lucide-react';
@@ -731,6 +731,8 @@ export default function Pedidos() {
     }
   };
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
+  const [codigoCuponAdmin, setCodigoCuponAdmin] = useState('');
+  const [aplicandoCuponAdmin, setAplicandoCuponAdmin] = useState(false);
   const [editandoEntrega, setEditandoEntrega] = useState(false);
   // Al corregir la entrega se actualiza el detalle abierto y la fila de la lista
   const entregaGuardada = (r: { tipo_entrega: string; datos_entrega: any }) => {
@@ -1489,6 +1491,7 @@ export default function Pedidos() {
 
   const openDetalle = async (id: number) => {
     try {
+      setCodigoCuponAdmin('');
       setDetailLoading(true);
       const detalle = await getPedidoVenta(id);
       // Intentar obtener pagos específicos del pedido (si el backend expone /pedidos-venta/:id/pagos)
@@ -1674,6 +1677,41 @@ export default function Pedidos() {
     setAjustesDraft([]);
     setAjustesDirty(false);
     setAjustesError(null);
+    setCodigoCuponAdmin('');
+  };
+
+  const handleAplicarCuponAdmin = async () => {
+    if (!selectedPedido?.id || aplicandoCuponAdmin) return;
+    const codigo = codigoCuponAdmin.trim().toUpperCase();
+    if (!codigo) {
+      toast.error('Escribe el código promocional');
+      return;
+    }
+    setAplicandoCuponAdmin(true);
+    try {
+      const pedidoId = Number(selectedPedido.id);
+      const result: any = await applyCouponToPedido(pedidoId, codigo);
+      setPedidos((list: any) => Array.isArray(list) ? list.map((pedido: any) => pedido.id === pedidoId ? {
+        ...pedido,
+        cupon_codigo: result.cupon_codigo,
+        descuento_cupon: result.descuento_cupon,
+        descuento_mayor: 0,
+        descuento_mayor_porcentaje: 0,
+        total_base: result.total_base,
+        total_descuentos: result.total_descuentos,
+        total_recargos: result.total_recargos,
+        total_final: result.total_final,
+        total: result.total_final,
+      } : pedido) : list);
+      setCodigoCuponAdmin('');
+      toast.success(`Cupón ${result.cupon_codigo} aplicado`);
+      await openDetalle(pedidoId);
+    } catch (err: any) {
+      const message = parseApiError(err) || err?.message || 'No se pudo aplicar el cupón';
+      toast.error(message);
+    } finally {
+      setAplicandoCuponAdmin(false);
+    }
   };
 
   async function handleCompletarPedido() {
@@ -2397,6 +2435,34 @@ export default function Pedidos() {
                   {cuponDetalle.pct && <span>· {cuponDetalle.pct} de descuento</span>}
                   <span>· -{cuponDetalle.descuento.toFixed(2)}</span>
                   {cuponDetalle.colaborador && <span>· {cuponDetalle.colaborador}</span>}
+                </div>
+              )}
+              {selectedPedido && !cuponDetalle && !selectedPedido.cupon_codigo && (
+                <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-3 sm:flex-row sm:items-center">
+                  <div className="flex-1">
+                    <label htmlFor="cupon-admin-pedido" className="mb-1 block text-xs font-semibold text-amber-900">Código promocional</label>
+                    <input
+                      id="cupon-admin-pedido"
+                      value={codigoCuponAdmin}
+                      onChange={(event) => setCodigoCuponAdmin(event.target.value.toUpperCase())}
+                      onKeyDown={(event) => { if (event.key === 'Enter') void handleAplicarCuponAdmin(); }}
+                      placeholder="Ej. MIRRA10"
+                      maxLength={64}
+                      disabled={aplicandoCuponAdmin || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
+                      className="h-9 w-full rounded-md border border-amber-300 bg-white px-3 text-sm uppercase outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    {(selectedPedido.pagos || []).length > 0 && <p className="mt-1 text-xs text-amber-800">No se puede aplicar un cupón después de registrar un pago.</p>}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleAplicarCuponAdmin()}
+                    disabled={aplicandoCuponAdmin || !codigoCuponAdmin.trim() || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
+                    className="shrink-0"
+                  >
+                    {aplicandoCuponAdmin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TicketPercent className="mr-2 h-4 w-4" />}
+                    {aplicandoCuponAdmin ? 'Aplicando...' : 'Aplicar cupón'}
+                  </Button>
                 </div>
               )}
               {mayorDetalle && (
