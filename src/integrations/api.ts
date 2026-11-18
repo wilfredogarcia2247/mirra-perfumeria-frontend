@@ -1116,6 +1116,10 @@ export async function applyCouponToPedido(id: number, codigo: string) {
   });
 }
 
+export async function removeCouponFromPedido(id: number) {
+  return apiFetch(`/pedidos-venta/${id}/cupon`, { method: 'DELETE' });
+}
+
 /**
  * Completar pedido de forma atómica (optimizado)
  * Endpoint: POST /api/pedidos-venta/:id/completar-todo-atomico

@@ -4,7 +4,7 @@ import { lineasConSets, NOMBRE_SET, type EtiquetaSet } from '@/lib/setsPedido';
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, applyCouponToPedido, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
+import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, applyCouponToPedido, removeCouponFromPedido, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
 import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike, Pencil } from 'lucide-react';
@@ -733,6 +733,7 @@ export default function Pedidos() {
   const [selectedPedido, setSelectedPedido] = useState<any | null>(null);
   const [codigoCuponAdmin, setCodigoCuponAdmin] = useState('');
   const [aplicandoCuponAdmin, setAplicandoCuponAdmin] = useState(false);
+  const [quitandoCuponAdmin, setQuitandoCuponAdmin] = useState(false);
   const [editandoEntrega, setEditandoEntrega] = useState(false);
   // Al corregir la entrega se actualiza el detalle abierto y la fila de la lista
   const entregaGuardada = (r: { tipo_entrega: string; datos_entrega: any }) => {
@@ -1714,6 +1715,38 @@ export default function Pedidos() {
     }
   };
 
+  const handleQuitarCuponAdmin = async () => {
+    if (!selectedPedido?.id || quitandoCuponAdmin) return;
+    const codigo = String(selectedPedido.cupon_codigo || '').trim();
+    if (!window.confirm(`¿Quitar el cupón ${codigo} de este pedido? Se liberará un uso y se recalculará el descuento al mayor.`)) return;
+    setQuitandoCuponAdmin(true);
+    try {
+      const pedidoId = Number(selectedPedido.id);
+      const result: any = await removeCouponFromPedido(pedidoId);
+      setPedidos((list: any) => Array.isArray(list) ? list.map((pedido: any) => pedido.id === pedidoId ? {
+        ...pedido,
+        cupon_id: null,
+        cupon_codigo: null,
+        descuento_cupon: 0,
+        descuento_mayor: result.descuento_mayor,
+        descuento_mayor_porcentaje: result.descuento_mayor_porcentaje,
+        descuento_mayor_quitado: false,
+        total_base: result.total_base,
+        total_descuentos: result.total_descuentos,
+        total_recargos: result.total_recargos,
+        total_final: result.total_final,
+        total: result.total_final,
+      } : pedido) : list);
+      toast.success('Cupón quitado y uso liberado');
+      await openDetalle(pedidoId);
+    } catch (err: any) {
+      const message = parseApiError(err) || err?.message || 'No se pudo quitar el cupón';
+      toast.error(message);
+    } finally {
+      setQuitandoCuponAdmin(false);
+    }
+  };
+
   async function handleCompletarPedido() {
     // Abrir modal de pago para preguntar cómo paga el cliente
     if (!selectedPedido?.id) return;
@@ -2435,6 +2468,17 @@ export default function Pedidos() {
                   {cuponDetalle.pct && <span>· {cuponDetalle.pct} de descuento</span>}
                   <span>· -{cuponDetalle.descuento.toFixed(2)}</span>
                   {cuponDetalle.colaborador && <span>· {cuponDetalle.colaborador}</span>}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-8 bg-white text-amber-900 hover:bg-amber-100"
+                    onClick={() => void handleQuitarCuponAdmin()}
+                    disabled={quitandoCuponAdmin || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
+                  >
+                    {quitandoCuponAdmin ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                    {quitandoCuponAdmin ? 'Quitando...' : 'Quitar cupón'}
+                  </Button>
                 </div>
               )}
               {selectedPedido && !cuponDetalle && !selectedPedido.cupon_codigo && (
