@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPedidosStats, getPedidosPaginated, getPedidos, getPedidoVenta, completarPedidoVenta, cancelarPedidoVenta, API_URL, getToken, createPago, updatePedidoAjustes, applyCouponToPedido, removeCouponFromPedido, getBancos, getFormasPago, apiFetch, getTasaBySimbolo, getTasasCambio, getPagosByPedido, getPagos, getProducto, getOrdenProduccionDetailed, createProduccion, getAlmacenes, getFormula, getProductos, getFormulas, getCatalogoPaginated, completarOrdenProduccion, searchPedidos, getPedidosCuponesResumen, setDescuentoMayorPedido } from "@/integrations/api";
 import PaymentByBank from '@/components/PaymentByBank';
 import { parseApiError, getImageUrl } from '@/lib/utils';
-import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike, Pencil } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight, Loader2, User, Phone, FileText, TicketPercent, ClipboardCopy, Store, Truck, Bike, Pencil, Search } from 'lucide-react';
 import EditarEntregaDialog from '@/components/EditarEntregaDialog';
 import { TableSkeleton } from '@/components/admin-skeletons';
 import { useNavigate } from 'react-router-dom';
@@ -122,6 +122,35 @@ function EntregaBadge({ pedido, className = '' }: { pedido: any; className?: str
       <Icono className="h-3 w-3 shrink-0" />
       {info.etiqueta}
     </span>
+  );
+}
+
+function DireccionResumen({ direccion }: { direccion: string }) {
+  const [expandida, setExpandida] = useState(false);
+  const puedeExpandir = direccion.length > 100;
+  return (
+    <div className="mt-0.5 max-w-3xl text-[11px] leading-snug opacity-80">
+      <p
+        className="break-words"
+        style={!expandida && puedeExpandir ? {
+          display: '-webkit-box',
+          WebkitBoxOrient: 'vertical',
+          WebkitLineClamp: 1,
+          overflow: 'hidden',
+        } : undefined}
+      >
+        {direccion}
+      </p>
+      {puedeExpandir && (
+        <button
+          type="button"
+          className="mt-0.5 font-semibold text-current underline decoration-current/40 underline-offset-2 hover:decoration-current"
+          onClick={() => setExpandida((actual) => !actual)}
+        >
+          {expandida ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -2094,37 +2123,43 @@ export default function Pedidos() {
 
   return (
     <Layout>
-      <div className="space-y-6 p-4">
-        <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
-          <div>
-            <h1 className="text-2xl font-bold">Pedidos</h1>
-            <p className="text-sm text-muted-foreground">Listado de pedidos recibidos</p>
-          </div>
-          <form onSubmit={handleSearch} className="relative w-full md:w-96">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar por nombre, cédula o teléfono..."
-                className="w-full pl-4 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                disabled={isSearching}
-              >
-                {isSearching ? 'Buscando...' : '🔍'}
-              </button>
+      <div className="space-y-5 p-4 lg:p-6">
+        <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-white via-white to-rose-50/80 px-5 py-5 shadow-sm sm:px-7 sm:py-6">
+          <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-rose-100/50 blur-3xl" />
+          <div className="relative flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-500">Gestión de ventas</p>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-[28px]">Pedidos</h1>
+              <p className="mt-1 text-sm text-gray-500">Consulta y administra los pedidos recibidos</p>
             </div>
-          </form>
+            <form onSubmit={handleSearch} className="relative w-full md:w-96">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, cédula o teléfono..."
+                  className="w-full rounded-xl border border-gray-200 bg-white/90 py-2.5 pl-10 pr-11 text-sm shadow-sm outline-none transition placeholder:text-gray-400 focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  aria-label="Buscar pedidos"
+                  disabled={isSearching}
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                >
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
         {/* Filtros rápidos por estado — scroll horizontal en móvil */}
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
-          <div className="flex gap-0.5 bg-card border border-border rounded-[10px] p-[3px] w-fit min-w-max">
+          <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit min-w-max shadow-sm">
             <button
-              className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
               onClick={() => cambiarPestana('')}
             >
               Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
@@ -2132,7 +2167,7 @@ export default function Pedidos() {
             {allStatuses.map((s) => (
               <button
                 key={s}
-                className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
                 onClick={() => cambiarPestana(selectedStatus === s ? '' : s)}
               >
                 <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
@@ -2140,7 +2175,7 @@ export default function Pedidos() {
               </button>
             ))}
             <button
-              className={`flex items-center gap-1.5 px-3 py-[5px] rounded-[7px] text-sm transition-colors duration-150 min-h-[36px] ${conCupon ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${conCupon ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
               onClick={() => { setConCupon((prev) => !prev); setPage(1); }}
               title="Mostrar solo pedidos con cupón aplicado"
             >
@@ -2240,11 +2275,11 @@ export default function Pedidos() {
             </div>
 
             {/* ── Desktop: tabla ── */}
-            <Card className="hidden sm:block overflow-hidden">
+            <Card className="hidden sm:block overflow-hidden rounded-2xl border-gray-200 shadow-sm">
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow className="hover:bg-transparent border-b border-border">
+                    <TableRow className="hover:bg-transparent border-b border-gray-100 bg-gray-50/70">
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3 pl-6 tabletv:pl-3 w-16">ID</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Cliente</TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground py-3">Fecha</TableHead>
@@ -2261,7 +2296,7 @@ export default function Pedidos() {
                       const totalParts = fmtTotalParts(p);
                       const estado = fmtEstado(p);
                       return (
-                        <TableRow key={p.id || JSON.stringify(p)} className={getRowClasses(p)}>
+                        <TableRow key={p.id || JSON.stringify(p)} className={`${getRowClasses(p)} transition-colors hover:bg-rose-50/40`}>
                           <TableCell className="text-xs tabular-nums text-muted-foreground pl-6 tabletv:pl-3">#{p.id ?? '-'}</TableCell>
                           <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
@@ -2375,9 +2410,9 @@ export default function Pedidos() {
 
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-white shadow-2xl overflow-hidden rounded-none sm:rounded-xl transition-all duration-200">
-            <DialogHeader className="p-5 tableth:px-5 tableth:py-3 border-b shrink-0 bg-white z-10 space-y-2 tableth:space-y-1.5">
-              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
+            <DialogHeader className="p-5 tableth:px-5 tableth:py-3 border-b border-rose-100 shrink-0 bg-gradient-to-r from-white via-white to-rose-50/60 z-10 space-y-2 tableth:space-y-1.5">
+              <DialogTitle className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
                 {selectedPedido && (
                   <Badge variant={estadoColor(selectedPedido.estado) as any} className="text-xs px-2 py-0.5 pointer-events-none">
@@ -2387,22 +2422,20 @@ export default function Pedidos() {
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-500 mt-1">
                 {selectedPedido ? (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                  <div className="flex flex-wrap gap-2 items-center text-gray-600">
+                    <span className="flex flex-wrap items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">
+                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5 text-rose-500" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
                       <ClienteHistorialBadge historial={selectedPedido.cliente_historial} />
                     </span>
-                    <span className="hidden sm:inline text-gray-300">|</span>
-                    <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
-                    <span className="hidden sm:inline text-gray-300">|</span>
-                    <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> {selectedPedido.telefono || selectedPedido.cliente_telefono || '-'}</span>
-                    <span className="hidden sm:inline text-gray-300">|</span>
-                    <span>Tasa: {(fmtTasa(selectedPedido) || 0).toFixed(4)}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm"><FileText className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm"><Phone className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.telefono || selectedPedido.cliente_telefono || '-'}</span>
+                    <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">Tasa: {(fmtTasa(selectedPedido) || 0).toFixed(4)}</span>
                   </div>
                 ) : (
                   <span>Cargando...</span>
                 )}
               </DialogDescription>
+              <div className={`grid grid-cols-1 items-start gap-2 ${selectedPedido?.tipo_entrega ? 'lg:grid-cols-[minmax(0,1fr)_400px]' : ''}`}>
               {selectedPedido && !selectedPedido.tipo_entrega && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-2 text-sm text-muted-foreground">
                   <span>Este pedido no tiene método de entrega.</span>
@@ -2412,11 +2445,11 @@ export default function Pedidos() {
                 </div>
               )}
               {selectedPedido?.tipo_entrega && (
-                <div className={`rounded-lg border-2 px-3 py-2 text-sm ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
-                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
+                <div className={`w-fit max-w-full rounded-lg border px-3 py-1.5 text-xs lg:w-full ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
                     <EntregaBadge pedido={selectedPedido} className="text-xs" />
-                    <Button size="sm" variant="outline" className="ml-auto h-7 bg-white/80 px-2.5 text-xs" onClick={() => setEditandoEntrega(true)}>
+                    <Button size="sm" variant="outline" className="ml-auto h-6 bg-white/80 px-2 text-[11px]" onClick={() => setEditandoEntrega(true)}>
                       <Pencil className="mr-1 h-3 w-3" /> Editar
                     </Button>
                   </div>
@@ -2431,18 +2464,23 @@ export default function Pedidos() {
                       <>
                         {type === 'tienda' && (
                           <>
-                            <p className="font-semibold">{details.sucursal_nombre || 'Sucursal'}</p>
-                            {details.sucursal_direccion && <p>{details.sucursal_direccion}</p>}
+                            <p className="font-semibold leading-tight">{details.sucursal_nombre || 'Sucursal'}</p>
+                            {details.sucursal_direccion && <DireccionResumen direccion={details.sucursal_direccion} />}
                           </>
                         )}
                         {type === 'envio_nacional' && (
                           <>
                             {details.estado && <p className="font-semibold">Destino: {details.ciudad ? `${details.ciudad}, ` : ""}{details.estado}</p>}
-                            <p>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</p>
-                            {(details.agencia_codigo || details.agencia_mrw_codigo) && (
-                              <p>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</p>
-                            )}
-                            <p>Dirección: {details.agencia_direccion || details.agencia_mrw_direccion || '-'}</p>
+                            <div className="flex flex-wrap items-center gap-x-2">
+                              <span>Empresa de envío: {details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW'}</span>
+                              {(details.agencia_codigo || details.agencia_mrw_codigo) && (
+                                <>
+                                  <span aria-hidden="true" className="text-current/50">·</span>
+                                  <span>Código de agencia: {details.agencia_codigo || details.agencia_mrw_codigo}</span>
+                                </>
+                              )}
+                            </div>
+                            <div>Dirección: <DireccionResumen direccion={details.agencia_direccion || details.agencia_mrw_direccion || '-'} /></div>
                           </>
                         )}
                         {type === 'delivery' && locationLink && (
@@ -2482,9 +2520,9 @@ export default function Pedidos() {
                 </div>
               )}
               {selectedPedido && !cuponDetalle && !selectedPedido.cupon_codigo && (
-                <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-3 sm:flex-row sm:items-center">
-                  <div className="flex-1">
-                    <label htmlFor="cupon-admin-pedido" className="mb-1 block text-xs font-semibold text-amber-900">Código promocional</label>
+                <div className="flex w-fit max-w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 sm:flex-row sm:items-start lg:justify-self-end">
+                  <div className="w-full min-w-0 sm:w-[220px]">
+                    <label htmlFor="cupon-admin-pedido" className="mb-0.5 block text-[11px] font-semibold text-amber-900">Código promocional</label>
                     <input
                       id="cupon-admin-pedido"
                       value={codigoCuponAdmin}
@@ -2493,7 +2531,7 @@ export default function Pedidos() {
                       placeholder="Ej. MIRRA10"
                       maxLength={64}
                       disabled={aplicandoCuponAdmin || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
-                      className="h-9 w-full rounded-md border border-amber-300 bg-white px-3 text-sm uppercase outline-none focus:ring-2 focus:ring-amber-400"
+                      className="h-8 w-full rounded-md border border-amber-300 bg-white px-3 text-xs uppercase outline-none focus:ring-2 focus:ring-amber-400"
                     />
                     {(selectedPedido.pagos || []).length > 0 && <p className="mt-1 text-xs text-amber-800">No se puede aplicar un cupón después de registrar un pago.</p>}
                   </div>
@@ -2502,13 +2540,14 @@ export default function Pedidos() {
                     size="sm"
                     onClick={() => void handleAplicarCuponAdmin()}
                     disabled={aplicandoCuponAdmin || !codigoCuponAdmin.trim() || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
-                    className="shrink-0"
+                    className="mt-0 h-7 shrink-0 px-2 text-[11px] sm:mt-5"
                   >
-                    {aplicandoCuponAdmin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TicketPercent className="mr-2 h-4 w-4" />}
+                    {aplicandoCuponAdmin ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TicketPercent className="mr-1.5 h-3.5 w-3.5" />}
                     {aplicandoCuponAdmin ? 'Aplicando...' : 'Aplicar cupón'}
                   </Button>
                 </div>
               )}
+              </div>
               {mayorDetalle && (
                 <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${mayorDetalle.quitado ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
                   <TicketPercent className="w-4 h-4 shrink-0" />
@@ -2536,14 +2575,14 @@ export default function Pedidos() {
               )}
             </DialogHeader>
 
-            <div id="modal-scroll-container" className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/50 space-y-6 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
+            <div id="modal-scroll-container" className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8f6f4] space-y-5 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
               {detailLoading ? (
                 <div className="flex items-center justify-center py-20 text-gray-400">
                   <Loader2 className="w-8 h-8 animate-spin mr-2" />
                   <span>Cargando detalle...</span>
                 </div>
               ) : selectedPedido ? (
-                <div className={`space-y-6 ${showPaymentInline ? 'hidden' : ''}`}>
+                <div className={`space-y-5 ${showPaymentInline ? 'hidden' : ''}`}>
                   <div className="flex justify-between items-center">
                     <div />
                     <div className="flex flex-wrap gap-2">
@@ -2560,26 +2599,32 @@ export default function Pedidos() {
                       <Button size="sm" variant="outline" onClick={async () => { await loadProductosOptions(); setAddProductId(null); setAddPresentacionId(null); setAddPrecio(null); setAddCantidad(1); setProductSearchTerm(''); setShowProductDropdown(false); setAddModalOpen(true); }}>Agregar producto</Button>
                     </div>
                   </div>
-                  <div className="overflow-auto">
-                    <table className="w-full table-auto text-sm">
-                      <thead>
+                  <div className="overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[680px] table-fixed text-sm">
+                      <colgroup>
+                        <col />
+                        <col className="w-[105px]" />
+                        <col className="w-[72px]" />
+                        <col className="w-[112px]" />
+                        <col className="w-[112px]" />
+                      </colgroup>
+                      <thead className="bg-gray-50/80">
                         <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                          <th className="hidden pb-2 pr-3 md:table-cell">Imagen</th>
-                          <th className="pb-2 pr-2">Nombre</th>
+                          <th className="px-4 py-3">Producto</th>
                           {/* Títulos abreviados; al pasar el ratón se ve el nombre completo */}
-                          <th className="px-3 pb-2 text-right" title="Precio">Prec.</th>
-                          <th className="hidden px-3 pb-2 text-right md:table-cell" title="Costo">Cost.</th>
-                          <th className="px-3 pb-2 text-center" title="Cantidad">Cant.</th>
-                          <th className="px-3 pb-2 text-right" title="Subtotal">Subt.</th>
-                          <th className="hidden pb-2 pl-3 text-center md:table-cell" title="Producción">Prod.</th>
+                          <th className="px-3 py-3 text-right" title="Precio">Precio</th>
+                          <th className="px-3 py-3 text-center" title="Cantidad">Cant.</th>
+                          <th className="px-3 py-3 text-right" title="Subtotal">Subtotal</th>
+                          <th className="px-3 py-3 text-center" title="Producción">Producción</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Array.isArray(selectedPedido.productos) && ordenarPorTamano(selectedPedido.productos).map((it: any) => (
-                          <tr key={it.id} className="border-t">
-                            <td className="hidden py-2 w-16 md:table-cell">
-                              <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
-                                <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="w-full h-full object-cover" onError={(e) => {
+                          <tr key={it.id} className="border-t border-gray-100 transition-colors hover:bg-rose-50/30">
+                            <td className="px-4 py-3 align-middle">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
+                                  <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="h-full w-full object-cover" onError={(e) => {
                                   const t = e.currentTarget as HTMLImageElement;
                                   t.onerror = null;
                                   // Usar una imagen aleatoria del asset folder como fallback
@@ -2587,98 +2632,97 @@ export default function Pedidos() {
                                   const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
                                   t.src = randomFallback;
                                   console.error('[Pedidos] image load failed, using fallback:', t.src);
-                                }} />
-                              </div>
-                            </td>
-                            <td className="py-2 pr-2 align-top">
-                              <div className="font-medium">{it.producto_nombre || it.nombre || '-'}</div>
-                              {(it.set_etiqueta === 'mujer' || it.set_etiqueta === 'hombre') && (
-                                // Vino del Set toda ocasión de la tienda
-                                <span className="mt-0.5 inline-block rounded-full border border-[#b08a57]/50 px-2 py-0.5 text-[10.5px] font-semibold text-[#7a5c33]">{NOMBRE_SET[it.set_etiqueta as EtiquetaSet]}</span>
-                              )}
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {(() => {
-                                  // Mostrar componentes asociados a la línea (si vienen) y/o componentes de la orden de producción referenciada
-                                  const compsFromLine = Array.isArray(it?.componentes) ? it.componentes.map((c: any) => {
-                                    const unit = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
-                                    const total = Number(c?.cantidad_total ?? (unit * Number(it?.cantidad ?? 1))) || 0;
-                                    return {
-                                      id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
-                                      nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
-                                      unidad: c?.unidad ?? c?.u ?? '',
-                                      cantidad: total,
-                                    };
-                                  }) : [];
-
-                                  const refId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? null);
-                                  let compsFromOrder: any[] = [];
-                                  if (Number.isFinite(refId) && refId > 0) {
-                                    const od = ordenDetailsMap[refId];
-                                    const ordObj = od?.orden ?? od ?? {};
-                                    const compList = Array.isArray(od?.componentes) ? od.componentes : (Array.isArray(ordObj?.componentes) ? ordObj.componentes : []);
-                                    if (Array.isArray(compList) && compList.length > 0) {
-                                      compsFromOrder = compList.map((c: any) => {
-                                        const cantidadPorUnidad = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
-                                        const cantidadTotal = Number(c?.cantidad_total ?? (cantidadPorUnidad * Number(ordObj?.cantidad ?? 0))) || 0;
+                                  }} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium leading-snug text-gray-900">{it.producto_nombre || it.nombre || '-'}</div>
+                                  {(it.set_etiqueta === 'mujer' || it.set_etiqueta === 'hombre') && (
+                                    // Vino del Set toda ocasión de la tienda
+                                    <span className="mt-0.5 inline-block rounded-full border border-[#b08a57]/50 px-2 py-0.5 text-[10.5px] font-semibold text-[#7a5c33]">{NOMBRE_SET[it.set_etiqueta as EtiquetaSet]}</span>
+                                  )}
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    {(() => {
+                                      // Mostrar componentes asociados a la línea (si vienen) y/o componentes de la orden de producción referenciada
+                                      const compsFromLine = Array.isArray(it?.componentes) ? it.componentes.map((c: any) => {
+                                        const unit = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
+                                        const total = Number(c?.cantidad_total ?? (unit * Number(it?.cantidad ?? 1))) || 0;
                                         return {
                                           id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
                                           nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
                                           unidad: c?.unidad ?? c?.u ?? '',
-                                          cantidad: cantidadTotal,
+                                          cantidad: total,
                                         };
-                                      });
-                                    }
-                                  }
+                                      }) : [];
 
-                                  const combined = [...(compsFromLine || []), ...(compsFromOrder || [])];
-                                  if (combined.length > 0) {
-                                    return (
-                                      <div className="mt-1 text-xs space-y-1">
-                                        {combined.map((c: any) => {
-                                          const cid = Number(c?.id ?? c?.materia_prima_id ?? 0) || 0;
-                                          const fallbackName = c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null;
-                                          const resolvedName = (cid && materiasCostMap && materiasCostMap[cid] && (materiasCostMap[cid].nombre || materiasCostMap[cid].nombre)) ? (materiasCostMap[cid].nombre) : (fallbackName ?? null);
-                                          const displayName = resolvedName ?? `ID ${cid || ''}`;
-                                          return (
-                                            <div key={String(cid || displayName)} className="flex justify-between">
-                                              <div className="break-words">{displayName}</div>
-                                              <div className="text-right">{Number(c.cantidad || 0).toFixed(2)} {c.unidad ?? ''}</div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    );
-                                  }
+                                      const refId = Number(it?.orden_id ?? it?.orden_produccion_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId ?? null);
+                                      let compsFromOrder: any[] = [];
+                                      if (Number.isFinite(refId) && refId > 0) {
+                                        const od = ordenDetailsMap[refId];
+                                        const ordObj = od?.orden ?? od ?? {};
+                                        const compList = Array.isArray(od?.componentes) ? od.componentes : (Array.isArray(ordObj?.componentes) ? ordObj.componentes : []);
+                                        if (Array.isArray(compList) && compList.length > 0) {
+                                          compsFromOrder = compList.map((c: any) => {
+                                            const cantidadPorUnidad = Number(c?.cantidad_por_unidad ?? c?.cantidad ?? 0) || 0;
+                                            const cantidadTotal = Number(c?.cantidad_total ?? (cantidadPorUnidad * Number(ordObj?.cantidad ?? 0))) || 0;
+                                            return {
+                                              id: Number(c?.materia_prima_id ?? c?.id ?? 0) || null,
+                                              nombre: c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null,
+                                              unidad: c?.unidad ?? c?.u ?? '',
+                                              cantidad: cantidadTotal,
+                                            };
+                                          });
+                                        }
+                                      }
 
-                                  // No hay componentes disponibles: mostrar botón para producir
-                                  return (
-                                    <div className="mt-2 flex items-center gap-2">
-                                      <Button size="sm" variant="outline" onClick={() => openProduceModalForLine(it)}>Producir</Button>
-                                      {/* Botón eliminar línea (solo si no tiene orden de producción asociada) */}
-                                      {(() => {
-                                        const hasOrder = Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId);
-                                        const createdFlag = (it?.produccion_creada === true);
-                                        const canDelete = !hasOrder && !createdFlag;
+                                      const combined = [...(compsFromLine || []), ...(compsFromOrder || [])];
+                                      if (combined.length > 0) {
                                         return (
-                                          <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteUnits('1'); setDeleteModalOpen(true); }}
-                                            disabled={!canDelete}
-                                            title={canDelete ? 'Eliminar línea' : 'No se puede eliminar: orden de producción asociada'}
-                                          >Eliminar</Button>
+                                          <div className="mt-1 space-y-1 text-xs">
+                                            {combined.map((c: any) => {
+                                              const cid = Number(c?.id ?? c?.materia_prima_id ?? 0) || 0;
+                                              const fallbackName = c?.materia_prima_nombre ?? c?.materia_nombre ?? c?.nombre ?? null;
+                                              const resolvedName = (cid && materiasCostMap && (materiasCostMap[cid]?.nombre)) ? materiasCostMap[cid].nombre : (fallbackName ?? null);
+                                              const displayName = resolvedName ?? `ID ${cid || ''}`;
+                                              return (
+                                                <div key={String(cid || displayName)} className="flex justify-between gap-2">
+                                                  <div className="break-words">{displayName}</div>
+                                                  <div className="shrink-0 text-right">{Number(c.cantidad || 0).toFixed(2)} {c.unidad ?? ''}</div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
                                         );
-                                      })()}
-                                    </div>
-                                  );
-                                })()}
+                                      }
+
+                                      // No hay componentes disponibles: mostrar botones de producción y eliminación
+                                      return (
+                                        <div className="mt-2 flex items-center gap-2">
+                                          <Button size="sm" variant="outline" onClick={() => openProduceModalForLine(it)}>Producir</Button>
+                                          {(() => {
+                                            const hasOrder = Boolean(it?.orden_produccion_id ?? it?.orden_id ?? it?.ordenes_produccion_id ?? it?.produccion_id ?? it?.produccionId);
+                                            const createdFlag = (it?.produccion_creada === true);
+                                            const canDelete = !hasOrder && !createdFlag;
+                                            return (
+                                              <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteUnits('1'); setDeleteModalOpen(true); }}
+                                                disabled={!canDelete}
+                                                title={canDelete ? 'Eliminar línea' : 'No se puede eliminar: orden de producción asociada'}
+                                              >Eliminar</Button>
+                                            );
+                                          })()}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
                               </div>
                             </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
-                            <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground md:table-cell">{fmtDinero(it.costo)}</td>
-                            <td className="px-3 py-2 text-center tabular-nums">{it.cantidad}</td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
-                            <td className="hidden py-2 pl-3 text-center md:table-cell">
+                            <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
+                            <td className="px-3 py-3 text-center tabular-nums">{it.cantidad}</td>
+                            <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
+                            <td className="px-3 py-3 text-center">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (
@@ -2692,7 +2736,7 @@ export default function Pedidos() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-white border rounded p-4 shadow-sm">
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                         <h3 className="text-base font-semibold">Descuentos y recargos</h3>
                         {ajustesDirty && (
@@ -2787,8 +2831,8 @@ export default function Pedidos() {
                     </div>
 
                     <div className="flex justify-end">
-                      <div className="text-right space-y-1">
-                        <div className="text-sm text-muted-foreground">Subtotal</div>
+                      <div className="w-full max-w-sm rounded-xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/70 p-4 text-right shadow-sm space-y-1.5">
+                        <div className="text-sm text-gray-500">Subtotal</div>
                         <div className="text-sm font-medium">${persistedTotals.base.toFixed(2)}</div>
                         {cuponDetalle && (
                           <div className="text-sm text-amber-700">
@@ -2806,7 +2850,8 @@ export default function Pedidos() {
                         {persistedTotals.recargos > 0 && (
                           <div className="text-sm text-rose-600">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
                         )}
-                        <div className="text-lg font-semibold">Total final: ${persistedTotals.final.toFixed(2)}</div>
+                        <div className="mt-2 border-t border-rose-100 pt-2 text-sm font-semibold uppercase tracking-wide text-gray-600">Total final</div>
+                        <div className="text-2xl font-bold tracking-tight text-rose-700">${persistedTotals.final.toFixed(2)}</div>
                         {tasaActual ? (
                           <div className="text-sm text-muted-foreground">
                             Convertido: <strong>{tasaSimbolo} {roundMoney(persistedTotals.final * tasaActual).toFixed(2)}</strong>
@@ -3287,7 +3332,7 @@ export default function Pedidos() {
               </div>
             )}
 
-            <DialogFooter className="p-4 bg-white border-t shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-2">
+            <DialogFooter className="p-4 bg-white border-t border-gray-200 shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-2 shadow-[0_-6px_20px_rgba(15,23,42,0.04)]">
               {/* Resumen por tamaño, a la vista justo antes de completar (sirve para revisar el paquete) */}
               <ResumenTamanos lineas={selectedPedido?.productos} conTotal className="w-full" />
               <div className="w-full flex flex-col md:flex-row tabletv:flex-wrap items-stretch md:items-center justify-between gap-2">
