@@ -2520,7 +2520,7 @@ export default function Pedidos() {
                 </div>
               )}
               {selectedPedido && !cuponDetalle && !selectedPedido.cupon_codigo && (
-                <div className="flex w-fit max-w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 sm:flex-row sm:items-start lg:justify-self-end">
+                <div className="flex w-full max-w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 sm:w-fit sm:flex-row sm:items-start lg:justify-self-end">
                   <div className="w-full min-w-0 sm:w-[220px]">
                     <label htmlFor="cupon-admin-pedido" className="mb-0.5 block text-[11px] font-semibold text-amber-900">Código promocional</label>
                     <input
@@ -2600,14 +2600,7 @@ export default function Pedidos() {
                     </div>
                   </div>
                   <div className="overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-                    <table className="w-full min-w-[680px] table-fixed text-sm">
-                      <colgroup>
-                        <col />
-                        <col className="w-[105px]" />
-                        <col className="w-[72px]" />
-                        <col className="w-[112px]" />
-                        <col className="w-[112px]" />
-                      </colgroup>
+                    <table className="w-full table-auto text-sm">
                       <thead className="bg-gray-50/80">
                         <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                           <th className="px-4 py-3">Producto</th>
@@ -2615,7 +2608,7 @@ export default function Pedidos() {
                           <th className="px-3 py-3 text-right" title="Precio">Precio</th>
                           <th className="px-3 py-3 text-center" title="Cantidad">Cant.</th>
                           <th className="px-3 py-3 text-right" title="Subtotal">Subtotal</th>
-                          <th className="px-3 py-3 text-center" title="Producción">Producción</th>
+                          <th className="hidden px-3 py-3 text-center md:table-cell" title="Producción">Producción</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2623,7 +2616,7 @@ export default function Pedidos() {
                           <tr key={it.id} className="border-t border-gray-100 transition-colors hover:bg-rose-50/30">
                             <td className="px-4 py-3 align-middle">
                               <div className="flex min-w-0 items-center gap-3">
-                                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
+                                <div className="hidden h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200 md:block">
                                   <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="h-full w-full object-cover" onError={(e) => {
                                   const t = e.currentTarget as HTMLImageElement;
                                   t.onerror = null;
@@ -2722,7 +2715,7 @@ export default function Pedidos() {
                             <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
                             <td className="px-3 py-3 text-center tabular-nums">{it.cantidad}</td>
                             <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
-                            <td className="px-3 py-3 text-center">
+                            <td className="hidden px-3 py-3 text-center md:table-cell">
                               {it.produccion_creada ? (
                                 <Badge variant="default" className="bg-green-500">Creada</Badge>
                               ) : (
