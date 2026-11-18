@@ -16,6 +16,7 @@ import {
   getVentasPorPresentacion,
   getReporteEntregas,
 } from '@/integrations/api';
+import type { ReporteResumen } from '@/integrations/api';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
@@ -66,6 +67,11 @@ const REPORT_OPTIONS: { slug: ReportSlug; title: string; description: string }[]
 
 // Reportes calculados en esta pantalla que excluyen las regalías (avisan cuántas hubo)
 const REPORTES_CON_REGALIAS = new Set<ReportSlug>(['ventas-periodo', 'productos-favoritos', 'ticket-promedio', 'compras']);
+const REPORTES_RESUMEN = new Set<ReportSlug>(['ventas-periodo', 'productos-favoritos', 'pedidos-estado', 'compras', 'ticket-promedio']);
+
+function esReporteResumen(reporte: ReportSlug): reporte is ReporteResumen {
+  return REPORTES_RESUMEN.has(reporte);
+}
 
 const COMPLETED_STATES = new Set(['completado', 'completa', 'completada', 'finalizado', 'finalizada', 'entregado', 'pagado', 'terminado']);
 
@@ -261,6 +267,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
 
   const [loadingInfo, setLoadingInfo] = useState({ active: true, progress: 0, message: 'Preparando reporte...', etaSeconds: 0 });
   const [pedidos, setPedidos] = useState<any[]>([]);
+  const [pedidosError, setPedidosError] = useState('');
   const [pedidosTodos, setPedidosTodos] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [formulasAll, setFormulasAll] = useState<any[]>([]);
@@ -435,7 +442,9 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
         if (cancelled) return;
         try {
           if (key === 'pedidos') {
-            const res = await getPedidosResumenReportes(fechaInicio || undefined, fechaFin || undefined);
+            if (!esReporteResumen(selectedReport)) throw new Error('Reporte de pedidos inválido.');
+            setPedidosError('');
+            const res = await getPedidosResumenReportes(selectedReport, fechaInicio || undefined, fechaFin || undefined);
             if (cancelled) return;
             setPedidos(Array.isArray(res) ? res : (res?.data || []));
           }
@@ -491,7 +500,10 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
           }
         } catch (error) {
           if (cancelled) return;
-          if (key === 'pedidos') setPedidos([]);
+          if (key === 'pedidos') {
+            setPedidos([]);
+            setPedidosError(error instanceof Error ? error.message : 'No se pudo cargar el reporte.');
+          }
           if (key === 'productos') setProductos([]);
           if (key === 'pedidosTodos') setPedidosTodos([]);
           if (key === 'categorias') setCategorias([]);
@@ -1890,7 +1902,9 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
           </p>
         )}
 
-        {renderReport()}
+        {esReporteResumen(selectedReport) && pedidosError
+          ? <p role="alert" className="text-sm text-destructive">{pedidosError}</p>
+          : renderReport()}
         </div>
       </div>
     </Layout>
