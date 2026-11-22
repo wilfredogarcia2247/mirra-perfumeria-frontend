@@ -349,7 +349,7 @@ export default function SetTodaOcasion() {
   );
 
   // Tarjeta de cada momento: foto grande ("Huele a" si existe; si no, el frasco o la foto de siempre),
-  // el número y el momento encima, "Cambiar" en la esquina. Día claro, toda ocasión crema, noche oscura.
+  // el número y el momento encima, "Cambiar" en la esquina (pastilla clara, igual que la etiqueta). Día claro, toda ocasión crema, noche oscura.
   const tarjeta = (m: (typeof MOMENTOS_SET)[number]) => {
     const el = elecciones[m.v]!;
     const i = MOMENTOS_SET.indexOf(m);
@@ -380,9 +380,9 @@ export default function SetTodaOcasion() {
             <button
               type="button"
               onClick={() => cambiarUno(m.v)}
-              className="group/c absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-full bg-[#221d1a]/75 px-3 py-[7px] text-[11.5px] font-semibold text-white backdrop-blur-sm transition hover:bg-[#221d1a]"
+              className="group/c absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-[#fffdf9]/95 py-[5px] pl-2.5 pr-3 text-[11px] font-medium tracking-[0.04em] text-mirra-tinta transition hover:bg-white"
             >
-              <RotateCw className="h-3.5 w-3.5 transition-transform duration-500 group-hover/c:rotate-180" /> Cambiar
+              <RotateCw className="h-3.5 w-3.5 text-[#a8874a] transition-transform duration-500 group-hover/c:rotate-180" strokeWidth={1.8} /> Cambiar
             </button>
           )}
         </div>
