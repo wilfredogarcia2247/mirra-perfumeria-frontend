@@ -1,61 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Product } from '@/lib/types';
-import { getImageUrl, getPrecioMostrar } from '@/lib/utils';
+import { getImageUrl } from '@/lib/utils';
 import { getCachedTasaActiva } from '@/integrations/api';
 import { useCart } from '@/hooks/use-cart';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito } from '@/lib/catalog';
-import SoldOutOverlay from '@/components/SoldOutOverlay';
-import FotoProducto from '@/components/FotoProducto';
-import { nombreTienda } from '@/lib/fichaTienda';
+import CatalogProductCard from '@/components/CatalogProductCard';
 
 type Tasa = { monto?: number | string; simbolo?: string } | null;
 
-function brandOf(product: Product) {
-  const brand = String(product.brand || '').trim();
-  return brand && brand.toLowerCase() !== 'marca' ? brand : '';
-}
-
-function presentationsOf(product: Product): string[] {
-  const formulas = (product as { formulas?: unknown }).formulas;
-  const list: unknown[] = Array.isArray(product.tamanos) && product.tamanos.length > 0
-    ? product.tamanos
-    : (Array.isArray(formulas) ? formulas : []);
-  const labels = list
-    .map((t) => presentationLabel(String((t as { nombre?: unknown })?.nombre ?? '')))
-    .filter(Boolean);
-  // De menor a mayor: "7 ml · 30 ml · 50 ml · 100 ml"
-  const sizeOf = (label: string) => {
-    const n = parseFloat(label.replace(',', '.'));
-    return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-  };
-  return Array.from(new Set(labels)).sort((a, b) => sizeOf(a) - sizeOf(b));
-}
-
-// Los nombres de presentación repiten el nombre del producto
-// ("31. BATH AND BODY WORKS ... Presentación 30ml"): se muestra solo el tamaño ("30 ml").
-function presentationLabel(name: string) {
-  const text = name.trim();
-  const size = /(\d+(?:[.,]\d+)?)\s*(ml|oz|g|gr|l)\b/i.exec(text);
-  if (size) return `${size[1]} ${size[2].toLowerCase()}`;
-  const afterWord = /presentaci[oó]n\s+(.+)$/i.exec(text);
-  return (afterWord ? afterWord[1] : text).trim();
-}
-
-function formatPrice(product: Product, tasa: Tasa) {
-  const { precio } = getPrecioMostrar(product);
-  if (precio == null || Number(precio) <= 0) return null;
-  const rate = Number(tasa?.monto);
-  const amount = Number.isFinite(rate) && rate > 0 ? Number(precio) * rate : Number(precio);
-  const symbol = Number.isFinite(rate) && rate > 0 ? (tasa?.simbolo || 'VES') : '$';
-  return `${symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 // Fila deslizable (con el dedo en celular, con flechas en computadora)
-function Rail({ children, dark = false, itemClassName }: { children: React.ReactNode[]; dark?: boolean; itemClassName: string }) {
+function Rail({ children, dark = false, itemClassName, puntos = false }: { children: React.ReactNode[]; dark?: boolean; itemClassName: string; puntos?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [actual, setActual] = useState(0);
+  // Qué tarjeta va primero (para los puntos del teléfono)
+  const alDeslizar = () => {
+    const el = ref.current;
+    const primera = el?.firstElementChild as HTMLElement | null;
+    if (!el || !primera) return;
+    const paso = primera.offsetWidth + 12;
+    setActual(Math.min(children.length - 1, Math.round(el.scrollLeft / paso)));
+  };
   const scroll = (direction: 1 | -1) => {
     const el = ref.current;
     if (el) el.scrollBy({ left: direction * el.clientWidth * 0.9, behavior: 'smooth' });
@@ -65,11 +32,19 @@ function Rail({ children, dark = false, itemClassName }: { children: React.React
     : 'border-mirra-linea bg-white text-mirra-tinta shadow-[0_4px_14px_rgba(40,30,20,0.08)] hover:bg-mirra-fondo';
   return (
     <div className="relative">
-      <div ref={ref} className="flex snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-4 scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={ref} onScroll={puntos ? alDeslizar : undefined} className="flex snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-4 scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {children.map((child, index) => (
           <div key={index} className={`shrink-0 snap-start ${itemClassName}`}>{child}</div>
         ))}
       </div>
+      {puntos && children.length > 1 && (
+        // Teléfono: puntos que indican cuántas hay y en cuál va
+        <div className="-mt-1 mb-1 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+          {children.map((_, i) => (
+            <span key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === actual ? 'w-[18px] bg-mirra-oro' : 'w-1.5 bg-[#e2d8ca]'}`} />
+          ))}
+        </div>
+      )}
       {children.length > 1 && (
         <>
           <button type="button" aria-label="Anterior" onClick={() => scroll(-1)} className={`absolute -left-4 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border md:flex ${arrowClass}`}>
@@ -84,45 +59,8 @@ function Rail({ children, dark = false, itemClassName }: { children: React.React
   );
 }
 
-// Banda de recomendados con el estilo nuevo de la tienda (crema, negro suave y dorado de acento):
-// tarjetas blancas con borde fino y botones negros.
-type OpenFn = (product: Product, foto: HTMLImageElement | null) => void;
-
-function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa; onOpen: OpenFn }) {
-  const price = formatPrice(product, tasa);
-  // Abre la ventana con la foto grande, creciendo desde la foto de esta tarjeta
-  const open = (e: React.MouseEvent<HTMLElement>) => onOpen(product, e.currentTarget.closest('article')?.querySelector('img') ?? null);
-  const brand = brandOf(product);
-  const presentations = presentationsOf(product);
-  return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-mirra-linea bg-white">
-      <button type="button" onClick={open} className="relative block aspect-square overflow-hidden bg-mirra-crema">
-        <FotoProducto product={product} ml={30} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-        {product.agotado && <SoldOutOverlay />}
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px] font-semibold text-[#f3e9d8]">
-          <Star className="h-3 w-3 fill-current" /> Recomendado
-        </span>
-      </button>
-      <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:px-5 sm:py-4">
-        {brand && <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-mirra-oro-osc sm:text-[11px]">{brand}</p>}
-        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-normal sm:min-h-[3.25rem] sm:text-lg leading-snug text-mirra-tinta">{nombreTienda(product)}</h3>
-        {presentations.length > 0 && <p className="text-[11px] text-mirra-suave sm:text-xs">{presentations.join(' · ')}</p>}
-        <div className="mt-auto pt-1.5 sm:pt-2">
-          {price ? (
-            <>
-              <p className="text-[10px] uppercase tracking-wider text-mirra-suave sm:text-[11px]">Desde</p>
-              <p className="whitespace-nowrap text-lg font-bold leading-tight text-mirra-tinta sm:text-xl">{price}</p>
-            </>
-          ) : <p className="text-sm text-mirra-suave">Consultar precio</p>}
-          <button type="button" onClick={open} className={`mt-2.5 w-full rounded-[10px] px-3 py-2 text-[13px] font-semibold sm:mt-3 sm:px-4 sm:py-2.5 sm:text-sm transition ${product.agotado ? 'bg-mirra-crema text-mirra-suave' : 'bg-mirra-tinta text-white hover:bg-black'}`}>
-            {product.agotado ? 'Agotado por el momento' : 'Ver presentaciones'}
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
+// Banda de recomendados: las tarjetas son las mismas de la lista de perfumes (estilo nuevo, maqueta aprobada
+// maquetas/estilo-nuevo/recomendaciones.html) con la etiqueta "★ Recomendado"; toda la tarjeta abre la ficha.
 interface FeaturedShowcaseProps {
   products: Product[];
   // Agregar desde la ventana (la tienda anima la foto hacia el carrito y actualiza el contador)
@@ -170,8 +108,10 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
               Ver todos los perfumes
             </a>
           </div>
-          <div className="min-w-0 lg:order-1"><Rail itemClassName="w-[62%] sm:w-[46%] lg:w-[calc(33.333%-11px)]">
-            {featured.map((product) => <FeaturedCard key={product.id} product={product} tasa={tasa} onOpen={(p, foto) => setSelected({ product: p, foto })} />)}
+          <div className="min-w-0 lg:order-1"><Rail puntos itemClassName="w-[44%] sm:w-[31%] lg:w-[calc(33.333%-11px)]">
+            {featured.map((product, i) => (
+              <CatalogProductCard key={product.id} product={product} tasa={tasa} index={i} recomendado onOpen={(p, foto) => setSelected({ product: p, foto })} />
+            ))}
           </Rail></div>
           {/* En celular el botón va debajo de las tarjetas, para que los productos aparezcan antes */}
           <a href="#catalog" className="-mt-2 block rounded-[10px] border border-mirra-tinta bg-white px-5 py-3 text-center text-sm font-semibold text-mirra-tinta transition hover:bg-mirra-fondo lg:hidden">

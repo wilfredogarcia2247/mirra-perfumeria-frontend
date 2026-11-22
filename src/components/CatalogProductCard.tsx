@@ -12,11 +12,13 @@ interface Props {
   index: number;
   // Abre la ventana con la foto grande; recibe la foto de la tarjeta para animar desde ella
   onOpen: (product: Product, foto: HTMLImageElement | null) => void;
+  // En "Nuestras recomendaciones": etiqueta "★ Recomendado" en lugar de "Más pedido" / "Quedan pocos"
+  recomendado?: boolean;
 }
 
 // Tarjeta del catálogo (estilo nuevo): toda la tarjeta abre la hoja del perfume para elegir tamaño y agregar.
 // Debajo del nombre va el perfume original (ficha.inspirado_en), si la ficha lo tiene.
-export default function CatalogProductCard({ product, tasa, index, onOpen }: Props) {
+export default function CatalogProductCard({ product, tasa, index, onOpen, recomendado = false }: Props) {
   const ref = useRef<HTMLElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [visible, setVisible] = useState(false);
@@ -78,12 +80,17 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
           </button>
         )}
         {/* "Quedan pocos" tiene prioridad sobre "Más pedido" (van en el mismo lugar) */}
-        {product.quedan_pocos && !product.agotado && (
+        {recomendado && (
+          <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] font-semibold text-[#f3e9d8] sm:text-[11px]">
+            ★ Recomendado
+          </span>
+        )}
+        {!recomendado && product.quedan_pocos && !product.agotado && (
           <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-[#ead9c2] bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#8a5a2b] sm:text-[11px]">
             Quedan pocos
           </span>
         )}
-        {product.mas_pedido && !product.quedan_pocos && !product.agotado && (
+        {!recomendado && product.mas_pedido && !product.quedan_pocos && !product.agotado && (
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] font-semibold text-[#f3e9d8] sm:text-[11px]">
             🔥 Más pedido
           </span>
