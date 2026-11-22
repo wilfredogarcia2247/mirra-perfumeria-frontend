@@ -5,7 +5,8 @@ import type { ConfigDescuentoMayor } from '@/integrations/api';
 import type { CartItem } from '@/hooks/use-cart';
 import type { Product } from '@/lib/types';
 import { presentacionesDe } from '@/lib/catalog';
-import { getImageUrl } from '@/lib/utils';
+import FotoProducto from '@/components/FotoProducto';
+import { mlDeNombre, nombreTienda } from '@/lib/fichaTienda';
 import { mlDe, cuentaParaMayor, type ResultadoMayor } from '@/lib/descuentoMayor';
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
@@ -227,20 +228,10 @@ export function SugerenciasDescuentoMayor({
             className="flex w-[238px] shrink-0 snap-start items-center gap-2.5 rounded-[14px] border border-mirra-linea bg-white p-2"
           >
             <div className="h-[78px] w-[62px] shrink-0 overflow-hidden rounded-[10px] bg-mirra-crema">
-              <img
-                src={getImageUrl(s.product)}
-                alt={s.product.name}
-                loading="lazy"
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  const t = e.currentTarget;
-                  t.onerror = null;
-                  t.src = '/asset/muestra1.jpeg';
-                }}
-              />
+              <FotoProducto product={s.product} ml={mlDeNombre((s.item as any).tamano?.nombre)} loading="lazy" className="h-full w-full object-cover" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <p className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-mirra-tinta">{s.product.name}</p>
+              <p className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-mirra-tinta">{nombreTienda(s.product)}</p>
               {/* Tamaño y precio en una sola línea */}
               <p className="mt-0.5 whitespace-nowrap text-[10.5px] text-mirra-suave">
                 {s.etiqueta} · <span className="font-semibold text-mirra-tinta">{formatPrice(s.precio)}</span>

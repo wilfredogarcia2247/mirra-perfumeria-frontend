@@ -8,16 +8,10 @@ import { useCart } from '@/hooks/use-cart';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
 import { volarAlCarrito } from '@/lib/catalog';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
-
-const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
+import FotoProducto from '@/components/FotoProducto';
+import { nombreTienda } from '@/lib/fichaTienda';
 
 type Tasa = { monto?: number | string; simbolo?: string } | null;
-
-// "57. CH GOOD GIRL SUPREME" -> "CH GOOD GIRL SUPREME"
-function cleanName(name: string, hideNumber: boolean) {
-  const text = String(name || '').trim();
-  return hideNumber ? text.replace(/^\s*\d+\s*[.\-)]\s*/, '') : text;
-}
 
 function brandOf(product: Product) {
   const brand = String(product.brand || '').trim();
@@ -57,22 +51,6 @@ function formatPrice(product: Product, tasa: Tasa) {
   const amount = Number.isFinite(rate) && rate > 0 ? Number(precio) * rate : Number(precio);
   const symbol = Number.isFinite(rate) && rate > 0 ? (tasa?.simbolo || 'VES') : '$';
   return `${symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function ProductImage({ product, className }: { product: Product; className?: string }) {
-  return (
-    <img
-      src={getImageUrl(product)}
-      alt={product.name}
-      loading="lazy"
-      onError={(e) => {
-        const img = e.currentTarget as HTMLImageElement;
-        img.onerror = null;
-        img.src = FALLBACK_IMAGES[Math.floor(Math.random() * FALLBACK_IMAGES.length)];
-      }}
-      className={`h-full w-full object-cover ${className || ''}`}
-    />
-  );
 }
 
 // Fila deslizable (con el dedo en celular, con flechas en computadora)
@@ -119,7 +97,7 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-mirra-linea bg-white">
       <button type="button" onClick={open} className="relative block aspect-square overflow-hidden bg-mirra-crema">
-        <ProductImage product={product} className="transition-transform duration-700 group-hover:scale-105" />
+        <FotoProducto product={product} ml={30} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
         {product.agotado && <SoldOutOverlay />}
         <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px] font-semibold text-[#f3e9d8]">
           <Star className="h-3 w-3 fill-current" /> Recomendado
@@ -127,7 +105,7 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
       </button>
       <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:px-5 sm:py-4">
         {brand && <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-mirra-oro-osc sm:text-[11px]">{brand}</p>}
-        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-normal sm:min-h-[3.25rem] sm:text-lg leading-snug text-mirra-tinta">{cleanName(product.name, false)}</h3>
+        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-normal sm:min-h-[3.25rem] sm:text-lg leading-snug text-mirra-tinta">{nombreTienda(product)}</h3>
         {presentations.length > 0 && <p className="text-[11px] text-mirra-suave sm:text-xs">{presentations.join(' · ')}</p>}
         <div className="mt-auto pt-1.5 sm:pt-2">
           {price ? (

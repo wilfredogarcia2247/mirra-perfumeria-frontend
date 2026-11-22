@@ -4,8 +4,9 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { guardarFichaProducto } from '@/integrations/api';
 import { copiarEnlacePerfume } from '@/lib/compartir';
+import ImageUpload from '@/components/ImageUpload';
 import {
-  DURACION, FAMILIAS, FICHA_VACIA, MOMENTO, PARA, TEMPORADAS,
+  COLORES_LIQUIDO, DURACION, FAMILIAS, FICHA_VACIA, MOMENTO, PARA, TEMPORADAS,
   normalizarFicha, type FichaPerfume,
 } from '@/lib/fichaPerfume';
 
@@ -70,6 +71,7 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
     const ficha: FichaPerfume = {
       ...f,
       inspirado_en: (f.inspirado_en || '').trim() || null,
+      nombre_mirra: (f.nombre_mirra || '').trim() || null,
       casa: (f.casa || '').trim() || null,
       anio: f.anio && Number.isInteger(f.anio) ? f.anio : null,
       notas: { salida: aLista(notas.salida), corazon: aLista(notas.corazon), fondo: aLista(notas.fondo) },
@@ -129,6 +131,42 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
           <div className="space-y-1"><p className="font-medium">Familia <span className="font-normal text-muted-foreground">(puedes marcar varias)</span></p><Opciones lista={FAMILIAS} valor={f.familias} onCambio={cambiar('familias')} varias /></div>
           <div className="space-y-1"><p className="font-medium">Duración</p><Opciones lista={DURACION} valor={f.duracion} onCambio={cambiar('duracion')} /></div>
           <div className="space-y-1"><p className="font-medium">Temporada</p><Opciones lista={TEMPORADAS} valor={f.temporadas} onCambio={cambiar('temporadas')} varias /></div>
+
+          {/* Estilo nuevo de la tienda: nombre propio, color del líquido y fotos extra de la galería */}
+          <div className="space-y-3 rounded-xl border border-[#ece6de] bg-[#faf8f5] p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a6a3e]">En la tienda</p>
+            <label className="block space-y-1">
+              <span className="font-medium">Nombre Mirra</span>
+              <input id="ficha-nombre-mirra" value={f.nombre_mirra || ''} maxLength={60} onChange={(e) => cambiar('nombre_mirra')(e.target.value)} placeholder="Ej. Café de Medianoche" className="h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm" />
+              <span className="block text-xs text-muted-foreground">Se muestra con el número del perfume (230. Café de Medianoche). Pedidos, inventario y WhatsApp siguen con el nombre de siempre.</span>
+            </label>
+            <div className="space-y-1">
+              <p className="font-medium">Color del líquido</p>
+              <div className="flex flex-wrap gap-1.5">
+                {COLORES_LIQUIDO.map((c) => (
+                  <button key={c.v} type="button" aria-pressed={f.color_liquido === c.v}
+                    onClick={() => cambiar('color_liquido')(f.color_liquido === c.v ? null : c.v)}
+                    className={`flex min-h-[36px] items-center gap-2 rounded-lg border px-3 text-sm transition ${f.color_liquido === c.v ? 'border-[#1c1917] bg-white font-semibold' : 'bg-background'}`}>
+                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ background: c.c }} />{c.t}
+                  </button>
+                ))}
+              </div>
+              <span className="block text-xs text-muted-foreground">La tienda muestra el frasco Mirra con este color. Sin color, se ve la foto de siempre.</span>
+            </div>
+            {([['huele', 'Foto "Huele a"', 'El frasco con sus ingredientes'], ['inspirado', 'Foto "Inspirado en"', 'El frasco con luz y ambiente'], ['estilo', 'Foto "Estilo"', 'Una persona usándolo']] as const).map(([k, titulo, ayuda]) => (
+              <div key={k} className="space-y-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-medium">{titulo} <span className="font-normal text-muted-foreground">· {ayuda}</span></p>
+                  {f.fotos[k] && <button type="button" onClick={() => setF((p) => ({ ...p, fotos: { ...p.fotos, [k]: null } }))} className="text-xs text-muted-foreground underline">Quitar</button>}
+                </div>
+                <ImageUpload
+                  key={`${producto?.id}-${k}-${f.fotos[k] ? 'con' : 'sin'}`}
+                  existingImageUrl={f.fotos[k] || undefined}
+                  onImageUpload={(url) => setF((p) => ({ ...p, fotos: { ...p.fotos, [k]: url || null } }))}
+                />
+              </div>
+            ))}
+          </div>
 
           <label className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${f.revisada ? 'border-green-300 bg-green-50' : 'bg-muted/40'}`}>
             <span>

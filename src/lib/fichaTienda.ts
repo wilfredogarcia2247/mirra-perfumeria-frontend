@@ -101,3 +101,51 @@ export function parecidos(p: Product, catalogo: Product[], max = 4): Parecido[] 
     .slice(0, max)
     .map(({ producto, motivo }) => ({ producto, motivo }));
 }
+
+// ── Nombre, frasco de color y textos de las fotos (parte 6) ────────────────
+// "230. YVES ... BLACK OPIUM DM" + nombre Mirra "Café de Medianoche" → "230. Café de Medianoche".
+// Sin nombre Mirra (o sin ficha revisada) se muestra el nombre de siempre.
+export function nombreTienda(p: Product): string {
+  const nuevo = fichaDe(p)?.nombre_mirra;
+  if (!nuevo) return p.name;
+  const numero = /^\s*(\d+)\s*[.\-)]/.exec(p.name || '')?.[1];
+  return numero ? `${numero}. ${nuevo}` : nuevo;
+}
+
+// Tamaño en ml de una presentación ("... Presentación 50 ml" → 50)
+export const mlDeNombre = (nombre?: string | null) => {
+  const m = /(\d+(?:[.,]\d+)?)\s*ml/i.exec(String(nombre ?? ''));
+  return m ? Math.round(Number(m[1].replace(',', '.'))) : null;
+};
+
+// Foto del frasco Mirra con el color del líquido (public/frascos). null si el perfume no tiene color.
+// Si el tamaño no tiene foto propia (p. ej. todavía no hay de 100 ml), la imagen falla y quien la usa
+// cae a la foto de siempre (onError).
+export function fotoFrasco(p: Product, ml?: number | null): string | null {
+  const color = fichaDe(p)?.color_liquido;
+  if (!color) return null;
+  return `/frascos/liquido-${color}-${ml && ml > 0 ? ml : 30}.webp`;
+}
+
+// "Huele a": una nota principal de cada sección → "Pera, café y vainilla"
+export function textoHuele(p: Product): string | null {
+  const f = fichaDe(p);
+  if (!f) return null;
+  const tres = [f.notas.salida[0], f.notas.corazon[0], f.notas.fondo[0]].filter(Boolean).map((n) => n.toLowerCase());
+  if (!tres.length) return null;
+  const t = y([...new Set(tres)]);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+// Frase de la foto "Estilo": varía por perfume (siempre la misma para cada uno) según el momento
+const FRASES: Record<'dia' | 'noche' | 'ambos', [string, string][]> = {
+  noche: [['Para', 'Las noches que no se olvidan'], ['Se siente como', 'Tu mejor cita'], ['Hecho para', 'Brillar después del atardecer'], ['Deja', 'Una estela que todos recuerdan'], ['Para', 'Cuando la noche es tuya'], ['Se siente como', 'Una cena a la luz de las velas']],
+  dia: [['Se siente como', 'Un día luminoso'], ['Para', 'Empezar el día con todo'], ['Se siente como', 'Brisa fresca en la piel'], ['Para', 'Tus días de sol'], ['Hecho para', 'Acompañarte de la mañana a la tarde'], ['Se siente como', 'Una mañana frente al mar']],
+  ambos: [['Para', 'Cualquier momento del día'], ['Se siente como', 'Tu firma personal'], ['Para', 'Del trabajo a la cena'], ['Se siente como', 'Un abrazo cálido'], ['Hecho para', 'Que te pregunten qué llevas puesto']],
+};
+export function fraseEstilo(p: Product): [string, string] {
+  const lista = FRASES[fichaDe(p)?.momento ?? 'ambos'];
+  let h = 2166136261;
+  for (const c of String(p.id) + (p.name || '')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return lista[((h >>> 0) >>> 8) % lista.length];
+}

@@ -8,7 +8,8 @@ import AvisameForm from '@/components/AvisameForm';
 import PildorasTamano from '@/components/PildorasTamano';
 import { useBloquearScroll } from "@/hooks/useBloquearScroll";
 import { compartirPerfume } from '@/lib/compartir';
-import { fichaDe, franja, idealPara, intensidad, paraTexto, parecidos } from '@/lib/fichaTienda';
+import { fichaDe, franja, fraseEstilo, idealPara, intensidad, mlDeNombre, nombreTienda, paraTexto, parecidos, textoHuele } from '@/lib/fichaTienda';
+import FotoProducto from '@/components/FotoProducto';
 
 const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
 const DURACION = 350;
@@ -26,9 +27,10 @@ interface Props {
   onAbrir?: (product: Product) => void;
 }
 
-// Fotos de la galería. Hoy cada perfume tiene una; en la parte 6 se suman "Huele a", "Inspirado en"
-// y la foto con persona, y la galería las muestra sola (puntos, etiquetas y flechas).
-type Foto = { src: string; etiqueta: string };
+// Fotos de la galería: el frasco (con el color del líquido, si la ficha lo tiene) y, si se cargaron en
+// la ficha, "Huele a", "Inspirado en" y "Estilo", cada una con su texto encima.
+type Texto = { chico: string; grande: string; lugar: 'arriba' | 'abajo' };
+type Foto = { etiqueta: string; src?: string; texto?: Texto };
 
 // Hoja del perfume (estilo nuevo, maquetas/tienda-nueva.html).
 // - Teléfono y tablet: ventana que sube desde abajo, la foto arriba y los datos debajo.
@@ -38,6 +40,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
   const presentaciones = presentacionesDe(product);
   // Empieza en el tamaño disponible más barato (los agotados se ven apagados)
   const [elegida, setElegida] = useState(() => Math.max(0, presentaciones.findIndex((p) => !p.agotada)));
+  const actual = presentaciones[elegida];
   const ficha = fichaDe(product);
   const [abierta, setAbierta] = useState(false);
   const [fotoLista, setFotoLista] = useState(!origen);
@@ -48,7 +51,15 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
   const arrastre = useRef<{ y: number; dy: number } | null>(null);
   const cerrando = useRef(false);
   const src = origen?.currentSrc || getImageUrl(product);
-  const fotos: Foto[] = [{ src, etiqueta: 'Frasco' }];
+  const extras = ficha?.fotos;
+  const huele = textoHuele(product);
+  const [fraseChica, fraseGrande] = fraseEstilo(product);
+  const fotos: Foto[] = [
+    { etiqueta: 'Frasco' },
+    ...(extras?.huele ? [{ etiqueta: 'Huele a', src: extras.huele, texto: huele ? { chico: 'Huele a', grande: huele, lugar: 'arriba' as const } : undefined }] : []),
+    ...(extras?.inspirado ? [{ etiqueta: 'Inspirado en', src: extras.inspirado, texto: ficha?.inspirado_en ? { chico: 'Inspirado en', grande: ficha.inspirado_en, lugar: 'abajo' as const } : undefined }] : []),
+    ...(extras?.estilo ? [{ etiqueta: 'Estilo', src: extras.estilo, texto: { chico: fraseChica, grande: fraseGrande, lugar: 'abajo' as const } }] : []),
+  ];
   // PC (≥1024 px): ventana de dos columnas. Se decide al abrir; solo se dibuja una galería.
   const [esPC] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
 
@@ -109,7 +120,6 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const actual = presentaciones[elegida];
   const precio = actual ? formatPrecio(actual.precio, tasa) : null;
   const puedeAgregar = !product.agotado && Boolean(actual) && !actual.agotada && actual.precio != null;
 
@@ -171,7 +181,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
         {/* Columna de la foto (en teléfono va arriba, dentro del scroll) */}
         {esPC && (
           <div className="relative flex min-h-0 bg-mirra-crema p-5">
-            <Galeria fotos={fotos} nombre={product.name} pc heroRef={heroRef} imgRef={heroImgRef} fotoLista={fotoLista} agotado={product.agotado} productId={product.id} />
+            <Galeria fotos={fotos} product={product} ml={mlDeNombre(actual?.tamano?.nombre)} nombre={product.name} pc heroRef={heroRef} imgRef={heroImgRef} fotoLista={fotoLista} agotado={product.agotado} productId={product.id} />
           </div>
         )}
 
@@ -179,7 +189,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
           <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
             {!esPC && (
               <div className="relative">
-                <Galeria fotos={fotos} nombre={product.name} heroRef={heroRef} imgRef={heroImgRef} fotoLista={fotoLista} agotado={product.agotado} productId={product.id} />
+                <Galeria fotos={fotos} product={product} ml={mlDeNombre(actual?.tamano?.nombre)} nombre={product.name} heroRef={heroRef} imgRef={heroImgRef} fotoLista={fotoLista} agotado={product.agotado} productId={product.id} />
                 <span className="absolute left-1/2 top-2 z-10 h-[5px] w-11 -translate-x-1/2 rounded-full bg-white/85 shadow sm:hidden" />
               </div>
             )}
@@ -205,7 +215,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
                   <Share2 className="h-3.5 w-3.5" /> Compartir
                 </button>
               </div>
-              <h2 className="mt-2 font-bell-mt text-[23px] font-normal leading-tight text-mirra-tinta lg:text-[30px]">{product.name}</h2>
+              <h2 className="mt-2 font-bell-mt text-[23px] font-normal leading-tight text-mirra-tinta lg:text-[30px]">{nombreTienda(product)}</h2>
               {ficha?.inspirado_en && <p className="mt-1 text-[12.5px] text-mirra-suave lg:text-sm">Inspirado en {ficha.inspirado_en}</p>}
 
               {partesFranja.length > 0 && (
@@ -261,10 +271,9 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
                     {sugeridos.map(({ producto, motivo }) => (
                       <button key={producto.id} type="button" onClick={() => onAbrir(producto)} className="flex w-[124px] shrink-0 snap-start flex-col justify-start text-left">
                         <span className="block aspect-square overflow-hidden rounded-xl bg-mirra-crema">
-                          <img src={getImageUrl(producto)} alt="" loading="lazy" className="h-full w-full object-cover"
-                            onError={(e) => { const img = e.currentTarget; img.onerror = null; img.src = FALLBACK_IMAGES[Number(producto.id) % FALLBACK_IMAGES.length]; }} />
+                          <FotoProducto product={producto} ml={30} alt="" loading="lazy" className="h-full w-full object-cover" />
                         </span>
-                        <span className="mt-1.5 block line-clamp-2 text-[11.5px] font-semibold leading-tight text-mirra-tinta">{producto.name}</span>
+                        <span className="mt-1.5 block line-clamp-2 text-[11.5px] font-semibold leading-tight text-mirra-tinta">{nombreTienda(producto)}</span>
                         {motivo && <span className="mt-0.5 block text-[10.5px] leading-snug text-mirra-suave">{motivo}</span>}
                       </button>
                     ))}
@@ -382,8 +391,8 @@ function FilaNotas({ titulo, notas }: { titulo: string; notas: string[] }) {
 // - PC: miniaturas a la izquierda; sobre la foto el cursor es un círculo gris con flecha
 //   (mitad izquierda ←, derecha →); también flechas del teclado y clic en las etiquetas.
 // Con una sola foto se ve solo la foto.
-function Galeria({ fotos, nombre, pc = false, heroRef, imgRef, fotoLista, agotado, productId }: {
-  fotos: Foto[]; nombre: string; pc?: boolean;
+function Galeria({ fotos, product, ml, nombre, pc = false, heroRef, imgRef, fotoLista, agotado, productId }: {
+  fotos: Foto[]; product: Product; ml: number | null; nombre: string; pc?: boolean;
   heroRef: React.RefObject<HTMLDivElement>; imgRef: React.RefObject<HTMLImageElement>;
   fotoLista: boolean; agotado?: boolean; productId: Product['id'];
 }) {
@@ -403,16 +412,33 @@ function Galeria({ fotos, nombre, pc = false, heroRef, imgRef, fotoLista, agotad
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const img = (f: Foto, i: number) => (
-    <img
-      ref={i === 0 ? imgRef : undefined}
-      src={f.src}
-      alt={i === 0 ? nombre : ''}
+  const img = (f: Foto, i: number) => (i === 0 ? (
+    <FotoProducto
+      ref={imgRef}
+      product={product}
+      ml={ml}
+      alt={nombre}
       draggable={false}
-      onError={(e) => { const el = e.currentTarget; el.onerror = null; el.src = FALLBACK_IMAGES[Number(productId) % FALLBACK_IMAGES.length]; }}
-      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-150 ${i > 0 || fotoLista ? 'opacity-100' : 'opacity-0'}`}
+      className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-150 ${fotoLista ? 'opacity-100' : 'opacity-0'}`}
     />
-  );
+  ) : (
+    <>
+      <img
+        src={f.src}
+        alt=""
+        draggable={false}
+        onError={(e) => { const el = e.currentTarget; el.onerror = null; el.src = FALLBACK_IMAGES[Number(productId) % FALLBACK_IMAGES.length]; }}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {f.texto && (
+        // Texto encima de la foto, sobre un degradado para que se lea en fotos claras u oscuras
+        <span className={`pointer-events-none absolute inset-x-0 px-[8%] text-center ${f.texto.lugar === 'arriba' ? 'top-0 bg-gradient-to-b from-white/85 to-transparent pb-10 pt-[7%] text-mirra-tinta' : 'bottom-0 bg-gradient-to-t from-black/70 to-transparent pb-[16%] pt-16 text-white'}`}>
+          <small className={`block text-[10px] font-semibold uppercase tracking-[0.26em] ${f.texto.lugar === 'arriba' ? 'text-mirra-oro' : 'text-[#e9d3ae]'}`}>{f.texto.chico}</small>
+          <span className={`mt-0.5 block font-bell-mt leading-tight ${pc ? 'text-[28px]' : 'text-[22px]'}`}>{f.texto.grande}</span>
+        </span>
+      )}
+    </>
+  ));
   const marcas = varias && (
     <>
       <div className={`pointer-events-none absolute inset-x-0 flex justify-center gap-1.5 ${pc ? 'bottom-11' : 'bottom-8'} z-10`}>
@@ -450,7 +476,7 @@ function Galeria({ fotos, nombre, pc = false, heroRef, imgRef, fotoLista, agotad
           {fotos.map((f, i) => (
             <button key={f.etiqueta} type="button" onClick={() => ir(i)} onMouseEnter={() => ir(i)}
               className={`aspect-[4/5] w-[70px] overflow-hidden rounded-[10px] bg-white outline outline-2 outline-offset-2 ${i === actual ? 'outline-mirra-tinta' : 'outline-transparent'}`}>
-              <img src={f.src} alt="" className="h-full w-full object-cover" />
+              {i === 0 ? <FotoProducto product={product} ml={ml} alt="" className="h-full w-full object-cover" /> : <img src={f.src} alt="" className="h-full w-full object-cover" />}
             </button>
           ))}
         </div>

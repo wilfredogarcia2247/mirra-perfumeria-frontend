@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
+import FotoProducto from '@/components/FotoProducto';
+import { mlDeNombre, nombreTienda } from '@/lib/fichaTienda';
 import { volarAlCarrito, bajarAlCatalogo, presentationLabel } from '@/lib/catalog';
 import { agruparPorSet, etiquetasParaEnviar, NOMBRE_SET } from '@/lib/setsPedido';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
@@ -250,7 +252,7 @@ export default function Hero() {
     const filtered = palabras.length
       ? catalogProducts.filter((product) => {
         const texto = sinAcentos([
-          product.name, product.brand, product.description, product.category,
+          product.name, product.ficha?.nombre_mirra, product.brand, product.description, product.category,
           (product.categories || []).join(' '), product.ficha?.inspirado_en, product.ficha?.casa,
         ].filter(Boolean).join(' '));
         return palabras.every((p) => texto.includes(p));
@@ -910,19 +912,10 @@ export default function Hero() {
                         <div key={it.key} className="group relative flex gap-4 bg-white p-3 rounded-xl border border-mirra-linea shadow-sm hover:shadow-md transition-shadow">
                           {/* Product Image */}
                           <div className="relative w-20 h-20 bg-mirra-fondo rounded-lg overflow-hidden shrink-0 border border-mirra-linea">
-                            <img
-                              src={getImageUrl(it.product)}
-                              alt={it.product.name}
-                              className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
-                              onError={(e) => {
-                                const t = e.currentTarget as HTMLImageElement;
-                                t.onerror = null;
-                                // Usar una imagen aleatoria del asset folder como fallback
-                                const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
-                                const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                                t.src = randomFallback;
-                                console.error('[Hero Cart] image load failed, using fallback:', t.src);
-                              }}
+                            <FotoProducto
+                              product={it.product}
+                              ml={mlDeNombre((it.product as any)?.tamano?.nombre)}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                           </div>
 
@@ -937,7 +930,7 @@ export default function Hero() {
                                   </p>
                                 )}
                                 <h3 className="text-sm font-semibold text-mirra-tinta line-clamp-2 leading-tight">
-                                  {it.product.name}
+                                  {nombreTienda(it.product)}
                                 </h3>
                                 </div>
                                 <button

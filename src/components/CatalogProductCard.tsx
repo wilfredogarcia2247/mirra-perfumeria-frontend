@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Product } from '@/lib/types';
-import { getImageUrl, getPrecioMostrar } from '@/lib/utils';
+import { getPrecioMostrar } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, Tasa } from '@/lib/catalog';
 import SoldOutOverlay from '@/components/SoldOutOverlay';
-
-const FALLBACK_IMAGES = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
+import FotoProducto from '@/components/FotoProducto';
+import { fichaDe, nombreTienda, textoHuele } from '@/lib/fichaTienda';
 
 interface Props {
   product: Product;
@@ -41,6 +41,10 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
   const precio = formatPrecio(getPrecioMostrar(product).precio, tasa);
   const open = () => onOpen(product, imgRef.current);
   const inspirado = product.ficha?.inspirado_en?.trim();
+  // Foto "Huele a" (frasco con sus ingredientes): botón en teléfono, al pasar el ratón en PC
+  const fotoHuele = fichaDe(product)?.fotos.huele || null;
+  const huele = textoHuele(product);
+  const [verHuele, setVerHuele] = useState(false);
 
   return (
     <article
@@ -50,19 +54,29 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
     >
       <div className="group relative aspect-square overflow-hidden bg-mirra-crema">
         <button type="button" onClick={open} className="block h-full w-full" aria-label={`Ver ${product.name}`}>
-          <img
-            ref={imgRef}
-            src={getImageUrl(product)}
-            alt={product.name}
-            loading="lazy"
-            onError={(e) => {
-              const img = e.currentTarget as HTMLImageElement;
-              img.onerror = null;
-              img.src = FALLBACK_IMAGES[Number(product.id) % FALLBACK_IMAGES.length];
-            }}
-            className="h-full w-full object-cover"
-          />
+          <FotoProducto ref={imgRef} product={product} ml={30} loading="lazy" className="h-full w-full object-cover" />
         </button>
+        {fotoHuele && (
+          // Encima de la foto: se ve con el botón (teléfono) o al pasar el ratón (PC)
+          <span className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${verHuele ? 'opacity-100' : 'opacity-0 [@media(hover:hover)]:group-hover:opacity-100'}`}>
+            <img src={fotoHuele} alt="" loading="lazy" className="h-full w-full object-cover" />
+            {huele && (
+              <span className="absolute inset-x-0 top-0 bg-gradient-to-b from-white/85 to-transparent px-3 pb-5 pt-2.5 text-center">
+                <small className="block text-[8px] font-semibold uppercase tracking-[0.26em] text-mirra-oro sm:text-[9.5px]">Huele a</small>
+                <span className="block font-bell-mt text-[12.5px] leading-tight text-mirra-tinta sm:text-base">{huele}</span>
+              </span>
+            )}
+          </span>
+        )}
+        {fotoHuele && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setVerHuele((v) => !v); }}
+            className="absolute bottom-2 left-2 z-[2] rounded-full bg-white/95 px-2.5 py-1 text-[10.5px] font-semibold text-mirra-tinta shadow-[0_2px_6px_rgba(0,0,0,0.12)] [@media(hover:hover)]:hidden"
+          >
+            ↻ {verHuele ? 'Frasco' : 'Huele a'}
+          </button>
+        )}
         {/* "Quedan pocos" tiene prioridad sobre "Más pedido" (van en el mismo lugar) */}
         {product.quedan_pocos && !product.agotado && (
           <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-[#ead9c2] bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#8a5a2b] sm:text-[11px]">
@@ -91,7 +105,7 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
           <span className="self-start rounded-full bg-[#f6efe5] px-2 py-0.5 text-[10px] font-semibold text-mirra-oro-osc sm:text-xs">{product.category}</span>
         )}
         <h3 className="mt-1.5 line-clamp-2 font-bell-mt text-[14px] font-normal leading-[1.3] text-mirra-tinta sm:text-[17px]">
-          {product.name}
+          {nombreTienda(product)}
         </h3>
         {inspirado && (
           <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.35] text-mirra-suave sm:text-xs">Inspirado en {inspirado}</p>
