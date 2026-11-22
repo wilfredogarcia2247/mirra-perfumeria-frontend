@@ -459,6 +459,10 @@ export default function SetTodaOcasion() {
             <div className={`mt-5 grid gap-[18px] ${esPC ? 'mt-6 grid-cols-3 gap-[22px]' : ''}`}>
               {puestos.map(tarjeta)}
             </div>
+            {!esPC && cambiarTodos && (
+              // Teléfono: otro "Cambiar los tres" al final (igual al de arriba), para no tener que subir
+              <div className="mt-5 flex justify-center">{cambiarTodos}</div>
+            )}
             {esPC && lineas.length > 0 && (
               // PC: total del set en una tarjeta debajo de las tres
               <div className="mx-auto mt-8 flex max-w-[1100px] flex-wrap items-center gap-6 rounded-[18px] border border-mirra-linea bg-[#fffdf9] px-6 py-[18px]">
