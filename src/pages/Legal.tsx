@@ -278,6 +278,8 @@ function PaginaLegal({ titulo, bajada, secciones, otra }: {
   }, [titulo]);
 
   const indice = secciones.filter((s) => s.enIndice);
+  // Sin índice (Política de privacidad): título y texto en una sola columna centrada
+  const conIndice = indice.length > 0;
   const margenSalto = { scrollMarginTop: `${(altoMenu ?? 80) + 12}px` };
 
   return (
@@ -286,14 +288,14 @@ function PaginaLegal({ titulo, bajada, secciones, otra }: {
 
       {/* Portada crema con línea fina abajo */}
       <div className="border-b border-mirra-linea px-4 pb-6 lg:px-10 lg:pb-9" style={{ paddingTop: altoMenu != null ? `${altoMenu + 30}px` : '8rem' }}>
-        <div className="mx-auto max-w-[1100px]">
+        <div className={`mx-auto ${conIndice ? "max-w-[1100px]" : "max-w-[720px]"}`}>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-mirra-oro">Mirra Perfumería</p>
           <h1 className="mt-2 font-bell-mt text-[34px] font-normal leading-tight text-mirra-tinta lg:text-[52px]">{titulo}</h1>
           <p className="mt-2 text-[14px] text-mirra-suave lg:text-[15.5px]">{bajada}</p>
         </div>
       </div>
 
-      <main className="mx-auto grid max-w-[1100px] grid-cols-[minmax(0,1fr)] gap-5 px-4 pb-14 pt-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-16 lg:px-10 lg:pt-10">
+      <main className={`mx-auto grid grid-cols-[minmax(0,1fr)] gap-5 px-4 pb-14 pt-6 lg:px-10 lg:pt-10 ${conIndice ? "max-w-[1100px] lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-16" : "max-w-[800px]"}`}>
         {indice.length > 0 ? (
           // Teléfono: botones que se deslizan de lado; PC: lista fija a la izquierda mientras se lee
           <nav className="lg:sticky lg:self-start" style={{ top: `${(altoMenu ?? 80) + 24}px` }} aria-label="En esta página">
@@ -311,7 +313,7 @@ function PaginaLegal({ titulo, bajada, secciones, otra }: {
               ))}
             </div>
           </nav>
-        ) : <div className="hidden lg:block" />}
+        ) : null}
 
         <div className="min-w-0">
           {secciones.map((s, i) => (
