@@ -65,8 +65,8 @@ export default function AboutUs() {
 
   // Estilo nuevo (2026-11-22, maqueta aprobada maquetas/estilo-nuevo/nosotros.html): portada con foto ancha, capítulos
   // con foto al lado, la misión en franja oscura y contacto en tarjetas. Mismos textos, mapa y enlaces que antes.
-  // Párrafos justificados con corte de palabras (guion) para que no queden huecos en el teléfono (pedido del dueño)
-  const parrafo = 'text-justify hyphens-auto text-[15px] leading-[1.75] text-mirra-suave';
+  // Párrafos justificados con las palabras completas (sin guiones; el dueño prefiere más espacio entre palabras)
+  const parrafo = 'text-justify hyphens-none text-[15px] leading-[1.75] text-mirra-suave';
   const titulo = 'font-bell-mt text-[30px] font-normal leading-tight text-mirra-tinta lg:text-[40px]';
   const tarjetaContacto = 'flex items-start gap-3.5 rounded-2xl border border-mirra-linea bg-white p-5';
   const icono = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-mirra-crema text-mirra-tinta';
