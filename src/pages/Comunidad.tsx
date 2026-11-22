@@ -474,40 +474,46 @@ export default function Comunidad() {
       <section id="resenas" className={seccion} style={margenSalto}>
         <div className={ancho}>
           <Titulo sub="Tu opinión nos ayuda a crecer y a que más personas encuentren su aroma.">Lo que dicen de nosotros</Titulo>
-          <div className="lg:grid lg:grid-cols-[1fr_1.5fr] lg:items-start lg:gap-6">
-            <div>
-              <div className="flex items-center gap-3.5 rounded-2xl border border-mirra-linea bg-white p-4">
-                {nota != null ? (
-                  <div className="shrink-0 text-center">
-                    <p className="font-bell-mt text-[40px] leading-none text-mirra-tinta">{formatoNota(nota)}</p>
-                    <Estrellas valor={nota} className="text-sm" />
+          {/* Mismo orden que antes en teléfono: nota de Google, carrusel, resumen y botones.
+              PC: nota, resumen y botones a la izquierda; el carrusel a la derecha. */}
+          <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start lg:gap-x-6">
+            <div className="lg:col-start-1 lg:row-start-1">
+                <div className="flex items-center gap-3.5 rounded-2xl border border-mirra-linea bg-white p-4">
+                  {nota != null ? (
+                    <div className="shrink-0 text-center">
+                      <p className="font-bell-mt text-[40px] leading-none text-mirra-tinta">{formatoNota(nota)}</p>
+                      <Estrellas valor={nota} className="text-sm" />
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-lg tracking-[2px] text-mirra-oro" aria-hidden="true">★★★★★</span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[15px]">
+                      <LogoGoogle />
+                      <span className="font-[Arial,sans-serif] font-semibold text-mirra-suave"> Maps</span>
+                    </p>
+                    <p className="mt-0.5 text-[13px] leading-snug text-mirra-suave">
+                      {nota != null
+                        ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
+                        : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
+                    </p>
                   </div>
-                ) : (
-                  <span className="shrink-0 text-lg tracking-[2px] text-mirra-oro" aria-hidden="true">★★★★★</span>
-                )}
-                <div className="min-w-0">
-                  <p className="text-[15px]">
-                    <LogoGoogle />
-                    <span className="font-[Arial,sans-serif] font-semibold text-mirra-suave"> Maps</span>
-                  </p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-mirra-suave">
-                    {nota != null
-                      ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
-                      : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
-                  </p>
                 </div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2.5">
-                <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={btnNegro}>
-                  <PenLine className="h-4 w-4" /> Dejar mi reseña
-                </a>
-                <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
-                  Ver todas
-                </a>
-              </div>
-              {resumen && <TarjetaResumen resumen={resumen} />}
             </div>
-            {resenas.length > 0 && <CarruselResenas resenas={resenas} />}
+            {resenas.length > 0 && (
+              <div className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1"><CarruselResenas resenas={resenas} /></div>
+            )}
+            {resumen && <div className="lg:col-start-1"><TarjetaResumen resumen={resumen} /></div>}
+            <div className="lg:col-start-1">
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={btnNegro}>
+                    <PenLine className="h-4 w-4" /> Dejar mi reseña
+                  </a>
+                  <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
+                    Ver todas
+                  </a>
+                </div>
+            </div>
           </div>
         </div>
       </section>
