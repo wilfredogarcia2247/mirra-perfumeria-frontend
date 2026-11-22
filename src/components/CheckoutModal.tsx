@@ -95,12 +95,12 @@ function ListaDesplegable({ id, value, placeholder, opciones, onChange }: {
         aria-controls={`${id}-opciones`}
         onClick={() => setAbierta((a) => !a)}
         onKeyDown={(event) => { if (event.key === 'Escape') setAbierta(false); }}
-        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-left text-base leading-5 text-gray-900 outline-none transition-colors focus:border-primary-700 focus:ring-primary-700 md:text-sm"
+        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-mirra-linea bg-mirra-fondo px-3 py-2 text-left text-base leading-5 text-mirra-tinta outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb] md:text-sm"
       >
-        <span className={`min-w-0 truncate ${elegida ? '' : 'text-gray-400'}`}>
+        <span className={`min-w-0 truncate ${elegida ? '' : 'text-[#a8a29e]'}`}>
           {elegida ? `${elegida.label}${elegida.detalle ? ` — ${elegida.detalle}` : ''}` : placeholder}
         </span>
-        <span aria-hidden="true" className={`shrink-0 text-gray-500 transition-transform ${abierta ? 'rotate-180' : ''}`}>▾</span>
+        <span aria-hidden="true" className={`shrink-0 text-mirra-suave transition-transform ${abierta ? 'rotate-180' : ''}`}>▾</span>
       </button>
       {abierta && (
         <ul
@@ -109,7 +109,7 @@ function ListaDesplegable({ id, value, placeholder, opciones, onChange }: {
           role="listbox"
           aria-labelledby={id}
           onKeyDown={(event) => { if (event.key === 'Escape') setAbierta(false); }}
-          className="absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-lg border border-mirra-linea bg-white py-1 shadow-lg"
         >
           {opciones.map((o) => {
             const seleccionada = o.value === value;
@@ -118,10 +118,10 @@ function ListaDesplegable({ id, value, placeholder, opciones, onChange }: {
                 <button
                   type="button"
                   onClick={() => { onChange(o.value); setAbierta(false); }}
-                  className={`w-full px-3 py-2.5 text-left text-[15px] leading-snug transition-colors hover:bg-[#fbf7f2] md:text-sm ${seleccionada ? 'bg-[#fbf7f2] font-medium text-[#735c3f]' : 'text-gray-800'}`}
+                  className={`w-full px-3 py-2.5 text-left text-[15px] leading-snug transition-colors hover:bg-mirra-fondo md:text-sm ${seleccionada ? 'bg-mirra-fondo font-medium text-mirra-oro-osc' : 'text-mirra-tinta'}`}
                 >
                   <span className="block">{o.label}</span>
-                  {o.detalle && <span className="mt-0.5 block text-xs font-normal text-gray-500">{o.detalle}</span>}
+                  {o.detalle && <span className="mt-0.5 block text-xs font-normal text-mirra-suave">{o.detalle}</span>}
                 </button>
               </li>
             );
@@ -367,7 +367,7 @@ export default function CheckoutModal({
   const renderCustomerFields = ({ wideName = false, widePhone = false } = {}) => (
     <>
       <div>
-        <label htmlFor="checkout-cedula" className="mb-2 block text-sm font-medium text-gray-700">Cédula</label>
+        <label htmlFor="checkout-cedula" className="mb-2 block text-sm font-medium text-[#44403c]">Cédula</label>
         <input
           id="checkout-cedula"
           required
@@ -394,10 +394,10 @@ export default function CheckoutModal({
               telefonoAutocompletado.current = false;
             }
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
           placeholder="Escribe tu cédula"
         />
-        {buscandoCliente && <p className="mt-1 text-xs text-gray-500">Buscando tus datos...</p>}
+        {buscandoCliente && <p className="mt-1 text-xs text-mirra-suave">Buscando tus datos...</p>}
         {clienteLookupError && !(nombreCliente.trim() && telefono.trim()) && (
           <p className="mt-1 text-xs text-amber-700">{clienteLookupError}</p>
         )}
@@ -405,7 +405,7 @@ export default function CheckoutModal({
       {clienteLookupComplete && (
         <>
       <div className={wideName ? 'col-span-2' : undefined}>
-        <label htmlFor="checkout-nombre" className="mb-2 block text-sm font-medium text-gray-700">
+        <label htmlFor="checkout-nombre" className="mb-2 block text-sm font-medium text-[#44403c]">
           Nombre y apellido
         </label>
         <input
@@ -418,12 +418,12 @@ export default function CheckoutModal({
             nombreAutocompletado.current = false;
             setNombreCliente(event.target.value);
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
           placeholder="Ej. María González"
         />
       </div>
       <div className={widePhone ? 'col-span-2' : undefined}>
-        <label htmlFor="checkout-telefono" className="mb-2 block text-sm font-medium text-gray-700">Número de teléfono</label>
+        <label htmlFor="checkout-telefono" className="mb-2 block text-sm font-medium text-[#44403c]">Número de teléfono</label>
         <input
           id="checkout-telefono"
           required
@@ -438,10 +438,10 @@ export default function CheckoutModal({
             telefonoAutocompletado.current = false;
             setTelefono(digits);
           }}
-          className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+          className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
           placeholder="Ej. 584141234567"
         />
-        <p className="mt-1 text-xs text-gray-500">Solo números, mínimo 11 dígitos.</p>
+        <p className="mt-1 text-xs text-mirra-suave">Solo números, mínimo 11 dígitos.</p>
       </div>
       {clienteExistente && (
         <p className={wideName || widePhone ? 'col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700' : 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'}>
@@ -449,14 +449,14 @@ export default function CheckoutModal({
         </p>
       )}
       {!clienteExistente && !clienteLookupError && (
-        <p className={wideName || widePhone ? 'col-span-2 text-xs text-gray-500' : 'text-xs text-gray-500'}>
+        <p className={wideName || widePhone ? 'col-span-2 text-xs text-mirra-suave' : 'text-xs text-mirra-suave'}>
           No encontramos datos para esta cédula. Completa tu nombre y teléfono.
         </p>
       )}
         </>
       )}
       {!clienteLookupComplete && !buscandoCliente && cedula.trim().length < 4 && (
-        <p className={wideName || widePhone ? 'col-span-2 text-xs text-gray-500' : 'text-xs text-gray-500'}>
+        <p className={wideName || widePhone ? 'col-span-2 text-xs text-mirra-suave' : 'text-xs text-mirra-suave'}>
           Ingresa tu cédula para buscar tus datos antes de continuar.
         </p>
       )}
@@ -833,13 +833,13 @@ export default function CheckoutModal({
   return (
     <div className={`${inline ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/60 p-4 backdrop-blur-sm'} ${visible ? '' : 'hidden'}`}>
       {!inline && <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="absolute inset-0 h-full w-full cursor-default" />}
-      <section className={inline ? 'w-full rounded-2xl border border-[#eadfce] bg-white px-4 py-5 shadow-sm' : 'relative z-10 my-auto max-h-[94vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl'}>
-        {!inline &&         <header className="flex items-start justify-between bg-primary-800 px-6 py-5">
+      <section className={inline ? 'w-full rounded-2xl border border-mirra-linea bg-white px-4 py-5 shadow-sm' : 'relative z-10 my-auto max-h-[94vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl'}>
+        {!inline &&         <header className="flex items-start justify-between bg-mirra-tinta px-6 py-5">
           <div>
             <h2 className="text-2xl font-bold text-white">Finalizar compra</h2>
-            <p className="mt-1 text-sm text-gray-400">Selecciona tu método de entrega para continuar.</p>
+            <p className="mt-1 text-sm text-[#a8a29e]">Selecciona tu método de entrega para continuar.</p>
           </div>
-          <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white">
+          <button type="button" aria-label="Cerrar checkout" onClick={onClose} className="rounded-full p-2 text-mirra-suave transition-colors hover:bg-mirra-crema hover:text-mirra-tinta">
             <X className="h-5 w-5" />
           </button>
         </header>}
@@ -847,9 +847,9 @@ export default function CheckoutModal({
         <form ref={formRef} onSubmit={handleSubmit} className={inline ? 'mx-auto w-full max-w-md space-y-5' : 'max-h-[calc(94vh-88px)] space-y-6 overflow-y-auto p-6 md:p-8'}>
           {checkoutStep === 'delivery' && (
             <>
-          <div className="rounded-lg border border-[#eadfce] bg-[#fbf7f2] px-3 py-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#806747]">Paso 1 de 2 · Entrega</p>
-            <p className="mt-1 text-sm text-gray-700">Elige cómo recibirás tu pedido y completa los datos.</p>
+          <div className="rounded-lg border border-mirra-linea bg-mirra-fondo px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-mirra-oro-osc">Paso 1 de 2 · Entrega</p>
+            <p className="mt-1 text-sm text-[#44403c]">Elige cómo recibirás tu pedido y completa los datos.</p>
           </div>
           <fieldset>
             <legend className="sr-only">Método de entrega</legend>
@@ -867,10 +867,10 @@ export default function CheckoutModal({
                     if (fulfillmentType !== value) setClienteLookupComplete(false);
                     setFulfillmentType(value);
                   }}
-                  className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-gray-700 transition-colors hover:bg-[#fbf7f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cbb496] ${fulfillmentType === value ? 'border-[#b4936a] bg-[#fbf7f2] ring-2 ring-[#d8c5aa]' : 'border-gray-200'}`}
+                  className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-[#44403c] transition-colors hover:bg-mirra-fondo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mirra-tinta ${fulfillmentType === value ? 'border-mirra-tinta bg-mirra-fondo ring-2 ring-mirra-tinta' : 'border-mirra-linea'}`}
                 >
                   {fulfillmentType === value && (
-                    <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-[#efe5d8] px-1.5 py-0.5 text-[9px] font-semibold leading-none text-[#735c3f]">
+                    <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-mirra-crema px-1.5 py-0.5 text-[9px] font-semibold leading-none text-mirra-oro-osc">
                       <Check className="h-2.5 w-2.5" />
                       Elegido
                     </span>
@@ -882,29 +882,29 @@ export default function CheckoutModal({
             </div>
           </fieldset>
 
-          <hr className="border-gray-200" />
+          <hr className="border-mirra-linea" />
 
           {!fulfillmentType ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center py-10 text-center text-gray-400">
+            <div className="flex min-h-[220px] flex-col items-center justify-center py-10 text-center text-[#a8a29e]">
               <svg className="mb-3 h-12 w-12 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-2.3 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
               </svg>
-              <p className="font-medium text-gray-600">Elige una opción de entrega para continuar.</p>
+              <p className="font-medium text-[#57534e]">Elige una opción de entrega para continuar.</p>
               <p className="mt-1 max-w-xs text-sm">Al seleccionarla, aparecerán los datos necesarios para recibir tu pedido.</p>
             </div>
           ) : (
             <div key={fulfillmentType} className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <p className="text-sm font-medium text-[#735c3f]">
+              <p className="text-sm font-medium text-mirra-oro-osc">
                 Opción elegida: {fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local'}
               </p>
               {fulfillmentType === 'tienda' && (
                 <>
-                  <h3 className="text-lg font-semibold text-gray-800">Retiro en tienda</h3>
+                  <h3 className="text-lg font-semibold text-mirra-tinta">Retiro en tienda</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {renderCustomerFields({ widePhone: true })}
                   </div>
                   <div>
-                    <label htmlFor="checkout-sucursal" className="mb-1.5 block text-sm font-medium text-gray-700">Sucursal</label>
+                    <label htmlFor="checkout-sucursal" className="mb-1.5 block text-sm font-medium text-[#44403c]">Sucursal</label>
                     {sucursalesError ? (
                       <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{sucursalesError}</p>
                     ) : sucursales.length > 0 ? (
@@ -924,20 +924,20 @@ export default function CheckoutModal({
                         {loadingSucursales ? 'Cargando sucursales...' : 'Aún no hay sucursales activas disponibles. Elige otra modalidad o inténtalo más tarde.'}
                       </p>
                     )}
-                    <p className="mt-1.5 text-xs text-gray-500">Retira tu pedido en el horario de atención de la sucursal.</p>
+                    <p className="mt-1.5 text-xs text-mirra-suave">Retira tu pedido en el horario de atención de la sucursal.</p>
                   </div>
                 </>
               )}
 
               {fulfillmentType === 'envio_nacional' && (
                 <>
-                  <h3 className="text-lg font-semibold text-gray-800">Datos para envío</h3>
+                  <h3 className="text-lg font-semibold text-mirra-tinta">Datos para envío</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {renderCustomerFields({ widePhone: true })}
                     {/* Paso 2: estado (aparece cuando los datos del cliente están completos) */}
                     {datosClienteListos && (
                       <div className="col-span-2">
-                        <label htmlFor="checkout-estado" className="mb-2 block text-sm font-medium text-gray-700">Estado</label>
+                        <label htmlFor="checkout-estado" className="mb-2 block text-sm font-medium text-[#44403c]">Estado</label>
                         <ListaDesplegable
                           id="checkout-estado"
                           value={estadoEnvio}
@@ -955,7 +955,7 @@ export default function CheckoutModal({
                     {/* Paso 3: ciudad (aparece al elegir el estado) */}
                     {datosClienteListos && estadoEnvio && (
                       <div className="col-span-2">
-                        <label htmlFor="checkout-ciudad" className="mb-2 block text-sm font-medium text-gray-700">Ciudad</label>
+                        <label htmlFor="checkout-ciudad" className="mb-2 block text-sm font-medium text-[#44403c]">Ciudad</label>
                         <ListaDesplegable
                           id="checkout-ciudad"
                           value={ciudadEnvio}
@@ -976,7 +976,7 @@ export default function CheckoutModal({
                             maxLength={100}
                             value={ciudadOtra}
                             onChange={(event) => setCiudadOtra(event.target.value)}
-                            className="mt-2 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                            className="mt-2 block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
                             placeholder="Escribe tu ciudad"
                           />
                         )}
@@ -987,7 +987,7 @@ export default function CheckoutModal({
                     <>
                     <div>
                       <fieldset>
-                        <legend className="mb-2 block text-sm font-medium text-gray-700">Empresa de envío</legend>
+                        <legend className="mb-2 block text-sm font-medium text-[#44403c]">Empresa de envío</legend>
                         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Empresa de envío">
                           {[
                             { value: 'MRW', label: 'MRW' },
@@ -1004,7 +1004,7 @@ export default function CheckoutModal({
                                 checked={empresaEnvio === value}
                                 onChange={() => setEmpresaEnvio(value)}
                               />
-                              <span className="flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 transition-colors hover:bg-[#fbf7f2] peer-checked:border-[#cbb496] peer-checked:bg-[#fbf7f2] peer-checked:font-semibold peer-checked:text-[#735c3f] peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[#cbb496]">
+                              <span className="flex min-h-10 items-center justify-center rounded-lg border border-mirra-linea bg-white px-2 text-sm text-[#44403c] transition-colors hover:bg-mirra-fondo peer-checked:border-mirra-tinta peer-checked:bg-mirra-fondo peer-checked:font-semibold peer-checked:text-mirra-oro-osc peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-mirra-tinta">
                                 {label}
                               </span>
                             </label>
@@ -1015,38 +1015,38 @@ export default function CheckoutModal({
                     <div>
                       {empresaEnvio === 'OTRA' ? (
                         <>
-                          <label htmlFor="checkout-transportista-otra" className="mb-2 block text-sm font-medium text-gray-700">¿Cuál empresa?</label>
+                          <label htmlFor="checkout-transportista-otra" className="mb-2 block text-sm font-medium text-[#44403c]">¿Cuál empresa?</label>
                           <input
                             id="checkout-transportista-otra"
                             required
                             maxLength={100}
                             value={empresaEnvioOtra}
                             onChange={(event) => setEmpresaEnvioOtra(event.target.value)}
-                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-[#b4936a] focus:ring-[#b4936a]"
+                            className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-mirra-tinta focus:ring-[#e9dccb]"
                             placeholder="Nombre de la empresa"
                           />
                         </>
                       ) : (
                         <>
-                          <label htmlFor="checkout-agencia-codigo" className="mb-2 block text-sm font-medium text-gray-700">Código de agencia</label>
+                          <label htmlFor="checkout-agencia-codigo" className="mb-2 block text-sm font-medium text-[#44403c]">Código de agencia</label>
                           <input
                             id="checkout-agencia-codigo"
                             required
                             value={agenciaCodigo}
                             onChange={(event) => setAgenciaCodigo(event.target.value)}
-                            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                            className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
                             placeholder="Código de sucursal"
                           />
                         </>
                       )}
                     </div>
                     <div className="col-span-2">
-                      <label className="mb-2 block text-sm font-medium text-gray-700">Dirección de la agencia</label>
+                      <label className="mb-2 block text-sm font-medium text-[#44403c]">Dirección de la agencia</label>
                       <input
                         required
                         value={agenciaDireccion}
                         onChange={(event) => setAgenciaDireccion(event.target.value)}
-                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
                         placeholder="Sector, calle o punto de referencia"
                       />
                     </div>
@@ -1058,25 +1058,25 @@ export default function CheckoutModal({
 
               {fulfillmentType === 'delivery' && (
                 <>
-                  <h3 className="text-lg font-semibold text-gray-800">Datos para delivery</h3>
+                  <h3 className="text-lg font-semibold text-mirra-tinta">Datos para delivery</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {renderCustomerFields({ widePhone: true })}
                   </div>
-                  <hr className="border-gray-200" />
+                  <hr className="border-mirra-linea" />
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-gray-800">Ubicación de entrega</h4>
+                    <h4 className="text-sm font-semibold text-mirra-tinta">Ubicación de entrega</h4>
                     <button
                       type="button"
                       disabled={localizando}
                       onClick={capturarUbicacionActual}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-100 px-5 py-2.5 text-sm font-medium text-primary-800 transition-colors hover:bg-primary-200 disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-mirra-linea bg-mirra-crema px-5 py-2.5 text-sm font-medium text-mirra-oro-osc transition-colors hover:bg-mirra-crema disabled:opacity-60"
                     >
                       <Navigation className="h-5 w-5" />
                       {localizando ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
                     </button>
-                    <div className="flex items-center text-sm text-gray-400 before:mr-4 before:flex-1 before:border-t before:border-gray-200 after:ml-4 after:flex-1 after:border-t after:border-gray-200">O</div>
+                    <div className="flex items-center text-sm text-[#a8a29e] before:mr-4 before:flex-1 before:border-t before:border-mirra-linea after:ml-4 after:flex-1 after:border-t after:border-mirra-linea">O</div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">Pegar enlace de Google Maps (opcional si compartes ubicación actual)</label>
+                      <label className="mb-2 block text-sm font-medium text-[#44403c]">Pegar enlace de Google Maps (opcional si compartes ubicación actual)</label>
                       <input
                         type="url"
                         value={ubicacionLink}
@@ -1084,16 +1084,16 @@ export default function CheckoutModal({
                           setUbicacionLink(event.target.value);
                           setUbicacionActual(null);
                         }}
-                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-base text-gray-900 md:text-sm outline-none transition-colors focus:border-primary-700 focus:ring-primary-700"
+                        className="block w-full rounded-lg border border-mirra-linea bg-mirra-fondo p-2.5 text-base text-mirra-tinta md:text-sm outline-none transition-colors focus:border-[#cdbfae] focus:ring-[#e9dccb]"
                         placeholder="https://maps.app.goo.gl/..."
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => window.open('https://www.google.com/maps', '_blank', 'noopener,noreferrer')}
-                      className="flex h-48 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-50"
+                      className="flex h-48 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-mirra-linea bg-mirra-crema text-mirra-suave transition-colors hover:bg-mirra-fondo"
                     >
-                      <MapPin className="mb-2 h-8 w-8 text-gray-400" />
+                      <MapPin className="mb-2 h-8 w-8 text-[#a8a29e]" />
                       <span className="text-sm font-medium">Google Maps</span>
                       <span className="mt-1 text-xs">Haz clic para elegir una ubicación y luego pega el enlace</span>
                     </button>
@@ -1114,20 +1114,20 @@ export default function CheckoutModal({
             <section className="mx-auto w-full max-w-md space-y-5" aria-labelledby="checkout-review-title">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 id="checkout-review-title" className="text-lg font-semibold text-gray-900">Revisa tu pedido</h3>
-                  <p className="mt-1 text-sm text-gray-500">Ajusta cantidades o elimina productos antes de confirmar.</p>
+                  <h3 id="checkout-review-title" className="text-lg font-semibold text-mirra-tinta">Revisa tu pedido</h3>
+                  <p className="mt-1 text-sm text-mirra-suave">Ajusta cantidades o elimina productos antes de confirmar.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setCheckoutStep('delivery')}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-[#806747] hover:bg-[#fbf7f2]"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-mirra-oro-osc hover:bg-mirra-fondo"
                 >
                   <Pencil className="h-4 w-4" />
                   Editar entrega
                 </button>
               </div>
 
-              <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+              <div className="divide-y divide-gray-100 rounded-xl border border-mirra-linea bg-white">
                 {items.length > 0 ? items.map((item) => {
                   const unitPrice = getItemPrice(item);
                   return (
@@ -1135,18 +1135,18 @@ export default function CheckoutModal({
                       <img
                         src={item.product.image_url || '/asset/muestra1.jpeg'}
                         alt=""
-                        className="h-14 w-14 shrink-0 rounded-lg border border-gray-100 bg-gray-50 object-cover"
+                        className="h-14 w-14 shrink-0 rounded-lg border border-mirra-linea bg-mirra-fondo object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-800">{item.product.name}</p>
-                        <p className="mt-0.5 text-xs text-gray-500">{displayPrice(unitPrice)} c/u</p>
+                        <p className="truncate text-sm font-medium text-mirra-tinta">{item.product.name}</p>
+                        <p className="mt-0.5 text-xs text-mirra-suave">{displayPrice(unitPrice)} c/u</p>
                         <div className="mt-2 flex items-center gap-2">
                           <button
                             type="button"
                             aria-label={`Reducir cantidad de ${item.product.name}`}
                             disabled={item.qty <= 1}
                             onClick={() => onUpdateQty?.(item.key, item.qty - 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-600 disabled:opacity-40"
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-mirra-linea text-[#57534e] disabled:opacity-40"
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
@@ -1155,19 +1155,19 @@ export default function CheckoutModal({
                             type="button"
                             aria-label={`Aumentar cantidad de ${item.product.name}`}
                             onClick={() => onUpdateQty?.(item.key, item.qty + 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-600"
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-mirra-linea text-[#57534e]"
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
                       <div className="flex h-full flex-col items-end justify-between gap-3">
-                        <span className="text-sm font-semibold text-gray-900">{displayPrice(unitPrice * item.qty)}</span>
+                        <span className="text-sm font-semibold text-mirra-tinta">{displayPrice(unitPrice * item.qty)}</span>
                         <button
                           type="button"
                           aria-label={`Quitar ${item.product.name} del pedido`}
                           onClick={() => onRemoveItem?.(item.key)}
-                          className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          className="rounded-md p-1 text-[#a8a29e] hover:bg-red-50 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1175,49 +1175,49 @@ export default function CheckoutModal({
                     </div>
                   );
                 }) : (
-                  <p className="p-4 text-sm text-gray-500">No quedan productos en tu carrito.</p>
+                  <p className="p-4 text-sm text-mirra-suave">No quedan productos en tu carrito.</p>
                 )}
                 <div className="flex items-center justify-between gap-3 p-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Total estimado</p>
+                    <p className="text-sm font-semibold text-mirra-tinta">Total estimado</p>
                     {(discountLabel || couponCode) && (
                       <p className="mt-0.5 text-xs text-emerald-700">{discountLabel || `Cupón ${couponCode} aplicado`}</p>
                     )}
                   </div>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-lg font-bold text-mirra-tinta">
                     {displayPrice(cartTotal ?? items.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0))}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-xl border border-[#eadfce] bg-[#fbf7f2] p-4 text-sm">
+              <div className="space-y-2 rounded-xl border border-mirra-linea bg-mirra-fondo p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-semibold text-mirra-tinta">
                       {fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local'}
                     </p>
                     {fulfillmentType === 'tienda' && selectedBranch && (
-                      <p className="mt-1 text-gray-600">{selectedBranch.nombre} · {selectedBranch.direccion}</p>
+                      <p className="mt-1 text-[#57534e]">{selectedBranch.nombre} · {selectedBranch.direccion}</p>
                     )}
                     {fulfillmentType === 'envio_nacional' && (
                       <>
-                        {estadoEnvio && <p className="mt-1 font-medium text-gray-700">{ciudadFinal}, {estadoEnvio}</p>}
-                        <p className="mt-1 text-gray-600">
+                        {estadoEnvio && <p className="mt-1 font-medium text-[#44403c]">{ciudadFinal}, {estadoEnvio}</p>}
+                        <p className="mt-1 text-[#57534e]">
                           {empresaEnvio === 'OTRA' ? empresaEnvioOtra : empresaEnvio}
                           {empresaEnvio !== 'OTRA' && agenciaCodigo ? ` · Agencia ${agenciaCodigo}` : ''}
                         </p>
-                        <p className="text-gray-600">{agenciaDireccion}</p>
+                        <p className="text-[#57534e]">{agenciaDireccion}</p>
                       </>
                     )}
                     {fulfillmentType === 'delivery' && (
-                      <p className="mt-1 break-all text-gray-600">
+                      <p className="mt-1 break-all text-[#57534e]">
                         {ubicacionLink || (ubicacionActual ? 'Ubicación actual compartida' : '')}
                       </p>
                     )}
                   </div>
                 </div>
                 {fulfillmentType !== 'tienda' && (
-                  <p className="border-t border-[#eadfce] pt-2 text-xs text-gray-600">
+                  <p className="border-t border-mirra-linea pt-2 text-xs text-[#57534e]">
                     {nombreCliente} · {cedula} · {telefono}
                   </p>
                 )}
@@ -1226,19 +1226,19 @@ export default function CheckoutModal({
           )}
 
           {checkoutStep === 'delivery' && !inline && tasaActiva ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-3">
-              <p className="text-sm text-gray-600">Tasa activa: <strong>{tasaActiva.simbolo} {tasaActiva.monto}</strong></p>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-mirra-fondo px-4 py-3">
+              <p className="text-sm text-[#57534e]">Tasa activa: <strong>{tasaActiva.simbolo} {tasaActiva.monto}</strong></p>
+              <label className="inline-flex items-center gap-2 text-sm text-[#44403c]">
                 <input type="checkbox" checked={useTasaActiva} onChange={(event) => setUseTasaActiva(event.target.checked)} />
                 Usar tasa activa
               </label>
             </div>
           ) : checkoutStep === 'delivery' && !inline ? (
-            <p className="text-sm text-gray-500">No hay tasa activa disponible</p>
+            <p className="text-sm text-mirra-suave">No hay tasa activa disponible</p>
           ) : null}
 
-          {checkoutStep === 'delivery' && !inline && <section className="rounded-xl border border-gray-200 p-4">
-            <h4 className="font-semibold text-gray-800">Resumen de compra</h4>
+          {checkoutStep === 'delivery' && !inline && <section className="rounded-xl border border-mirra-linea p-4">
+            <h4 className="font-semibold text-mirra-tinta">Resumen de compra</h4>
             <ul className="mt-3 max-h-36 space-y-2 overflow-auto text-sm">
               {items.map((item) => {
                 const base = Number(item.product.price || 0);
@@ -1247,8 +1247,8 @@ export default function CheckoutModal({
                 const amount = converted ? base * Number(tasaActiva.monto) : base;
                 return (
                   <li key={item.key} className="flex justify-between gap-4">
-                    <span className="text-gray-600">{item.product.name} × {qty}</span>
-                    <span className="shrink-0 font-medium text-gray-800">
+                    <span className="text-[#57534e]">{item.product.name} × {qty}</span>
+                    <span className="shrink-0 font-medium text-mirra-tinta">
                       {converted ? `${tasaActiva.simbolo || 'USD'} ` : ''}
                       {Number(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -1256,9 +1256,9 @@ export default function CheckoutModal({
                 );
               })}
             </ul>
-            <div className="mt-3 flex justify-between border-t border-gray-200 pt-3">
-              <span className="font-semibold text-gray-800">Total</span>
-              <span className="font-bold text-gray-900">
+            <div className="mt-3 flex justify-between border-t border-mirra-linea pt-3">
+              <span className="font-semibold text-mirra-tinta">Total</span>
+              <span className="font-bold text-mirra-tinta">
                 {(() => {
                   const subtotal = items.reduce((sum, item) => sum + Number(item.product.price || 0) * Number(item.qty || 0), 0);
                   const total = useTasaActiva && tasaActiva && Number(tasaActiva.monto) > 0
@@ -1273,12 +1273,12 @@ export default function CheckoutModal({
           <button
             type="submit"
             disabled={loading || !fulfillmentType || (checkoutStep === 'review' && items.length === 0)}
-            className="w-full rounded-lg bg-[#b4936a] px-5 py-3.5 text-center text-sm font-medium text-white transition-colors hover:bg-[#a4825b] focus:outline-none focus:ring-4 focus:ring-[#eadfce] disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-xl bg-mirra-tinta px-5 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-black focus:outline-none focus:ring-4 focus:ring-[#e9dccb] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Enviando...' : checkoutStep === 'delivery' ? fulfillmentType ? 'Guardar entrega y volver al carrito' : 'Elige una opción de entrega' : 'Confirmar pedido'}
           </button>
           {checkoutStep === 'delivery' && (
-            <p className="-mt-3 text-center text-xs leading-relaxed text-gray-500">
+            <p className="-mt-3 text-center text-xs leading-relaxed text-mirra-suave">
               Volverás al carrito para revisar tus productos. Podrás editar la entrega antes de confirmar.
             </p>
           )}

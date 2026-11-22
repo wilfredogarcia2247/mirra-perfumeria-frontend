@@ -54,32 +54,32 @@ export function BarraDescuentoMayor({
 
   return (
     <section
-      className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 px-3 py-2.5"
+      className="rounded-[14px] border border-mirra-linea bg-white px-3.5 py-3"
       aria-label="Descuento al mayor"
       aria-live="polite"
     >
-      <p className="text-sm leading-snug text-gray-900">{titulo}</p>
+      <p className="text-[13.5px] leading-snug text-mirra-tinta">{titulo}</p>
       <div
-        className="mt-2 h-2 overflow-hidden rounded-full bg-white"
+        className="mt-2.5 h-[5px] overflow-hidden rounded-full bg-[#efe6da]"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(progreso)}
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-amber-400 to-[#b8834a] transition-[width] duration-500 ease-out"
+          className="h-full rounded-full bg-gradient-to-r from-[#c9a77c] to-mirra-oro-osc transition-[width] duration-500 ease-out"
           style={{ width: `${progreso}%` }}
         />
       </div>
-      <p className="mt-1.5 text-[11px] leading-snug text-gray-600">
+      <p className="mt-2 text-[11.5px] leading-snug text-mirra-suave">
         {fraseNiveles(niveles)}
         {tamanosTexto && <><br />Aplica en perfumes de {tamanosTexto}.</>}
       </p>
       {ganaCupon && porcentaje > 0 && (
-        <p className="mt-1 text-[11px] font-medium text-amber-800">Tu cupón da más descuento, así que se aplica el cupón.</p>
+        <p className="mt-1 text-[11px] font-medium text-mirra-oro-osc">Tu cupón da más descuento, así que se aplica el cupón.</p>
       )}
       {!ganaCupon && porcentaje > 0 && (
-        <p className="mt-1.5 rounded-lg bg-white/70 px-2 py-1 text-[11px] font-medium text-gray-700">
+        <p className="mt-1.5 rounded-lg bg-mirra-fondo px-2 py-1 text-[11px] font-medium text-[#44403c]">
           💳 Este descuento no aplica para pagos con Cashea.
         </p>
       )}
@@ -135,7 +135,7 @@ function FilaDeslizable({ children }: { children: ReactNode }) {
     const el = ref.current;
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
   };
-  const flecha = 'absolute top-[38%] z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-800 shadow-md transition hover:bg-gray-50 [@media(hover:hover)_and_(pointer:fine)]:flex';
+  const flecha = 'absolute top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-mirra-linea bg-white text-mirra-tinta shadow-[0_4px_12px_rgba(40,30,20,0.12)] transition hover:bg-mirra-fondo [@media(hover:hover)_and_(pointer:fine)]:flex';
   return (
     <div className="relative">
       <div ref={ref} onScroll={medir} className="mt-2 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -215,8 +215,8 @@ export function SugerenciasDescuentoMayor({
   return (
     <section aria-label="Sugerencias para completar tu descuento" className="-mx-6">
       <div className="flex items-baseline justify-between px-6">
-        <h3 className="text-sm font-semibold text-gray-900">✨ Completa tu descuento</h3>
-        <span className="text-[11px] text-gray-500">
+        <h3 className="font-bell-mt text-[17px] font-normal text-mirra-tinta">✨ Completa tu descuento</h3>
+        <span className="text-[11.5px] text-mirra-suave">
           {faltan > 0 ? `${faltan} ${plural(faltan, 'perfume más', 'perfumes más')}` : ''}
         </span>
       </div>
@@ -224,9 +224,9 @@ export function SugerenciasDescuentoMayor({
         {visibles.map((s) => (
           <article
             key={s.product.id}
-            className="flex w-[8.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm"
+            className="flex w-[238px] shrink-0 snap-start items-center gap-2.5 rounded-[14px] border border-mirra-linea bg-white p-2"
           >
-            <div className="aspect-square w-full bg-gray-50">
+            <div className="h-[78px] w-[62px] shrink-0 overflow-hidden rounded-[10px] bg-mirra-crema">
               <img
                 src={getImageUrl(s.product)}
                 alt={s.product.name}
@@ -239,19 +239,19 @@ export function SugerenciasDescuentoMayor({
                 }}
               />
             </div>
-            <div className="flex flex-1 flex-col p-2">
-              <p className="line-clamp-2 text-xs font-semibold leading-tight text-gray-900">{s.product.name}</p>
+            <div className="flex min-w-0 flex-1 flex-col items-start">
+              <p className="line-clamp-2 text-[11.5px] font-semibold leading-tight text-mirra-tinta">{s.product.name}</p>
               {/* Tamaño y precio en una sola línea */}
-              <p className="mt-1 whitespace-nowrap text-[11px] text-gray-500">
-                {s.etiqueta} · <span className="font-bold text-copper-700">{formatPrice(s.precio)}</span>
+              <p className="mt-0.5 whitespace-nowrap text-[10.5px] text-mirra-suave">
+                {s.etiqueta} · <span className="font-semibold text-mirra-tinta">{formatPrice(s.precio)}</span>
               </p>
               <button
                 type="button"
                 onClick={() => onAgregar(s.item)}
-                className="mt-2 flex h-8 items-center justify-center gap-1 rounded-lg bg-gray-900 text-xs font-semibold text-white transition active:scale-[0.97] hover:bg-gray-800"
+                className="mt-1.5 flex items-center justify-center gap-1 rounded-full border border-mirra-tinta bg-white px-2.5 py-1 text-[11px] font-semibold text-mirra-tinta transition active:scale-[0.97] hover:bg-mirra-fondo"
                 aria-label={`Agregar ${s.product.name} ${s.etiqueta}`}
               >
-                <Plus className="h-3.5 w-3.5" /> Agregar
+                <Plus className="h-3 w-3" /> Agregar
               </button>
             </div>
           </article>
