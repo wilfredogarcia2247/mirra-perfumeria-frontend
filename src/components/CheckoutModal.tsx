@@ -498,19 +498,19 @@ export default function CheckoutModal({
       setCheckoutStep('review');
       const selectedBranch = sucursales.find((branch) => String(branch.id) === sucursalId);
       const carrier = empresaEnvio === 'OTRA' ? empresaEnvioOtra.trim() : empresaEnvio;
-      const customerDetails = [
-        `Cliente: ${nombreCliente.trim()} · Cédula: ${cedula.trim()} · Teléfono: ${telefono.trim()}`,
-      ];
+      // Resumen corto del paso 2 (dueño 2026-11-22): sin direcciones y solo el nombre del cliente, para que ocupe menos.
+      // La dirección, cédula y teléfono se siguen guardando y van completos en el pedido y en WhatsApp.
+      const customerDetails = [`Cliente: ${nombreCliente.trim()}`];
       onReview?.({
         method: fulfillmentType === 'tienda' ? 'Retiro en tienda' : fulfillmentType === 'envio_nacional' ? 'Envío nacional' : 'Delivery local',
         details: fulfillmentType === 'tienda'
-          ? [selectedBranch?.nombre, selectedBranch?.direccion, ...customerDetails].filter(Boolean)
+          ? [selectedBranch?.nombre, ...customerDetails].filter(Boolean)
           : fulfillmentType === 'envio_nacional'
-            ? [`${ciudadFinal}, ${estadoEnvio}`, carrier, empresaEnvio !== 'OTRA' && agenciaCodigo.trim() ? `Agencia ${agenciaCodigo.trim()}` : '', agenciaDireccion.trim(), ...customerDetails]
+            ? [`${ciudadFinal}, ${estadoEnvio}`, carrier, empresaEnvio !== 'OTRA' && agenciaCodigo.trim() ? `Agencia ${agenciaCodigo.trim()}` : '', ...customerDetails]
               .filter(Boolean)
             : [
               ...customerDetails,
-              ubicacionLink.trim() || (ubicacionActual ? 'Ubicación actual compartida' : ''),
+              ubicacionLink.trim() || ubicacionActual ? 'Ubicación compartida ✓' : '',
             ].filter(Boolean),
         fulfillmentType,
         nombreCliente: nombreCliente.trim(),
