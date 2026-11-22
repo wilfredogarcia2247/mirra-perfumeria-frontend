@@ -1,6 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Share2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share2, X } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, presentacionesDe, Tasa } from '@/lib/catalog';
@@ -257,9 +257,9 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
               {sugeridos.length > 0 && onAbrir && (
                 <div className="mt-6">
                   <p className="mb-2 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-mirra-suave">Si te gusta este, prueba</p>
-                  <div className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden">
+                  <FilaParecidos>
                     {sugeridos.map(({ producto, motivo }) => (
-                      <button key={producto.id} type="button" onClick={() => onAbrir(producto)} className="w-[124px] shrink-0 text-left">
+                      <button key={producto.id} type="button" onClick={() => onAbrir(producto)} className="flex w-[124px] shrink-0 snap-start flex-col justify-start text-left">
                         <span className="block aspect-square overflow-hidden rounded-xl bg-mirra-crema">
                           <img src={getImageUrl(producto)} alt="" loading="lazy" className="h-full w-full object-cover"
                             onError={(e) => { const img = e.currentTarget; img.onerror = null; img.src = FALLBACK_IMAGES[Number(producto.id) % FALLBACK_IMAGES.length]; }} />
@@ -268,7 +268,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
                         {motivo && <span className="mt-0.5 block text-[10.5px] leading-snug text-mirra-suave">{motivo}</span>}
                       </button>
                     ))}
-                  </div>
+                  </FilaParecidos>
                 </div>
               )}
             </div>
@@ -301,6 +301,56 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
       </div>
     </>,
     document.body,
+  );
+}
+
+// Fila de "Si te gusta este, prueba…". Con el dedo o el touchpad se desliza sola; con mouse
+// muestra flechas ‹ › (solo en equipos con mouse), que se ocultan en cada extremo, y también
+// se puede arrastrar.
+function FilaParecidos({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const arrastre = useRef<{ x: number; s: number; movio: boolean } | null>(null);
+  const [puede, setPuede] = useState({ izq: false, der: false });
+  const medir = useCallback(() => {
+    const el = ref.current;
+    if (el) setPuede({ izq: el.scrollLeft > 4, der: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    medir();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [medir, children]);
+  const mover = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.8, behavior: 'smooth' });
+  const flecha = 'absolute top-[62px] z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-mirra-linea bg-white text-mirra-tinta shadow-[0_4px_12px_rgba(40,30,20,0.12)] transition hover:bg-mirra-fondo [@media(hover:hover)_and_(pointer:fine)]:flex';
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onScroll={medir}
+        onMouseDown={(e) => { const el = ref.current; if (el) arrastre.current = { x: e.clientX, s: el.scrollLeft, movio: false }; }}
+        onMouseMove={(e) => { const a = arrastre.current; const el = ref.current; if (!a || !el) return; if (Math.abs(e.clientX - a.x) > 4) a.movio = true; el.scrollLeft = a.s - (e.clientX - a.x); }}
+        onMouseUp={() => { window.setTimeout(() => { arrastre.current = null; }, 0); }}
+        onMouseLeave={() => { arrastre.current = null; }}
+        // Si se arrastró, el clic no abre el perfume
+        onClickCapture={(e) => { if (arrastre.current?.movio) { e.stopPropagation(); e.preventDefault(); } }}
+        className="-mx-[18px] flex snap-x items-start gap-2.5 overflow-x-auto scroll-px-[18px] px-[18px] pb-1 [scrollbar-width:none] lg:mx-0 lg:scroll-px-0 lg:px-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      {puede.izq && (
+        <button type="button" aria-label="Ver anteriores" onClick={() => mover(-1)} className={`${flecha} -left-2`}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+      {puede.der && (
+        <button type="button" aria-label="Ver más" onClick={() => mover(1)} className={`${flecha} -right-2`}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 }
 
