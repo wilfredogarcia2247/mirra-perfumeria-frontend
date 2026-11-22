@@ -203,11 +203,14 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
       </section>
       {selected && (
         <ProductQuickSheet
+          key={selected.product.id}
           product={selected.product}
           origen={selected.foto}
           tasa={tasa}
           onClose={() => setSelected(null)}
           onAdd={handleAddToCart}
+          catalogo={products}
+          onAbrir={(product) => setSelected({ product, foto: null })}
         />
       )}
     </>

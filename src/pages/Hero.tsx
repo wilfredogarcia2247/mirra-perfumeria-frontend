@@ -602,11 +602,14 @@ export default function Hero() {
 
         {sheetProduct && (
           <ProductQuickSheet
+            key={sheetProduct.product.id}
             product={sheetProduct.product}
             origen={sheetProduct.foto}
             tasa={tasaPublic}
             onClose={() => setSheetProduct(null)}
             onAdd={handleAddFromSheet}
+            catalogo={catalogProducts}
+            onAbrir={(product) => setSheetProduct({ product, foto: null })}
           />
         )}
 
