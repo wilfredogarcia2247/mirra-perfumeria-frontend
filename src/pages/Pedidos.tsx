@@ -2410,7 +2410,9 @@ export default function Pedidos() {
 
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
+          {/* En teléfonos (menos de 640 px) todo el detalle se desliza junto y solo los botones quedan fijos abajo;
+              antes los datos de arriba y los botones tapaban los productos. Desde sm (tablet y PC) queda como siempre. */}
+          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
             <DialogHeader className="p-5 tableth:px-5 tableth:py-3 border-b border-rose-100 shrink-0 bg-gradient-to-r from-white via-white to-rose-50/60 z-10 space-y-2 tableth:space-y-1.5">
               <DialogTitle className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
@@ -2575,7 +2577,7 @@ export default function Pedidos() {
               )}
             </DialogHeader>
 
-            <div id="modal-scroll-container" className={`flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8f6f4] space-y-5 min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
+            <div id="modal-scroll-container" className={`flex-none sm:flex-1 sm:overflow-y-auto p-4 sm:p-6 bg-[#f8f6f4] space-y-5 sm:min-h-0 ${showPaymentInline ? 'hidden' : ''}`}>
               {detailLoading ? (
                 <div className="flex items-center justify-center py-20 text-gray-400">
                   <Loader2 className="w-8 h-8 animate-spin mr-2" />
@@ -3266,7 +3268,7 @@ export default function Pedidos() {
 
             {/* Formulario de registro de pago embebido en el detalle del pedido (se muestra dentro del dialog) */}
             {selectedPedido && showPaymentInline && (
-              <div className="flex-1 min-h-0 mt-4 p-0 overflow-y-auto">
+              <div className="flex-none sm:flex-1 sm:min-h-0 mt-4 p-0 sm:overflow-y-auto">
                 <PaymentByBank
                   embedded={true}
                   pedidoId={selectedPedido?.id ?? 0}
@@ -3325,22 +3327,23 @@ export default function Pedidos() {
               </div>
             )}
 
-            <DialogFooter className="p-4 bg-white border-t border-gray-200 shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-2 shadow-[0_-6px_20px_rgba(15,23,42,0.04)]">
+            {/* Teléfono: fijo abajo y compacto (menos alto) para que se vean los productos; tablet y PC igual que antes */}
+            <DialogFooter className="sticky bottom-0 sm:static p-2.5 sm:p-4 bg-white border-t border-gray-200 shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-1.5 sm:gap-2 shadow-[0_-6px_20px_rgba(15,23,42,0.04)]">
               {/* Resumen por tamaño, a la vista justo antes de completar (sirve para revisar el paquete) */}
               <ResumenTamanos lineas={selectedPedido?.productos} conTotal className="w-full" />
               <div className="w-full flex flex-col md:flex-row tabletv:flex-wrap items-stretch md:items-center justify-between gap-2">
-                <div className="grid grid-cols-1 gap-2 md:flex">
+                <div className="grid grid-cols-1 gap-1.5 sm:gap-2 md:flex">
                   <Button size="lg" variant="default" onClick={() => {
                     if (ajustesDirty) {
                       toast.error('Guarda los ajustes antes de registrar el pago');
                       return;
                     }
                     setShowPaymentInline(true);
-                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido) || ajustesDirty} className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white">
+                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido) || ajustesDirty} className="h-10 sm:h-11 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white">
                     Registrar pago y completar
                   </Button>
                   {selectedPedido?.estado === 'Completado' && (
-                    <Button size="lg" variant={showPaymentsView ? 'default' : 'outline'} onClick={() => {
+                    <Button size="lg" className="h-10 sm:h-11" variant={showPaymentsView ? 'default' : 'outline'} onClick={() => {
                       if (showPaymentsView) {
                         setShowPaymentsView(false);
                       } else {
@@ -3348,8 +3351,11 @@ export default function Pedidos() {
                         setTimeout(() => {
                           const panel = document.getElementById('payments-view-panel');
                           const container = document.getElementById('modal-scroll-container');
-                          if (panel && container) {
+                          // En teléfono se desliza todo el detalle (no esta zona): ahí basta con llevar el panel a la vista
+                          if (panel && container && container.scrollHeight > container.clientHeight) {
                             container.scrollTo({ top: panel.offsetTop - container.offsetTop - 16, behavior: 'smooth' });
+                          } else if (panel) {
+                            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           }
                         }, 50);
                       }
@@ -3357,15 +3363,15 @@ export default function Pedidos() {
                       {showPaymentsView ? 'Ocultar pagos' : 'Ver pagos'}
                     </Button>
                   )}
-                  <Button size="lg" variant="destructive" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
+                  <Button size="lg" variant="destructive" className="h-10 sm:h-11" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:flex">
-                  <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="hover:bg-slate-50">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:flex">
+                  <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="h-9 sm:h-10 hover:bg-slate-50">
                     {canceling ? 'Procesando...' : 'Cancelar pedido'}
                   </Button>
-                  <Button variant="ghost" onClick={closeDetalle}>Cerrar</Button>
+                  <Button variant="ghost" className="h-9 sm:h-10" onClick={closeDetalle}>Cerrar</Button>
                 </div>
               </div>
             </DialogFooter>

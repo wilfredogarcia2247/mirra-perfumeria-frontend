@@ -1267,9 +1267,10 @@ export default function Hero() {
 
             {/* Footer with Total and Actions (Fixed at bottom) */}
             {cartItems.length > 0 && !isCheckoutOpen && (
-              <div className="border-t border-mirra-linea bg-white p-6 shadow-[0_-6px_16px_rgba(40,30,20,0.05)] z-20 sticky bottom-0">
+              <div className="border-t border-mirra-linea bg-white p-6 [@media(max-width:359px)]:px-4 [@media(max-width:359px)]:py-3 shadow-[0_-6px_16px_rgba(40,30,20,0.05)] z-20 sticky bottom-0">
+                {/* Teléfonos muy pequeños (menos de 360 px): menos relleno para que se vean más los perfumes del carrito */}
                 {/* Cupón: una sola línea; el campo se abre solo si el cliente lo toca */}
-                <div className="mb-3">
+                <div className="mb-3 [@media(max-width:359px)]:mb-1.5">
                   {cuponAplicado ? (
                     <div>
                       <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5">
@@ -1348,10 +1349,10 @@ export default function Hero() {
                   )}
                 </div>
 
-                <div className="flex justify-between items-end mb-4">
+                <div className="flex justify-between items-end mb-4 [@media(max-width:359px)]:mb-2.5">
                   <div>
                     <p className="text-sm text-mirra-suave">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
-                    <p className="text-2xl font-bold text-mirra-tinta leading-none mt-1">
+                    <p className="text-2xl [@media(max-width:359px)]:text-xl font-bold text-mirra-tinta leading-none mt-1">
                       {formatMonto(totalCarrito)}
                     </p>
                   </div>
@@ -1390,7 +1391,7 @@ export default function Hero() {
                   <div className="flex gap-3">
                     <button
                       onClick={vaciarCarrito}
-                      className="px-4 py-3 border border-mirra-linea rounded-xl text-[#57534e] hover:bg-mirra-fondo hover:text-red-500 hover:border-red-200 transition-colors"
+                      className="px-4 py-3 [@media(max-width:359px)]:py-2.5 border border-mirra-linea rounded-xl text-[#57534e] hover:bg-mirra-fondo hover:text-red-500 hover:border-red-200 transition-colors"
                       title="Vaciar carrito"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -1406,9 +1407,9 @@ export default function Hero() {
                         }
                       }}
                       disabled={checkoutSubmitting || faltan7ml > 0}
-                      className={`flex-1 bg-mirra-tinta text-white font-semibold py-3 px-6 rounded-xl hover:bg-black transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
+                      className={`flex-1 bg-mirra-tinta text-white font-semibold py-3 [@media(max-width:359px)]:py-2.5 px-6 [@media(max-width:359px)]:px-4 rounded-xl hover:bg-black transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
                     >
-                      <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
+                      <span className="[@media(max-width:359px)]:whitespace-nowrap">{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
