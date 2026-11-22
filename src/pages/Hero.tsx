@@ -778,6 +778,16 @@ export default function Hero() {
                 )}
               </h2>
               <div className="flex items-center gap-1">
+                {/* Teléfono: "Vaciar" arriba (abajo solo quedan el total y el botón) */}
+                {!isCheckoutOpen && cartItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={vaciarCarrito}
+                    className="mr-1 rounded-md px-1.5 py-1 text-[12.5px] text-mirra-suave underline underline-offset-[3px] transition-colors hover:text-red-600 sm:hidden"
+                  >
+                    Vaciar
+                  </button>
+                )}
                 {isCheckoutOpen && (
                   <button
                     onClick={() => setIsCheckoutOpen(false)}
@@ -1267,10 +1277,10 @@ export default function Hero() {
 
             {/* Footer with Total and Actions (Fixed at bottom) */}
             {cartItems.length > 0 && !isCheckoutOpen && (
-              <div className="border-t border-mirra-linea bg-white p-6 [@media(max-width:359px)]:px-4 [@media(max-width:359px)]:py-3 shadow-[0_-6px_16px_rgba(40,30,20,0.05)] z-20 sticky bottom-0">
+              <div className="border-t border-mirra-linea bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_16px_rgba(40,30,20,0.05)] z-20 sticky bottom-0 sm:p-6">
                 {/* Teléfonos muy pequeños (menos de 360 px): menos relleno para que se vean más los perfumes del carrito */}
                 {/* Cupón: una sola línea; el campo se abre solo si el cliente lo toca */}
-                <div className="mb-3 [@media(max-width:359px)]:mb-1.5">
+                <div className="mb-2 sm:mb-3">
                   {cuponAplicado ? (
                     <div>
                       <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5">
@@ -1349,22 +1359,8 @@ export default function Hero() {
                   )}
                 </div>
 
-                <div className="flex justify-between items-end mb-4 [@media(max-width:359px)]:mb-2.5">
-                  <div>
-                    <p className="text-sm text-mirra-suave">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
-                    <p className="text-2xl [@media(max-width:359px)]:text-xl font-bold text-mirra-tinta leading-none mt-1">
-                      {formatMonto(totalCarrito)}
-                    </p>
-                  </div>
-                  {!isCheckoutOpen && (
-                    <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">
-                      {deliveryReview?.method || 'Envío por coordinar'}
-                    </p>
-                  )}
-                </div>
-
                 {(descuentoCupon > 0 || descuentoMayor > 0) && (
-                  <div className="mb-4 space-y-1 rounded-xl bg-emerald-50/70 px-3 py-2 text-sm">
+                  <div className="mb-2.5 space-y-1 sm:mb-4 rounded-xl bg-emerald-50/70 px-3 py-2 text-sm">
                     <div className="flex justify-between text-[#57534e]">
                       <span>Subtotal</span>
                       <span>{formatMonto(subtotalCarrito)}</span>
@@ -1381,17 +1377,37 @@ export default function Hero() {
                 )}
 
                 {!isCheckoutOpen && faltan7ml > 0 && (
-                  <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p role="status" className="mb-2.5 rounded-lg sm:mb-3 border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     {avisoSieteMl(faltan7ml)}
                   </p>
                 )}
 
+                {/* Teléfono (opción B): total a la izquierda y el botón a la derecha, en una fila.
+                    Tablet y PC: el total arriba con la entrega al lado, y abajo vaciar + botón (como antes). */}
+                <div className="flex items-center gap-3 sm:block">
+                  <div className="shrink-0 sm:mb-4 sm:flex sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[12px] text-mirra-suave sm:text-sm">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
+                      <p className="mt-0.5 text-xl font-bold leading-none text-mirra-tinta sm:mt-1 sm:text-2xl">
+                        {formatMonto(totalCarrito)}
+                      </p>
+                      {!isCheckoutOpen && (
+                        <p className="mt-1 text-[11px] font-medium text-green-700 sm:hidden">{deliveryReview?.method || 'Envío por coordinar'}</p>
+                      )}
+                    </div>
+                    {!isCheckoutOpen && (
+                      <p className="hidden rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-600 sm:block">
+                        {deliveryReview?.method || 'Envío por coordinar'}
+                      </p>
+                    )}
+                  </div>
+
                 {!isCheckoutOpen ? (
                   <>
-                  <div className="flex gap-3">
+                  <div className="flex min-w-0 flex-1 gap-3">
                     <button
                       onClick={vaciarCarrito}
-                      className="px-4 py-3 [@media(max-width:359px)]:py-2.5 border border-mirra-linea rounded-xl text-[#57534e] hover:bg-mirra-fondo hover:text-red-500 hover:border-red-200 transition-colors"
+                      className="hidden px-4 py-3 border border-mirra-linea rounded-xl text-[#57534e] hover:bg-mirra-fondo hover:text-red-500 hover:border-red-200 transition-colors sm:block"
                       title="Vaciar carrito"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -1407,12 +1423,17 @@ export default function Hero() {
                         }
                       }}
                       disabled={checkoutSubmitting || faltan7ml > 0}
-                      className={`flex-1 bg-mirra-tinta text-white font-semibold py-3 [@media(max-width:359px)]:py-2.5 px-6 [@media(max-width:359px)]:px-4 rounded-xl hover:bg-black transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
+                      className={`flex-1 bg-mirra-tinta text-white font-semibold py-3 px-4 text-[14px] sm:px-6 sm:text-base rounded-xl hover:bg-black transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
                     >
-                      <span className="[@media(max-width:359px)]:whitespace-nowrap">{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
+                      <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
+                  </>
+                ) : null}
+                </div>
+                {!isCheckoutOpen && (
+                  <>
                   {/* Debajo de "Confirmar pedido", antes de tocarlo (enlaces en otra pestaña para no perder el pedido) */}
                   {deliveryReview && (
                     <p className="mt-2.5 text-center text-[11px] leading-relaxed text-mirra-suave">
@@ -1423,7 +1444,7 @@ export default function Hero() {
                     </p>
                   )}
                   </>
-                ) : null}
+                )}
               </div>
             )}
           </div>
