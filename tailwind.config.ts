@@ -22,7 +22,8 @@ export default {
         tableth: { raw: '(pointer: coarse) and (min-width: 1024px) and (min-height: 600px)' },
       },
       fontFamily: {
-        'bell-mt': ['Bell MT', 'serif'],
+        // Bell MT no viene de Google Fonts: donde no esté instalada (teléfonos) se usa Georgia o la serif del sistema
+        'bell-mt': ['Bell MT', 'Georgia', 'serif'],
         'montserrat': ['Montserrat', 'sans-serif'],
       },
       colors: {
@@ -123,6 +124,18 @@ export default {
           700: '#948773',
           800: '#6f6050',
           900: '#4a3f33',
+        },
+
+        // Estilo nuevo de la tienda (2026-11, maquetas/tienda-nueva.html): crema, negro suave y dorado solo de acento.
+        // Solo la tienda pública los usa; el panel sigue con su paleta.
+        mirra: {
+          tinta: '#1c1917',     // texto y botones principales
+          suave: '#78716c',     // texto secundario
+          linea: '#ece6de',     // bordes finos
+          fondo: '#faf8f5',     // fondo de página
+          crema: '#f3eee8',     // fondo de fotos y bloques
+          oro: '#b08a57',       // detalles dorados
+          'oro-osc': '#8a6a3e', // dorado para texto pequeño
         },
 
         // Semantic tokens mapped to the palette

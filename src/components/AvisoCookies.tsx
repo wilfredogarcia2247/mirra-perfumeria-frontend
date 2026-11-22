@@ -28,15 +28,15 @@ export default function AvisoCookies() {
     <div
       role="region"
       aria-label="Aviso de cookies"
-      className="fixed inset-x-2.5 z-[45] mx-auto flex max-w-xl items-center gap-2.5 rounded-2xl border border-[#f1e6d6] bg-white py-3 pl-3.5 pr-3 shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+      className="fixed inset-x-2.5 z-[45] mx-auto flex max-w-xl items-center gap-2.5 rounded-2xl border border-mirra-linea bg-white py-3 pl-3.5 pr-3 shadow-[0_12px_30px_rgba(40,30,20,0.12)]"
       style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
     >
-      <p className="min-w-0 text-xs leading-snug text-gray-700">
+      <p className="min-w-0 text-xs leading-snug text-mirra-suave">
         <span aria-hidden="true">🍪 </span>
         Usamos cookies para guardar tu carrito y medir nuestros anuncios.{' '}
-        <Link to="/privacidad#cookies" className="font-semibold text-[#8b6439] underline underline-offset-2">Ver más</Link>
+        <Link to="/privacidad#cookies" className="font-semibold text-mirra-tinta underline underline-offset-2">Ver más</Link>
       </p>
-      <button type="button" onClick={entendido} className="btn-dorado shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-white">
+      <button type="button" onClick={entendido} className="shrink-0 rounded-[10px] bg-mirra-tinta px-3.5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-black">
         Entendido
       </button>
     </div>
