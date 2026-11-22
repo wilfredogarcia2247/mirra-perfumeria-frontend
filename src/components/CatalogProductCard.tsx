@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { getImageUrl, getPrecioMostrar } from '@/lib/utils';
 import { formatPrecio, prefiereMenosMovimiento, Tasa } from '@/lib/catalog';
@@ -15,7 +14,8 @@ interface Props {
   onOpen: (product: Product, foto: HTMLImageElement | null) => void;
 }
 
-// Tarjeta compacta para el catálogo en dos columnas (celular)
+// Tarjeta del catálogo (estilo nuevo): toda la tarjeta abre la hoja del perfume para elegir tamaño y agregar.
+// Debajo del nombre va el perfume original (ficha.inspirado_en), si la ficha lo tiene.
 export default function CatalogProductCard({ product, tasa, index, onOpen }: Props) {
   const ref = useRef<HTMLElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -40,14 +40,15 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
 
   const precio = formatPrecio(getPrecioMostrar(product).precio, tasa);
   const open = () => onOpen(product, imgRef.current);
+  const inspirado = product.ficha?.inspirado_en?.trim();
 
   return (
     <article
       ref={ref}
       style={{ transitionDelay: visible ? `${(index % 2) * 90}ms` : undefined }}
-      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-[#e8d9c5] bg-white shadow-sm transition-all duration-500 ease-out ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-mirra-linea bg-white transition-all duration-500 ease-out ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
     >
-      <div className="relative aspect-square overflow-hidden bg-[#efe7dc]">
+      <div className="relative aspect-square overflow-hidden bg-mirra-crema">
         <button type="button" onClick={open} className="block h-full w-full" aria-label={`Ver ${product.name}`}>
           <img
             ref={imgRef}
@@ -63,39 +64,31 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
           />
         </button>
         {product.mas_pedido && !product.agotado && (
-          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-[#e4572e] px-2 py-1 text-[10px] font-bold text-white shadow sm:text-[11px]">
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] font-semibold text-[#f3e9d8] sm:text-[11px]">
             🔥 Más pedido
           </span>
         )}
-        {product.agotado ? (
-          <SoldOutOverlay size="sm" />
-        ) : (
-          <button
-            type="button"
-            onClick={open}
-            aria-label={`Agregar ${product.name}`}
-            className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#CA9E67] text-white shadow-lg transition active:scale-90 hover:bg-[#b58a53]"
-          >
-            <Plus className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        )}
+        {product.agotado && <SoldOutOverlay size="sm" />}
       </div>
       <button type="button" onClick={open} className="flex flex-1 flex-col p-2.5 text-left sm:p-3.5">
         {product.category && (
-          <span className="self-start rounded-full bg-[#f5eee6] px-2 py-0.5 text-[10px] font-semibold text-[#8b6439] sm:text-xs">{product.category}</span>
+          <span className="self-start rounded-full bg-[#f6efe5] px-2 py-0.5 text-[10px] font-semibold text-mirra-oro-osc sm:text-xs">{product.category}</span>
         )}
-        <h3 className="mt-1.5 line-clamp-2 h-[2.6em] font-bell-mt text-[13px] font-semibold leading-[1.3] text-gray-900 sm:text-base">
+        <h3 className="mt-1.5 line-clamp-2 font-bell-mt text-[14px] font-normal leading-[1.3] text-mirra-tinta sm:text-[17px]">
           {product.name}
         </h3>
-        <div className="mt-auto pt-1">
+        {inspirado && (
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.35] text-mirra-suave sm:text-xs">Inspirado en {inspirado}</p>
+        )}
+        <div className="mt-auto pt-1.5">
           {product.agotado ? (
-            <p className="text-xs font-semibold text-gray-500">Agotado por el momento</p>
+            <p className="text-xs text-mirra-suave">Agotado por el momento</p>
           ) : precio ? (
-            <p className="whitespace-nowrap text-sm font-bold text-[#8b6439] sm:text-base">
-              <span className="mr-1 text-[10px] font-medium text-gray-500 sm:text-xs">Desde</span>{precio}
+            <p className="whitespace-nowrap text-sm font-bold text-mirra-tinta sm:text-base">
+              <span className="mr-1 text-[10px] font-normal text-mirra-suave sm:text-xs">Desde</span>{precio}
             </p>
           ) : (
-            <p className="text-xs font-semibold text-gray-500">Consultar precio</p>
+            <p className="text-xs text-mirra-suave">Consultar precio</p>
           )}
         </div>
       </button>

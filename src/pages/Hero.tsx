@@ -243,15 +243,18 @@ export default function Hero() {
   }, []);
 
   useEffect(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? catalogProducts.filter((product) => (
-        (product.name || '').toLowerCase().includes(q) ||
-        (product.brand || '').toLowerCase().includes(q) ||
-        (product.description || '').toLowerCase().includes(q) ||
-        (product.category || '').toLowerCase().includes(q) ||
-        (product.categories || []).join(' ').toLowerCase().includes(q)
-      ))
+    // Busca en el nombre, la marca, la descripción, la categoría y el perfume original (ficha);
+    // sin importar acentos ni mayúsculas, y cada palabra por separado ("black opium" = "opium black")
+    const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const palabras = sinAcentos(search.trim()).split(/\s+/).filter(Boolean);
+    const filtered = palabras.length
+      ? catalogProducts.filter((product) => {
+        const texto = sinAcentos([
+          product.name, product.brand, product.description, product.category,
+          (product.categories || []).join(' '), product.ficha?.inspirado_en, product.ficha?.casa,
+        ].filter(Boolean).join(' '));
+        return palabras.every((p) => texto.includes(p));
+      })
       : catalogProducts;
 
     const categoryFiltered = selectedCategory === 'all'
@@ -505,24 +508,24 @@ export default function Hero() {
 
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
-          <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3 capitalize">
+          <h2 className="text-[26px] sm:text-4xl font-bell-mt font-normal text-mirra-tinta mb-2 sm:mb-3 capitalize">
             {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${selectedCategory.split('-').join(' ')}`}
           </h2>
-          <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
-          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">
+          <div className="w-11 h-px bg-mirra-oro mx-auto mb-4 sm:mb-5"></div>
+          <p className="text-mirra-suave text-[13px] sm:text-base leading-relaxed max-w-2xl mx-auto">
             {categorySlug ? `Explora nuestra selección de ${categorySlug.replace(/-/g, ' ')}` : 'Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.'}
           </p>
         </div>
-        <div className="mb-8 sm:mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
+        <div className="mb-5 sm:mb-8 flex flex-col md:flex-row md:items-center md:justify-center">
           <div className="w-full md:w-2/3">
             <div className="relative">
-              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-[18px] sm:h-[18px] text-[#a8a29e]" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Buscar por nombre, marca o descripción..."
-                className="w-full pl-9 sm:pl-12 pr-4 sm:pr-6 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
+                placeholder="Busca por nombre o perfume original"
+                className="w-full pl-10 sm:pl-12 pr-4 sm:pr-6 py-3 sm:py-3.5 rounded-xl bg-white border border-mirra-linea text-base text-mirra-tinta placeholder:text-[#a8a29e] focus:outline-none focus:border-[#cdbfae] focus:ring-2 focus:ring-mirra-crema focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
               />
             </div>
           </div>
@@ -548,7 +551,7 @@ export default function Hero() {
                       key={f.slug}
                       type="button"
                       onClick={() => navigate(RUTA_SET)}
-                      className="shrink-0 rounded-full border-[1.5px] border-[#b08a57] bg-white px-4 py-2 text-sm font-semibold text-[#7a5c33] transition hover:bg-[#fbf7f1]"
+                      className="shrink-0 rounded-full border border-mirra-oro bg-white px-4 py-2 text-sm font-semibold text-mirra-oro-osc transition hover:bg-mirra-fondo"
                     >
                       {f.label}
                     </button>
@@ -562,7 +565,7 @@ export default function Hero() {
                     role="tab"
                     aria-selected={activo}
                     onClick={() => elegirFiltro(f.slug)}
-                    className={`shrink-0 rounded-full border-[1.5px] px-4 py-2 text-sm font-semibold transition ${activo ? 'border-gray-900 bg-gray-900 text-white' : 'border-[#e8d9c5] bg-white text-gray-800 hover:border-[#CA9E67]'}`}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activo ? 'border-mirra-tinta bg-mirra-tinta text-white' : 'border-mirra-linea bg-white text-mirra-tinta hover:border-[#d6cfc5]'}`}
                   >
                     {f.label}
                   </button>
@@ -574,7 +577,7 @@ export default function Hero() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
+          <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-mirra-oro animate-spin" /></div>
         ) : (
           <div ref={listaRef} className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {products.map((p, i) => (
@@ -605,7 +608,7 @@ export default function Hero() {
 
         <div className="flex flex-col items-center justify-center mt-6 sm:mt-8 gap-4">
           {/* Info text */}
-          <div className="text-xs sm:text-sm text-copper-600 text-center">
+          <div className="text-xs sm:text-sm text-mirra-suave text-center">
             {total !== null ? `Mostrando página ${page} de ${Math.max(1, Math.ceil((total || 0) / perPage))} — ${total} productos` : ''}
           </div>
 
@@ -613,7 +616,7 @@ export default function Hero() {
           <div className="flex flex-wrap items-center justify-center gap-2">
             {/* Jump to first page */}
             <button
-              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(1)}
               disabled={page === 1}
               title="Ir a la primera página"
@@ -623,7 +626,7 @@ export default function Hero() {
 
             {/* Previous page */}
             <button
-              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(Math.max(1, page - 1))}
               disabled={page === 1}
             >
@@ -650,14 +653,14 @@ export default function Hero() {
                   <button
                     key={1}
                     onClick={() => irAPagina(1)}
-                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
+                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors font-medium"
                   >
                     1
                   </button>
                 );
                 if (startPage > 2) {
                   pageNumbers.push(
-                    <span key="ellipsis-start" className="hidden sm:inline px-2 text-gray-400">...</span>
+                    <span key="ellipsis-start" className="hidden sm:inline px-2 text-[#a8a29e]">...</span>
                   );
                 }
               }
@@ -668,9 +671,9 @@ export default function Hero() {
                   <button
                     key={i}
                     onClick={() => irAPagina(i)}
-                    className={`w-8 h-8 flex items-center justify-center text-xs sm:text-sm rounded-md border transition-all font-medium ${i === page
-                      ? 'bg-gradient-to-r from-primary-500 to-amber-600 text-white border-primary-600 shadow-md scale-110'
-                      : 'border-gray-300 bg-white hover:bg-gray-50 hover:border-primary-300'
+                    className={`w-8 h-8 flex items-center justify-center text-xs sm:text-sm rounded-lg border transition-all font-medium ${i === page
+                      ? 'bg-mirra-tinta text-white border-mirra-tinta'
+                      : 'border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5]'
                       }`}
                   >
                     {i}
@@ -682,14 +685,14 @@ export default function Hero() {
               if (endPage < totalPages) {
                 if (endPage < totalPages - 1) {
                   pageNumbers.push(
-                    <span key="ellipsis-end" className="hidden sm:inline px-2 text-gray-400">...</span>
+                    <span key="ellipsis-end" className="hidden sm:inline px-2 text-[#a8a29e]">...</span>
                   );
                 }
                 pageNumbers.push(
                   <button
                     key={totalPages}
                     onClick={() => irAPagina(totalPages)}
-                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
+                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors font-medium"
                   >
                     {totalPages}
                   </button>
@@ -701,7 +704,7 @@ export default function Hero() {
 
             {/* Next page */}
             <button
-              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(page + 1)}
               disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}
             >
@@ -710,7 +713,7 @@ export default function Hero() {
 
             {/* Jump to last page */}
             <button
-              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => {
                 const totalPages = Math.max(1, Math.ceil((total || 0) / perPage));
                 irAPagina(totalPages);
