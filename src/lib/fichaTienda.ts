@@ -48,7 +48,6 @@ export function idealPara(f: FichaPerfume | null): string[] {
   const o: string[] = [];
   if (f.momento && f.momento !== 'noche') o.push('Diario', 'Oficina');
   if (f.momento && f.momento !== 'dia') o.push('Cita', 'Salida de noche');
-  if (f.familias.includes('dulce') || f.familias.includes('gourmand')) o.push('Para consentirse');
   if (f.familias.some((x) => FRESCAS.includes(x))) o.push('Calor', 'Playa');
   return [...new Set(o)].slice(0, 5);
 }
