@@ -84,7 +84,7 @@ function Rail({ children, dark = false, itemClassName }: { children: React.React
   };
   const arrowClass = dark
     ? 'border-white/20 bg-white/10 text-white hover:bg-white/20'
-    : 'border-gray-200 bg-white text-gray-800 shadow hover:bg-gray-50';
+    : 'border-mirra-linea bg-white text-mirra-tinta shadow-[0_4px_14px_rgba(40,30,20,0.08)] hover:bg-mirra-fondo';
   return (
     <div className="relative">
       <div ref={ref} className="flex snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-4 scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -106,8 +106,8 @@ function Rail({ children, dark = false, itemClassName }: { children: React.React
   );
 }
 
-// Banda premium con el color de la marca (#CA9E67) en versión clara:
-// fondo con sus tonos suaves, tarjetas blancas y acentos dorados.
+// Banda de recomendados con el estilo nuevo de la tienda (crema, negro suave y dorado de acento):
+// tarjetas blancas con borde fino y botones negros.
 type OpenFn = (product: Product, foto: HTMLImageElement | null) => void;
 
 function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa; onOpen: OpenFn }) {
@@ -117,27 +117,26 @@ function FeaturedCard({ product, tasa, onOpen }: { product: Product; tasa: Tasa;
   const brand = brandOf(product);
   const presentations = presentationsOf(product);
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#e8d9c5] bg-white shadow-lg">
-      <button type="button" onClick={open} className="relative block aspect-square overflow-hidden">
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-mirra-linea bg-white">
+      <button type="button" onClick={open} className="relative block aspect-square overflow-hidden bg-mirra-crema">
         <ProductImage product={product} className="transition-transform duration-700 group-hover:scale-105" />
         {product.agotado && <SoldOutOverlay />}
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white to-transparent" />
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#CA9E67] px-2 py-0.5 text-[10px] sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px] font-semibold text-white">
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px] font-semibold text-[#f3e9d8]">
           <Star className="h-3 w-3 fill-current" /> Recomendado
         </span>
       </button>
       <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:px-5 sm:py-4">
-        {brand && <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-700 sm:text-[11px]">{brand}</p>}
-        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-semibold sm:min-h-[3.25rem] sm:text-lg leading-snug text-gray-900">{cleanName(product.name, false)}</h3>
-        {presentations.length > 0 && <p className="text-[11px] text-gray-500 sm:text-xs">{presentations.join(' · ')}</p>}
+        {brand && <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-mirra-oro-osc sm:text-[11px]">{brand}</p>}
+        <h3 className="line-clamp-2 min-h-[2.6rem] font-bell-mt text-[15px] font-normal sm:min-h-[3.25rem] sm:text-lg leading-snug text-mirra-tinta">{cleanName(product.name, false)}</h3>
+        {presentations.length > 0 && <p className="text-[11px] text-mirra-suave sm:text-xs">{presentations.join(' · ')}</p>}
         <div className="mt-auto pt-1.5 sm:pt-2">
           {price ? (
             <>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 sm:text-[11px]">Desde</p>
-              <p className="whitespace-nowrap text-lg font-semibold leading-tight text-[#8b6439] sm:text-xl">{price}</p>
+              <p className="text-[10px] uppercase tracking-wider text-mirra-suave sm:text-[11px]">Desde</p>
+              <p className="whitespace-nowrap text-lg font-bold leading-tight text-mirra-tinta sm:text-xl">{price}</p>
             </>
-          ) : <p className="text-sm text-gray-500">Consultar precio</p>}
-          <button type="button" onClick={open} className={`mt-2.5 w-full rounded-lg px-3 py-2 text-[13px] font-semibold sm:mt-3 sm:px-4 sm:py-2.5 sm:text-sm transition ${product.agotado ? 'bg-gray-200 text-gray-500' : 'bg-[#CA9E67] text-white hover:bg-[#b58a53]'}`}>
+          ) : <p className="text-sm text-mirra-suave">Consultar precio</p>}
+          <button type="button" onClick={open} className={`mt-2.5 w-full rounded-[10px] px-3 py-2 text-[13px] font-semibold sm:mt-3 sm:px-4 sm:py-2.5 sm:text-sm transition ${product.agotado ? 'bg-mirra-crema text-mirra-suave' : 'bg-mirra-tinta text-white hover:bg-black'}`}>
             {product.agotado ? 'Agotado por el momento' : 'Ver presentaciones'}
           </button>
         </div>
@@ -180,23 +179,23 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
 
   return (
     <>
-      <section className="w-full bg-gradient-to-b from-[#f5eee6] to-[#e8d9c5] py-12 md:py-16" aria-label="Productos destacados">
-        {/* Texto de la marca a la izquierda y favoritos a la derecha (en celular, el texto va arriba) */}
-        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-8 px-4 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10 lg:px-8">
-          <div className="text-center lg:text-left">
-            <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a07746] sm:text-xs sm:tracking-[0.3em] lg:text-[11px] lg:tracking-[0.16em]">✦ Seleccionados por Mirra ✦</span>
-            <h2 className="mt-3 font-bell-mt text-3xl font-bold leading-tight text-gray-900 md:text-4xl">Nuestras recomendaciones</h2>
-            <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-[#CA9E67] to-transparent lg:mx-0 lg:from-[#CA9E67]" />
-            <p className="mx-auto mt-4 max-w-md leading-relaxed text-[#6b5b4d] lg:mx-0">Fragancias que elegimos especialmente para ti.</p>
-            <a href="#catalog" className="mt-6 hidden rounded-lg bg-[#CA9E67] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#b58a53] lg:inline-block">
+      <section className="w-full bg-gradient-to-b from-mirra-crema to-mirra-fondo py-12 md:py-16" aria-label="Productos destacados">
+        {/* En PC los favoritos a la izquierda y el texto a la derecha (alterna con la portada); en celular el texto va arriba */}
+        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10 lg:px-8">
+          <div className="text-center lg:order-2 lg:text-left">
+            <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-mirra-oro sm:text-xs sm:tracking-[0.3em] lg:text-[11px] lg:tracking-[0.16em]">✦ Seleccionados por Mirra ✦</span>
+            <h2 className="mt-3 font-bell-mt text-3xl font-normal leading-tight text-mirra-tinta md:text-4xl">Nuestras recomendaciones</h2>
+            <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-mirra-oro to-transparent lg:mx-0 lg:from-mirra-oro" />
+            <p className="mx-auto mt-4 max-w-md leading-relaxed text-mirra-suave lg:mx-0">Fragancias que elegimos especialmente para ti.</p>
+            <a href="#catalog" className="mt-6 hidden rounded-[10px] border border-mirra-tinta bg-white px-5 py-3 text-sm font-semibold text-mirra-tinta transition hover:bg-mirra-fondo lg:inline-block">
               Ver todos los perfumes
             </a>
           </div>
-          <Rail itemClassName="w-[62%] sm:w-[46%] lg:w-[calc(33.333%-11px)]">
+          <div className="min-w-0 lg:order-1"><Rail itemClassName="w-[62%] sm:w-[46%] lg:w-[calc(33.333%-11px)]">
             {featured.map((product) => <FeaturedCard key={product.id} product={product} tasa={tasa} onOpen={(p, foto) => setSelected({ product: p, foto })} />)}
-          </Rail>
+          </Rail></div>
           {/* En celular el botón va debajo de las tarjetas, para que los productos aparezcan antes */}
-          <a href="#catalog" className="-mt-2 block rounded-lg border-2 border-[#CA9E67] px-5 py-3 text-center text-sm font-semibold text-[#8b6439] transition hover:bg-white/60 lg:hidden">
+          <a href="#catalog" className="-mt-2 block rounded-[10px] border border-mirra-tinta bg-white px-5 py-3 text-center text-sm font-semibold text-mirra-tinta transition hover:bg-mirra-fondo lg:hidden">
             Ver todos los perfumes
           </a>
         </div>

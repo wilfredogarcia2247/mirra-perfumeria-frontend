@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { bajarAlCatalogo } from '@/lib/catalog';
@@ -80,7 +79,7 @@ function Foto({ foto }: { foto: FotoCinta | null }) {
   const [fallo, setFallo] = useState(false);
   const src = foto && !fallo ? (usarOriginal ? foto.original : foto.mini) : null;
   return (
-    <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#f3e9dc] shadow-md sm:h-36 sm:w-32 lg:h-44 lg:w-40">
+    <div className="relative h-[116px] w-24 shrink-0 overflow-hidden rounded-2xl bg-mirra-crema sm:h-[136px] sm:w-[108px] lg:h-[148px] lg:w-[118px]">
       <img
         src="/isotipo.png"
         alt=""
@@ -108,8 +107,10 @@ interface PortadaCintaProps {
   selectedCategory: string;
 }
 
-// Portada de la tienda: filas de perfumes que se deslizan de fondo
-// (una hacia cada lado) y, encima, una tarjeta con el mensaje y los botones.
+// Portada de la tienda (estilo nuevo, maquetas/tienda-nueva.html):
+// - PC: el mensaje a la izquierda y, a la derecha, 3 filas de perfumes que se deslizan
+//   (una hacia cada lado) con los bordes desvanecidos.
+// - Teléfono: 2 filas arriba y el mensaje debajo.
 export default function PortadaCinta({ products, selectedCategory }: PortadaCintaProps) {
   const filas = useMemo(() => {
     const fotos = fotosDe(products);
@@ -123,51 +124,48 @@ export default function PortadaCinta({ products, selectedCategory }: PortadaCint
   const categoria = selectedCategory.split('-').join(' ');
 
   return (
-    <section className="relative z-10 overflow-hidden bg-gradient-to-b from-gray-50 to-[#f5eee6]" aria-label="Portada">
-      {/* Cinta de perfumes (decorativa) */}
-      <div className="pointer-events-none absolute inset-x-[-10%] top-24 flex sm:top-16 -rotate-[4deg] flex-col gap-3 sm:gap-4" aria-hidden="true">
-        {filas.map((fotos, fila) => (
-          <div key={fila} className={`cinta-fila flex w-max gap-3 sm:gap-4 ${fila % 2 ? 'cinta-reversa' : ''}`}>
-            {/* Se repite dos veces para que el movimiento no tenga cortes */}
-            {/* La key incluye la foto: al llegar los productos cada lugar empieza de cero (miniatura primero) */}
-            {[...fotos, ...fotos].map((foto, i) => <Foto key={`${i}-${foto?.original ?? ''}`} foto={foto} />)}
+    // El espacio de arriba deja libre el encabezado fijo (cintillo + barra)
+    <section className="relative z-10 overflow-hidden bg-mirra-fondo pt-[104px] md:pt-[124px]" aria-label="Portada">
+      <div className="mx-auto max-w-7xl lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10 lg:px-8 lg:pb-14 lg:pt-6">
+        {/* Cinta de perfumes (decorativa); en PC con los bordes izquierdo y derecho desvanecidos */}
+        <div
+          className="pointer-events-none overflow-hidden lg:order-2 lg:rounded-[20px] lg:[-webkit-mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)] lg:[mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]"
+          aria-hidden="true"
+        >
+          <div className="flex flex-col gap-2.5">
+            {filas.map((fotos, fila) => (
+              // La tercera fila solo se ve en PC
+              <div key={fila} className={`cinta-fila w-max gap-2.5 ${fila % 2 ? 'cinta-reversa' : ''} ${fila === 2 ? 'hidden lg:flex' : 'flex'}`}>
+                {/* Se repite dos veces para que el movimiento no tenga cortes */}
+                {/* La key incluye la foto: al llegar los productos cada lugar empieza de cero (miniatura primero) */}
+                {[...fotos, ...fotos].map((foto, i) => <Foto key={`${i}-${foto?.original ?? ''}`} foto={foto} />)}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {/* Suaviza los bordes de la cinta */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#f5eee6]" aria-hidden="true" />
+        </div>
 
-      <div className="relative flex min-h-[640px] items-end justify-center px-4 pb-8 pt-32 sm:min-h-[600px] sm:items-center sm:pb-12 sm:px-6 lg:min-h-[640px]">
-        <div className="w-full max-w-2xl rounded-3xl bg-white/95 px-5 py-6 text-center shadow-2xl backdrop-blur-md sm:px-10 sm:py-10">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a07746]">
-            ✦ {enCategoria ? categoria : 'Colección 2026'} ✦
+        <div className="px-6 pb-10 pt-6 text-center lg:order-1 lg:p-0 lg:text-left">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.26em] text-mirra-oro lg:text-[11px]">
+            {enCategoria ? categoria : 'Mirra Perfumería · Maracaibo'}
           </span>
-          <h1 className="mt-2 font-bell-mt text-[28px] font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl">
-            Descubre la Esencia de la <span className="text-primary-600">Elegancia</span>
+          <h1 className="mt-2 font-bell-mt text-[30px] font-normal leading-[1.15] text-mirra-tinta sm:text-4xl lg:mt-3 lg:text-[46px]">
+            Tu perfume favorito,<br />a tu medida
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed sm:mt-4 text-gray-600 sm:text-lg">
+          <p className="mx-auto mt-3 max-w-[320px] text-[13.5px] leading-relaxed text-mirra-suave sm:max-w-md lg:mx-0 lg:mt-4 lg:max-w-[420px] lg:text-[15px]">
             {enCategoria
               ? `Descubre nuestra selección exclusiva de ${selectedCategory.replace(/-/g, ' ')}.`
-              : 'Sumérgete en nuestra exclusiva colección de fragancias que capturan la esencia del lujo y la sofisticación.'}
+              : 'Fragancias inspiradas en las grandes casas, preparadas para ti en el tamaño que prefieras.'}
           </p>
-          <div className="mt-5 flex items-stretch justify-center gap-2 sm:mt-7 sm:gap-4">
-            <a
-              href="#catalog"
-              onClick={(e) => {
-                // Baja dejando el título "Nuestros Productos" visible bajo el menú fijo
-                if (bajarAlCatalogo()) e.preventDefault();
-              }}
-              className="flex-1 transform rounded-lg bg-gradient-to-r from-primary-500 to-amber-600 whitespace-nowrap px-2 py-3 text-center text-[13px] font-semibold min-[400px]:text-sm text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-500/30 sm:flex-none sm:px-8 sm:py-4 sm:text-base"
-            >
-              Explorar Colección
-            </a>
-            <Link
-              to="/about"
-              className="flex-1 rounded-lg border-2 border-gray-200 bg-white/80 whitespace-nowrap px-2 py-3 text-center text-[13px] font-medium min-[400px]:text-sm text-gray-700 transition-all duration-300 hover:border-primary-200 hover:bg-white sm:flex-none sm:px-8 sm:py-4 sm:text-base"
-            >
-              Nuestra Historia
-            </Link>
-          </div>
+          <a
+            href="#catalog"
+            onClick={(e) => {
+              // Baja dejando el título "Nuestros Productos" visible bajo el menú fijo
+              if (bajarAlCatalogo()) e.preventDefault();
+            }}
+            className="mt-5 inline-flex items-center justify-center rounded-xl bg-mirra-tinta px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-black lg:mt-7"
+          >
+            Ver perfumes
+          </a>
         </div>
       </div>
     </section>

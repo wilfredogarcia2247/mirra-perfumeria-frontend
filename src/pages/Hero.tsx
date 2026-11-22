@@ -489,13 +489,7 @@ export default function Hero() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-x-clip">
-      {/* Decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -right-20 -top-20 w-96 h-96 bg-primary-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-gradient-radial from-primary-100 to-transparent rounded-full opacity-10"></div>
-      </div>
+    <div className="min-h-screen bg-mirra-fondo relative overflow-x-clip">
 
       <Header cartItemsCount={count} cartPulseKey={cartPulseKey} onCartClick={() => setIsCartOpen(true)} />
 
@@ -735,7 +729,7 @@ export default function Hero() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Hablar con Mirra Perfumería por WhatsApp"
-        className="catalog-whatsapp group fixed bottom-5 right-4 sm:bottom-7 sm:right-7 z-40 inline-flex items-center gap-2 rounded-full border border-white/70 bg-gradient-to-r from-primary-500 to-amber-600 px-3 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(158,108,57,0.28)] transition-all duration-300 hover:-translate-y-1 hover:from-primary-600 hover:to-amber-700 hover:shadow-[0_14px_32px_rgba(158,108,57,0.36)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-primary-300/40"
+        className="catalog-whatsapp group fixed bottom-5 right-4 sm:bottom-7 sm:right-7 z-40 inline-flex items-center gap-2 rounded-full border border-white/20 bg-mirra-tinta px-3 py-3 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-1 hover:from-primary-600 hover:to-amber-700 hover:shadow-[0_14px_32px_rgba(158,108,57,0.36)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-primary-300/40"
       >
         <MessageCircle className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
         <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-40 group-hover:opacity-100 group-focus-visible:max-w-40 group-focus-visible:opacity-100">
