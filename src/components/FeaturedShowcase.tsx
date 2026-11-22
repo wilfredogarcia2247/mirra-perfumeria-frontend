@@ -172,7 +172,8 @@ export default function FeaturedShowcase({ products, onAddToCart }: FeaturedShow
     }
     const espera = volarAlCarrito(foto?.currentSrc || getImageUrl(product), foto ? foto.getBoundingClientRect() : null);
     window.setTimeout(() => {
-      addItem(product, 1);
+      const aviso = addItem(product, 1);
+      if (aviso) { toast.error(aviso); return; }
       toast.success(`${product.name} agregado al carrito`);
     }, espera);
   };

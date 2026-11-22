@@ -9,7 +9,7 @@ import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, loo
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
 import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
-import useCart, { CartItem } from '@/hooks/use-cart';
+import useCart, { CartItem, avisoSinEsencia } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { trackCatalogPageView } from '@/lib/google-ads';
@@ -368,12 +368,16 @@ export default function Hero() {
 
   // Agregar desde la ventana: la foto vuela al carrito y luego se suma
   function handleAddFromSheet(item: Product, foto: HTMLImageElement | null) {
+    // Si ya no alcanza la esencia, se avisa antes de que la foto "vuele" al carrito
+    const aviso = avisoSinEsencia(cartItems, item, 1);
+    if (aviso) { toast.error(aviso); return; }
     const espera = volarAlCarrito(foto?.currentSrc || getImageUrl(item), foto ? foto.getBoundingClientRect() : null);
     window.setTimeout(() => handleAddToCart(item), espera);
   }
 
   function handleAddToCart(product: Product) {
-    addItem(product, 1);
+    const aviso = addItem(product, 1);
+    if (aviso) { toast.error(aviso); return; }
     setCartPulseKey((prev) => prev + 1);
     toast.success(`${product.name} agregado al carrito`);
   }
@@ -960,12 +964,12 @@ export default function Hero() {
                                   type="number"
                                   min={1}
                                   value={it.qty}
-                                  onChange={(e) => updateQty(it.key, Math.max(1, Number(e.target.value || 1)))}
+                                  onChange={(e) => { const aviso = updateQty(it.key, Math.max(1, Number(e.target.value || 1))); if (aviso) toast.error(aviso); }}
                                   className="w-8 text-center bg-transparent text-base md:text-sm font-medium focus:outline-none appearance-none m-0 p-0"
                                 />
                                 <button
                                   className="px-2 h-full hover:bg-gray-200 text-gray-600 rounded-r-lg transition-colors flex items-center justify-center active:bg-gray-300"
-                                  onClick={() => updateQty(it.key, (it.qty || 1) + 1)}
+                                  onClick={() => { const aviso = updateQty(it.key, (it.qty || 1) + 1); if (aviso) toast.error(aviso); }}
                                 >+</button>
                               </div>
                             </div>

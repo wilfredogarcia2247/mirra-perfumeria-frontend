@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PildorasTamano from '@/components/PildorasTamano';
-import useCart from '@/hooks/use-cart';
+import useCart, { avisoSinEsencia } from '@/hooks/use-cart';
 import { getCatalogoPaginated, getCachedTasaActiva } from '@/integrations/api';
 import { productoDesdeCatalogo } from '@/lib/catalogoPublico';
 import { formatPrecio, type Tasa } from '@/lib/catalog';
@@ -263,6 +263,15 @@ export default function SetTodaOcasion() {
   // el carrito y el cliente cambió algo, lo reemplaza (no lo suma ni duplica perfumes).
   const comprar = () => {
     if (lineas.length === 0 || yaAgregado) return;
+    // Antes de tocar el carrito: ¿alcanza la esencia para los tres (junto con lo que ya hay)?
+    const quedan = setEnCarrito ? items.filter((it) => !(agregados[para] ?? []).includes(it.key)) : items;
+    let prueba = [...quedan];
+    for (const [i, l] of lineas.entries()) {
+      const prod = { ...l.producto, tamano: l.pres!.tamano } as Product;
+      const aviso = avisoSinEsencia(prueba, prod, 1);
+      if (aviso) { toast.error(`${l.producto.name}: ${aviso}`); return; }
+      prueba = [...prueba, { key: `prueba-${i}`, product: prod, qty: 1 }];
+    }
     if (setEnCarrito) sacarDelCarrito(agregados[para] ?? []);
     for (const l of lineas) {
       addItem({ ...l.producto, tamano: l.pres!.tamano, precio_snapshot: l.pres!.precio ?? undefined, set_etiqueta: para, set_total: lineas.length } as Product, 1);

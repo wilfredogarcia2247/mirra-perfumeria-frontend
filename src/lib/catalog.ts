@@ -25,7 +25,8 @@ export function formatPrecio(precio: number | null | undefined, tasa: Tasa) {
 
 // Presentación (fórmula) tal como llega del catálogo
 // agotada: no queda esencia para preparar esta presentación (la marca el catálogo)
-export type Tamano = { id?: number; nombre?: string | null; precio_venta?: number | null; precio_calculado?: number | null; agotada?: boolean };
+// esencia_g: gramos de esencia que pide un frasco de esta presentación
+export type Tamano = { id?: number; nombre?: string | null; precio_venta?: number | null; precio_calculado?: number | null; agotada?: boolean; esencia_g?: number | null };
 
 export type Presentacion = { tamano: Tamano; label: string; precio: number | null; agotada: boolean };
 
