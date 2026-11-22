@@ -34,6 +34,7 @@ export function productoDesdeCatalogo(item: any): Product {
     featured: Boolean(item.destacado ?? item.featured ?? false),
     agotado: Boolean(item.agotado),
     mas_pedido: Boolean(item.mas_pedido),
+    quedan_pocos: Boolean(item.quedan_pocos),
     brand: (item.marca && (item.marca.nombre ?? item.marca.name)) ?? item.marca_nombre ?? item.marca ?? item.brand ?? '',
     categories: categoryNames(item),
     category: categoryLabel(categoryNames(item)),

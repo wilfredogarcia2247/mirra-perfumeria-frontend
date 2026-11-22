@@ -48,7 +48,7 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
       style={{ transitionDelay: visible ? `${(index % 2) * 90}ms` : undefined }}
       className={`flex h-full flex-col overflow-hidden rounded-2xl border border-mirra-linea bg-white transition-all duration-500 ease-out ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
     >
-      <div className="relative aspect-square overflow-hidden bg-mirra-crema">
+      <div className="group relative aspect-square overflow-hidden bg-mirra-crema">
         <button type="button" onClick={open} className="block h-full w-full" aria-label={`Ver ${product.name}`}>
           <img
             ref={imgRef}
@@ -63,12 +63,28 @@ export default function CatalogProductCard({ product, tasa, index, onOpen }: Pro
             className="h-full w-full object-cover"
           />
         </button>
-        {product.mas_pedido && !product.agotado && (
+        {/* "Quedan pocos" tiene prioridad sobre "Más pedido" (van en el mismo lugar) */}
+        {product.quedan_pocos && !product.agotado && (
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-[#ead9c2] bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#8a5a2b] sm:text-[11px]">
+            Quedan pocos
+          </span>
+        )}
+        {product.mas_pedido && !product.quedan_pocos && !product.agotado && (
           <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-mirra-tinta/85 px-2 py-0.5 text-[10px] font-semibold text-[#f3e9d8] sm:text-[11px]">
             🔥 Más pedido
           </span>
         )}
         {product.agotado && <SoldOutOverlay size="sm" />}
+        {!product.agotado && (
+          <button
+            type="button"
+            onClick={open}
+            tabIndex={-1}
+            className="absolute inset-x-2.5 bottom-2.5 hidden translate-y-2 rounded-[10px] bg-mirra-tinta/90 py-2.5 text-[13px] font-semibold text-white opacity-0 transition-all duration-300 [@media(hover:hover)]:block group-hover:translate-y-0 group-hover:opacity-100"
+          >
+            Agregar
+          </button>
+        )}
       </div>
       <button type="button" onClick={open} className="flex flex-1 flex-col p-2.5 text-left sm:p-3.5">
         {product.category && (
