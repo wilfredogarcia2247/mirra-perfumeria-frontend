@@ -187,7 +187,7 @@ export default function SetTodaOcasion() {
         const p = g ? (opciones[m.v] ?? []).find((x) => String(x.id) === String(g.id)) : undefined;
         if (p) {
           const pres = presentacionesConPrecio(p);
-          nuevas[m.v] = { producto: p, tam: g!.tam >= 0 && g!.tam < pres.length ? g!.tam : presentacionInicial(pres) };
+          nuevas[m.v] = { producto: p, tam: g!.tam >= 0 && g!.tam < pres.length && !pres[g!.tam].agotada ? g!.tam : presentacionInicial(pres) };
         } else {
           nuevas[m.v] = nuevaEleccion(m.v);
         }

@@ -27,7 +27,8 @@ interface Props {
 // La foto es la protagonista: ocupa todo el ancho.
 export default function ProductQuickSheet({ product, tasa, origen, onClose, onAdd }: Props) {
   const presentaciones = presentacionesDe(product);
-  const [elegida, setElegida] = useState(0);
+  // Empieza en el tamaño disponible más barato (los agotados se ven apagados)
+  const [elegida, setElegida] = useState(() => Math.max(0, presentaciones.findIndex((p) => !p.agotada)));
   // Ficha del perfume: datos rápidos arriba y detalles (familia, casa y año del original).
   // Las notas no se muestran porque ya salen en la foto de cada perfume.
   const ficha = product.ficha ? normalizarFicha(product.ficha) : null;
@@ -102,7 +103,7 @@ export default function ProductQuickSheet({ product, tasa, origen, onClose, onAd
 
   const actual = presentaciones[elegida];
   const precio = actual ? formatPrecio(actual.precio, tasa) : null;
-  const puedeAgregar = !product.agotado && Boolean(actual) && actual.precio != null;
+  const puedeAgregar = !product.agotado && Boolean(actual) && !actual.agotada && actual.precio != null;
 
   const agregar = () => {
     if (!puedeAgregar || !actual) return;

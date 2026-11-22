@@ -193,7 +193,7 @@ export function SugerenciasDescuentoMayor({
       mezclar(disponibles.filter((p) => !p.featured && !p.mas_pedido && mismoGenero(p))),
     ];
     for (const p of grupos.flat()) {
-      const presentaciones = presentacionesDe(p).filter((pr) => pr.precio != null && cuentaParaMayor(pr.tamano?.nombre, config));
+      const presentaciones = presentacionesDe(p).filter((pr) => pr.precio != null && !pr.agotada && cuentaParaMayor(pr.tamano?.nombre, config));
       if (presentaciones.length === 0) continue;
       const elegida = presentaciones.find((pr) => mlDe(pr.tamano?.nombre) === preferido) ?? presentaciones[0];
       resultado.push({
