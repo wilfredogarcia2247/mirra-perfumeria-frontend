@@ -19,21 +19,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast !bg-[hsl(32,30%,18%)] !text-[hsl(32,20%,92%)] !border-[hsl(32,25%,26%)] !shadow-2xl !rounded-2xl !px-5 !py-4 !text-[13px] !font-medium !gap-3.5",
+            "group toast !bg-[#221d1a] !text-[#e9dccb] !border-[#3a312a] !shadow-2xl !rounded-2xl !px-5 !py-4 !text-[13px] !font-medium !gap-3.5",
           title:
-            "!text-[hsl(32,20%,96%)] !font-semibold !text-[14px] !leading-tight",
+            "!text-[#f3e7d0] !font-semibold !text-[14px] !leading-tight",
           description:
-            "!text-[hsl(32,12%,65%)] !text-[13px] !leading-snug !mt-1",
+            "!text-[#b9ad9e] !text-[13px] !leading-snug !mt-1",
           success:
-            "!bg-[hsl(32,30%,18%)] !border-[hsl(32,25%,26%)]",
+            "!bg-[#221d1a] !border-[#3a312a]",
           error:
             "!bg-[hsl(0,28%,16%)] !text-[hsl(0,20%,92%)] !border-[hsl(0,22%,26%)]",
           info:
-            "!bg-[hsl(32,30%,18%)] !border-[hsl(32,25%,26%)]",
+            "!bg-[#221d1a] !border-[#3a312a]",
           warning:
             "!bg-[hsl(38,35%,16%)] !border-[hsl(38,30%,26%)]",
           icon:
-            "!text-[hsl(32,55%,65%)]",
+            "!text-[#c9a96e]",
         },
       }}
       // La librería centra arriba por sí sola: en computadora mide 360px

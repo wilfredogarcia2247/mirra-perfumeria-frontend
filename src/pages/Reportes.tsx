@@ -1048,8 +1048,8 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                   </Card>
 
                   {close.regalias?.cantidad_pedidos > 0 && (
-                    <Card className="border-violet-200 bg-violet-50/40">
-                      <CardHeader className="border-b border-violet-200/70 pb-3">
+                    <Card className="border-amber-200 bg-amber-50/40">
+                      <CardHeader className="border-b border-amber-200/70 pb-3">
                         <CardTitle className="text-base font-medium">🎁 Regalías (completados sin pago)</CardTitle>
                         <p className="text-xs text-muted-foreground">
                           No suman a las ventas del día. Salieron {close.regalias.unidades} perfume(s) en {close.regalias.cantidad_pedidos} pedido(s);
@@ -1060,7 +1060,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                       <CardContent className="space-y-3 pt-4">
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                           {(close.regalias.presentaciones || []).map((item: any) => (
-                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border border-violet-200 bg-white px-3 py-2">
+                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border border-amber-200 bg-white px-3 py-2">
                               <span className="font-medium">{item.presentacion}</span>
                               <span className="tabular-nums">{item.unidades} uds</span>
                             </div>
@@ -1068,7 +1068,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                         </div>
                         <div className="space-y-2">
                           {(close.regalias.pedidos || []).map((pedido: any) => (
-                            <div key={pedido.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-200 bg-white px-3 py-2 text-sm">
+                            <div key={pedido.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm">
                               <span className="font-medium">Pedido #{pedido.id} · {pedido.cliente}</span>
                               <span className="tabular-nums text-muted-foreground">{pedido.unidades} perfume(s) · {formatCloseUsd(pedido.valor_usd)}</span>
                             </div>
@@ -1109,7 +1109,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                               </div>
                             )}
                             {(pedido.ajustes || []).map((ajuste: any) => (
-                              <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-rose-700'}`}>
+                              <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-red-700'}`}>
                                 <span>
                                   {ajuste.tipo === 'descuento' ? 'Descuento' : 'Recargo'}
                                   {' '}{ajuste.modo === 'porcentaje' ? `${ajuste.valor}%` : formatCloseUsd(ajuste.valor)}
@@ -1908,7 +1908,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
         )}
 
         {REPORTES_CON_REGALIAS.has(selectedReport) && metrics.regalias?.pedidos > 0 && (
-          <p role="status" className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+          <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             🎁 {metrics.regalias.pedidos} pedido(s) completado(s) sin pago ({metrics.regalias.unidades} perfume(s), ${metrics.regalias.valor.toFixed(2)} a precio de venta) son regalías y no cuentan como venta en este reporte.
           </p>
         )}
