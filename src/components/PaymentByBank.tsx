@@ -1701,14 +1701,14 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
             <button
               type="button"
               onClick={() => setPaymentMode('single')}
-              className={`text-sm px-2 py-1 rounded ${paymentMode === 'single' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`whitespace-nowrap text-sm px-3 py-1.5 rounded-full ${paymentMode === 'single' ? 'bg-foreground text-white' : 'border border-input bg-card text-foreground'}`}
             >
               Pago único
             </button>
             <button
               type="button"
               onClick={() => setPaymentMode('multiple')}
-              className={`text-sm px-2 py-1 rounded ${paymentMode === 'multiple' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`whitespace-nowrap text-sm px-3 py-1.5 rounded-full ${paymentMode === 'multiple' ? 'bg-foreground text-white' : 'border border-input bg-card text-foreground'}`}
             >
               Varios pagos
             </button>
@@ -1730,9 +1730,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
       <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
         {borradorRecuperado && (
-          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
             <span>Recuperamos lo que habías escrito para este pedido.</span>
-            <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-sky-300 bg-white px-3 text-xs font-medium hover:bg-sky-100">Borrar y empezar de nuevo</button>
+            <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-input bg-card px-3 text-xs font-medium hover:bg-muted">Borrar y empezar de nuevo</button>
           </div>
         )}
         {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
@@ -1838,7 +1838,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
               <div className="mt-3 p-3 bg-white rounded-lg border">
                 <div className="text-xs text-gray-500">Equivalencia (monto / tasa)</div>
-                <div className="mt-1 text-2xl font-bold text-sky-700">
+                <div className="mt-1 font-bell-mt text-[30px] font-normal text-foreground">
                   {(() => {
                     const m = Number(String(monto || '').replace(',', '.'));
                     const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
@@ -1897,7 +1897,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                       </div>
                     )}
                     {pedidoResumen.recargos > 0 && (
-                      <div className="flex justify-between text-rose-600">
+                      <div className="flex justify-between text-red-700">
                         <span>Recargos</span>
                         <span>+ ${pedidoResumen.recargos.toFixed(2)}</span>
                       </div>
@@ -1921,7 +1921,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                 )}
 
                 <div className="mt-4 text-sm text-gray-600">Pagado (equiv.)</div>
-                <div className="text-lg font-medium text-sky-600 mt-1">{paymentsEquivalenciaSum.toFixed(2)}</div>
+                <div className="text-lg font-medium text-foreground mt-1">{paymentsEquivalenciaSum.toFixed(2)}</div>
                 {/** Mostrar conversiones para Pagado (equiv.) */}
                 {renderConversions(paymentsEquivalenciaSum)}
 
@@ -1929,7 +1929,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
                 <div className="mt-3 text-sm text-gray-600">Restante</div>
                 <div className="flex flex-wrap items-baseline gap-x-4 mt-1">
-                  <div className={`text-lg font-semibold ${remaining !== null && remaining > 0 ? 'text-rose-600' : 'text-emerald-600'} ${remaining !== null && remaining > 0.009 ? 'animate-pulse' : ''}`}>
+                  <div className={`text-lg font-semibold ${remaining !== null && remaining > 0 ? 'text-red-700' : 'text-emerald-600'} ${remaining !== null && remaining > 0.009 ? 'animate-pulse' : ''}`}>
                     ${remaining !== null ? remaining.toFixed(2) : '—'}
                   </div>
                   {(() => {
@@ -1973,21 +1973,21 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
                         <div className="flex items-center gap-2">
                           <div className="font-medium">{p.monto.toFixed ? p.monto.toFixed(2) : Number(p.monto).toFixed(2)}</div>
                           {p.existing && <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">existente</span>}
-                          {!p.existing && <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded">nuevo</span>}
+                          {!p.existing && <span className="text-xs border border-border bg-card text-foreground px-2 py-0.5 rounded-full">nuevo</span>}
                         </div>
                         <div className="text-xs text-gray-500">{p.forma_nombre ? `${p.forma_nombre}` : ''}{p.banco_nombre ? ` — ${p.banco_nombre}` : ''}</div>
                         <div className="text-xs text-gray-500">Equiv.: {p.equivalencia !== null && p.equivalencia !== undefined ? p.equivalencia.toFixed(2) : '—'} {resolvedMoneda ?? ''}</div>
                         {p.referencia && <div className="text-xs text-gray-500">ref: {p.referencia}</div>}
                       </div>
                       <div className="ml-3 flex flex-col items-end gap-2">
-                        <button className="text-sm text-rose-600 hover:underline" onClick={() => deletePayment(i)}>Eliminar</button>
+                        <button className="text-sm text-red-700 hover:underline" onClick={() => deletePayment(i)}>Eliminar</button>
                       </div>
                     </li>
                   ))}
                 </ul>
                 {payments.length > 4 && (
                   <div className="mt-2 text-center">
-                    <button className="text-sm text-sky-600 hover:underline" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
+                    <button className="text-sm text-foreground underline decoration-[#a8874a] underline-offset-[3px]" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
                   </div>
                 )}
               </div>
@@ -2002,7 +2002,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         {showSuccess && (
           <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-50">
             <div className="bg-white/90 p-6 rounded-full shadow-lg flex items-center justify-center animate-pulse">
-              <svg className="w-16 h-16 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg className="w-16 h-16 text-green-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
@@ -2014,9 +2014,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
           <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-500 animate-in fade-in">
             <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center border border-slate-100 scale-100 animate-in zoom-in-95 duration-300">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-sky-400 to-emerald-400 rounded-full blur-lg opacity-40 animate-pulse"></div>
+                <div className="absolute inset-0 bg-[#e9d3a8] rounded-full blur-lg opacity-40 animate-pulse"></div>
                 <div className="relative bg-white rounded-full p-4 shadow-sm border border-slate-100">
-                  <Loader2 className="w-10 h-10 text-sky-600 animate-spin" />
+                  <Loader2 className="w-10 h-10 text-foreground animate-spin" />
                 </div>
               </div>
               <div className="mt-6 text-xl font-semibold text-slate-800">Procesando pago</div>
@@ -2026,9 +2026,9 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
               </div>
               {/* Steps indicator simulado para dar feedback visual */}
               <div className="mt-6 flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-2 h-2 rounded-full bg-sky-600 animate-bounce"></div>
+                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce"></div>
               </div>
             </div>
           </div>
@@ -2053,11 +2053,11 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
 
           {/* Quick flows */}
           {paymentMode === 'multiple' && pedidoTotal !== null && restanteSinEscrito !== null && restanteSinEscrito <= 0.009 && !hayMontoEscrito ? (
-            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-foreground hover:bg-black text-white">
               {loading ? 'Procesando...' : 'Completar pedido'}
             </Button>
           ) : paymentMode === 'single' ? (
-            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-foreground hover:bg-black text-white">
               {loading ? 'Procesando...' : 'Pagar y completar'}
             </Button>
           ) : null}

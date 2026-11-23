@@ -1300,7 +1300,7 @@ export default function Formulas() {
                   <Button
                     onClick={handleBulkDeactivate}
                     disabled={bulkDeactivating}
-                    className={`gap-2 ${bulkDeactivateAction === 'activate' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                    className="gap-2 bg-foreground text-white hover:bg-black"
                   >
                     {bulkDeactivating ? (
                       <>
@@ -1538,7 +1538,7 @@ export default function Formulas() {
                   <Button
                     onClick={handleBulkUpdate}
                     disabled={bulkUpdating || !bulkNewPrice || Number(bulkNewPrice) < 0}
-                    className="gap-2 bg-green-600 hover:bg-green-700"
+                    className="gap-2 bg-foreground text-white hover:bg-black"
                   >
                     {bulkUpdating ? (
                       <>
