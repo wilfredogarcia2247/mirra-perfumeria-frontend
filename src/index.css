@@ -458,3 +458,33 @@
     min-height: 40px;
   }
 }
+
+/* Panel en teléfono y tablet: los campos con letra de 16 px para que el iPhone no acerque la pantalla al
+   tocarlos (lo hace con letra más pequeña). En PC siguen con su tamaño. La tienda ya lo tenía resuelto. */
+@media (max-width: 1023px) {
+  .panel-mirra input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .panel-mirra select,
+  .panel-mirra textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iPhone/iPad: el campo de fecha tiene un ancho mínimo propio y se sale del cuadro. Lo obligamos a quedarse dentro
+   (solo en Safari de iPhone/iPad, que es donde pasa; Android y PC quedan igual). */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+}

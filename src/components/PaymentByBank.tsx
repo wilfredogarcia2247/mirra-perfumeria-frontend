@@ -1792,7 +1792,7 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.2fr_1fr]">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
               <div>
                 <label className={etiqueta}>Monto{tasa?.simbolo ? ` (${tasa.simbolo})` : ''}</label>
                 <input type="number" step="0.01" className={campo} value={monto} onChange={(e) => setMonto(e.target.value)} disabled={loading} placeholder="0.00" />
