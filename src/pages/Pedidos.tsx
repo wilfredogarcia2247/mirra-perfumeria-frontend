@@ -2385,7 +2385,7 @@ export default function Pedidos() {
           {/* En teléfonos (menos de 640 px) todo el detalle se desliza junto y solo los botones quedan fijos abajo;
               antes los datos de arriba y los botones tapaban los productos. Desde sm (tablet y PC) queda como siempre.
               PC grande (desde 1280 px): la ventana usa casi todo el ancho, hasta 1440 px (pedido del dueño). */}
-          <DialogContent className="max-w-6xl xl:max-w-[1440px] h-[100dvh] sm:h-[90vh] xl:h-[94vh] w-full sm:w-auto xl:w-[calc(100vw-64px)] tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
+          <DialogContent className={`max-w-6xl xl:max-w-[1440px] h-[100dvh] ${showPaymentInline ? 'sm:h-auto sm:max-h-[90vh] xl:max-h-[94vh] tablet:h-auto tablet:max-h-[96dvh]' : 'sm:h-[90vh] xl:h-[94vh] tablet:h-[96dvh]'} w-full sm:w-auto xl:w-[calc(100vw-64px)] tabletv:w-[calc(100vw-24px)] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200`}>
             <DialogHeader className="p-5 text-left tableth:px-5 tableth:py-3 border-b border-border shrink-0 bg-card z-10 space-y-2 tableth:space-y-1.5">
               <DialogTitle className="font-bell-mt text-[26px] font-normal tracking-normal text-foreground flex items-center gap-2.5">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
