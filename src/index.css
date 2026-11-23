@@ -477,7 +477,8 @@
   input[type="time"] {
     -webkit-appearance: none;
     appearance: none;
-    display: block;
+    display: flex;
+    align-items: center;
     min-width: 0;
     max-width: 100%;
   }
