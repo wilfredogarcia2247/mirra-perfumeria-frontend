@@ -2383,8 +2383,9 @@ export default function Pedidos() {
         {/* Detalle del pedido en modal */}
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
           {/* En teléfonos (menos de 640 px) todo el detalle se desliza junto y solo los botones quedan fijos abajo;
-              antes los datos de arriba y los botones tapaban los productos. Desde sm (tablet y PC) queda como siempre. */}
-          <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
+              antes los datos de arriba y los botones tapaban los productos. Desde sm (tablet y PC) queda como siempre.
+              PC grande (desde 1280 px): la ventana usa casi todo el ancho, hasta 1440 px (pedido del dueño). */}
+          <DialogContent className="max-w-6xl xl:max-w-[1440px] h-[100dvh] sm:h-[90vh] xl:h-[94vh] w-full sm:w-auto xl:w-[calc(100vw-64px)] tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
             <DialogHeader className="p-5 text-left tableth:px-5 tableth:py-3 border-b border-border shrink-0 bg-card z-10 space-y-2 tableth:space-y-1.5">
               <DialogTitle className="font-bell-mt text-[26px] font-normal tracking-normal text-foreground flex items-center gap-2.5">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
@@ -2709,7 +2710,8 @@ export default function Pedidos() {
                     </table>
                   </div>
 
-                  <div className="space-y-4">
+                  {/* PC grande: descuentos y recargos a la izquierda, total a la derecha */}
+                  <div className="space-y-4 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start xl:gap-4 xl:space-y-0">
                     <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                         <h3 className="font-bell-mt text-[19px] font-normal">Descuentos y recargos</h3>
@@ -2808,7 +2810,7 @@ export default function Pedidos() {
                     </div>
 
                     <div className="flex justify-end">
-                      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-4 text-right space-y-1.5">
+                      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-4 text-right space-y-1.5 xl:max-w-none">
                         <div className="text-sm text-gray-500">Subtotal</div>
                         <div className="text-sm font-medium">${persistedTotals.base.toFixed(2)}</div>
                         {cuponDetalle && (
