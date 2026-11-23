@@ -253,6 +253,14 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
   const selectedReport = getReportSlug(location.pathname);
   // Al tocar un reporte de la lista, bajar hasta donde empieza (en el teléfono la lista es larga)
   const reporteRef = useRef<HTMLDivElement>(null);
+  // Teléfono: el menú de reportes es una fila que se desliza; la opción elegida queda a la vista
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const menu = menuRef.current;
+    const el = menu?.querySelector<HTMLElement>("[data-activo]");
+    if (!menu || !el || menu.scrollWidth <= menu.clientWidth) return;
+    menu.scrollTo({ left: el.offsetLeft - menu.clientWidth / 2 + el.offsetWidth / 2, behavior: "smooth" });
+  }, [selectedReport]);
   useEffect(() => {
     if (!(location.state as { irAlReporte?: boolean } | null)?.irAlReporte) return;
     const id = window.setTimeout(() => {
@@ -1831,11 +1839,13 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Reportes de análisis</h2>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-[#a8874a]">General</p>
+          <h2 className="mt-1 font-bell-mt text-[30px] font-normal leading-tight">Reportes de análisis</h2>
           <p className="text-sm text-muted-foreground">Panel informativo para evaluar ventas, clientes, productos y reposicion.</p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {/* Teléfono: fila de botones que se desliza de lado (el reporte queda justo debajo). Tablet y PC: tarjetas como antes */}
+        <div ref={menuRef} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
           {REPORT_OPTIONS.filter((report) => permitidos.has(report.slug)).map((report) => {
             const route = report.slug === 'resumen-general' ? '/reportes' : `/reportes/${report.slug}`;
             const active = selectedReport === report.slug;
@@ -1844,10 +1854,11 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                 key={report.slug}
                 to={route}
                 state={{ keepScroll: true, irAlReporte: true }}
-                className={`rounded-lg border p-4 transition-colors ${active ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                data-activo={active ? '1' : undefined}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] transition-colors md:whitespace-normal md:rounded-xl md:p-4 md:text-sm ${active ? 'border-foreground bg-foreground text-white md:bg-foreground/5 md:text-foreground' : 'border-border bg-card hover:bg-muted/50'}`}
               >
                 <p className="font-medium">{report.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{report.description}</p>
+                <p className="mt-1 hidden text-xs text-muted-foreground md:block">{report.description}</p>
               </Link>
             );
           })}
