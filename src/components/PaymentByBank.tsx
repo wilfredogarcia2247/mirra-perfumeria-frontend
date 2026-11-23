@@ -1689,315 +1689,195 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
     );
   }
 
+  // Estilo nuevo (maqueta aprobada maquetas/estilo-nuevo/panel-pago.html): arriba "← Volver al pedido", título y
+  // Pago único / Varios pagos; a la izquierda el formulario (tasa y equivalencia en una línea, y la lista de pagos
+  // en "Varios pagos"); a la derecha el resumen (total en $ y Bs una vez, Pagado, Falta pagar) con el botón.
+  // En teléfono el botón queda fijo abajo con lo que falta pagar. Mismos cálculos y la misma forma de guardar.
+  const tasaBs = (() => {
+    const bsEntry = Object.entries(symbolTasaMap).find(([s]) => isBsFamily(s));
+    if (bsEntry) return { sym: bsEntry[0], rate: bsEntry[1] };
+    if (tasa && isBsFamily(tasa.simbolo) && Number.isFinite(Number(tasa.monto))) return { sym: tasa.simbolo, rate: Number(tasa.monto) };
+    return null;
+  })();
+  const enBs = (v: number | null) => (v !== null && tasaBs && tasaBs.rate > 0 ? `${tasaBs.sym} ${(v * tasaBs.rate).toFixed(2)}` : null);
+  const equivalencia = (() => {
+    const m = Number(String(monto || '').replace(',', '.'));
+    const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
+    if (!Number.isFinite(m) || !Number.isFinite(t) || t === 0) return null;
+    return m / t;
+  })();
+  const campo = 'mt-1 h-11 w-full rounded-[11px] border border-input bg-background px-3 text-sm outline-none focus:border-foreground disabled:opacity-60';
+  const etiqueta = 'block text-[12.5px] font-semibold text-foreground';
+  const faltaRojo = remaining !== null && remaining > 0.009;
+
+  const botones = (
+    <>
+      {/* Varios pagos: "Añadir" sigue visible mientras haya un monto escrito (aunque complete el total);
+          "Completar" aparece cuando la lista ya cubre el total y no queda nada escrito sin añadir */}
+      {paymentMode === 'multiple' && (hayMontoEscrito || restanteSinEscrito === null || restanteSinEscrito > 0.009) && (
+        <Button onClick={handleAddPayment} disabled={loading} variant="outline" className="h-11 w-full rounded-xl">
+          Añadir pago parcial
+        </Button>
+      )}
+      {paymentMode === 'multiple' && pedidoTotal !== null && restanteSinEscrito !== null && restanteSinEscrito <= 0.009 && !hayMontoEscrito ? (
+        <Button onClick={handleAddAndComplete} disabled={loading} className="h-12 w-full rounded-xl bg-foreground text-[15px] text-white hover:bg-black">
+          {loading ? 'Procesando...' : 'Completar pedido'}
+        </Button>
+      ) : paymentMode === 'single' ? (
+        <Button onClick={handleAddAndComplete} disabled={loading} className="h-12 w-full rounded-xl bg-foreground text-[15px] text-white hover:bg-black">
+          {loading ? 'Procesando...' : 'Pagar y completar'}
+        </Button>
+      ) : null}
+    </>
+  );
+
   return (
     <div className={embedded
-      ? "relative w-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-200"
-      : `relative bg-white rounded-lg shadow-lg w-full max-w-4xl z-10 mx-auto max-h-[85vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`
+      ? "relative w-full flex flex-col"
+      : `relative bg-card rounded-2xl shadow-lg w-full max-w-4xl z-10 mx-auto max-h-[85vh] flex flex-col overflow-hidden transform transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`
     }>
-      <div className="flex justify-between items-start p-4 border-b">
-        <div>
-          <h3 className="text-lg font-semibold">Registrar pago y completar pedido</h3>
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPaymentMode('single')}
-              className={`whitespace-nowrap text-sm px-3 py-1.5 rounded-full ${paymentMode === 'single' ? 'bg-foreground text-white' : 'border border-input bg-card text-foreground'}`}
-            >
-              Pago único
+      {/* Barra: volver, título y modo */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-3 sm:px-5">
+        <button type="button" onClick={() => { if (onClose) onClose(); }} className="whitespace-nowrap text-[13px] font-semibold text-foreground underline decoration-[#a8874a] underline-offset-[3px]">
+          ← Volver al pedido
+        </button>
+        <h3 className="order-3 w-full font-bell-mt text-[21px] font-normal sm:order-none sm:w-auto">Registrar pago</h3>
+        <div className="ml-auto inline-flex rounded-full border border-border bg-muted p-[3px]" role="tablist" aria-label="Modo de pago">
+          {([['single', 'Pago único'], ['multiple', 'Varios pagos']] as const).map(([m, t]) => (
+            <button key={m} type="button" role="tab" aria-selected={paymentMode === m} onClick={() => setPaymentMode(m)}
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition ${paymentMode === m ? 'bg-foreground text-white' : 'text-muted-foreground hover:text-foreground'}`}>
+              {t}
             </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMode('multiple')}
-              className={`whitespace-nowrap text-sm px-3 py-1.5 rounded-full ${paymentMode === 'multiple' ? 'bg-foreground text-white' : 'border border-input bg-card text-foreground'}`}
-            >
-              Varios pagos
-            </button>
-            <div className="text-xs text-gray-500 ml-2">Modo: <strong className="text-gray-700">{paymentMode === 'single' ? 'Pago único' : 'Varios pagos'}</strong></div>
-          </div>
-          <div className="text-sm text-gray-600">Registra uno o varios pagos para este pedido y complétalo. Los pagos se conservarán en el historial del pedido.</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => { if (onClose) onClose(); }} title="Volver al pedido">
-            <X className="w-4 h-4" />
-          </Button>
+          ))}
         </div>
       </div>
 
-      {/* Mobile: botón para mostrar/ocultar el resumen lateral y ahorrar espacio */}
-      <div className="sm:hidden px-4 pb-3 border-b">
-        <button onClick={() => setShowAside(s => !s)} className="text-sm bg-gray-100 px-3 py-1 rounded">{showAside ? 'Ocultar resumen' : 'Mostrar resumen'}</button>
-      </div>
+      <div className={`${embedded ? 'p-4 sm:p-5' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-5">
+          {/* Izquierda: formulario */}
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            {borradorRecuperado && (
+              <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
+                <span>Recuperamos lo que habías escrito para este pedido.</span>
+                <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-input bg-card px-3 text-xs font-medium hover:bg-muted">Borrar y empezar de nuevo</button>
+              </div>
+            )}
+            {errors && <div className="mb-3 text-sm text-red-700">{errors}</div>}
 
-      <div className={`${embedded ? 'p-4' : 'p-4 sm:p-6'} overflow-y-auto flex-1 min-h-0`}>
-        {borradorRecuperado && (
-          <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-            <span>Recuperamos lo que habías escrito para este pedido.</span>
-            <button type="button" onClick={descartarBorrador} className="min-h-9 rounded-md border border-input bg-card px-3 text-xs font-medium hover:bg-muted">Borrar y empezar de nuevo</button>
-          </div>
-        )}
-        {errors && <div className="mb-3 text-sm text-red-600">{errors}</div>}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: formulario (ocupa 2 columnas en pantallas grandes) */}
-          <div className="lg:col-span-2">
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium">Banco</label>
-                <select
-                  className="mt-1 w-full border rounded px-2 py-2"
-                  value={selectedBancoId ?? ''}
-                  onChange={(e) => setSelectedBancoId(e.target.value ? Number(e.target.value) : null)}
-                  disabled={loading}
-                >
+                <label className={etiqueta}>Banco</label>
+                <select className={campo} value={selectedBancoId ?? ''} onChange={(e) => setSelectedBancoId(e.target.value ? Number(e.target.value) : null)} disabled={loading}>
                   <option value="">-- Selecciona banco --</option>
-                  {bancos.map((b) => (
-                    <option key={b.id} value={b.id}>{b.nombre}</option>
-                  ))}
+                  {bancos.map((b) => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
                 </select>
                 {selectedBanco && selectedBanco.formas_pago && selectedBanco.formas_pago.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600">Formas definidas en banco: {selectedBanco.formas_pago.map(f => f.nombre).join(', ')}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Formas de este banco: {selectedBanco.formas_pago.map(f => f.nombre).join(', ')}</div>
                 )}
               </div>
-
               <div>
-                <label className="block text-sm font-medium">Forma de pago</label>
-                <select
-                  className="mt-1 w-full border rounded px-2 py-2"
-                  value={selectedFormaId ?? ''}
-                  onChange={(e) => setSelectedFormaId(e.target.value ? Number(e.target.value) : null)}
-                  disabled={loading}
-                >
+                <label className={etiqueta}>Forma de pago</label>
+                <select className={campo} value={selectedFormaId ?? ''} onChange={(e) => setSelectedFormaId(e.target.value ? Number(e.target.value) : null)} disabled={loading}>
                   <option value="">-- Selecciona forma --</option>
-                  {availableFormas.map((f) => (
-                    <option key={f.id} value={f.id}>{f.nombre}</option>
-                  ))}
+                  {availableFormas.map((f) => (<option key={f.id} value={f.id}>{f.nombre}</option>))}
                 </select>
                 {selectedForma && selectedForma.detalles && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-700">
+                  <div className="mt-2 rounded-lg bg-muted p-2 text-xs text-foreground">
                     {selectedForma.detalles.numero_cuenta && <div><strong>Cuenta:</strong> {selectedForma.detalles.numero_cuenta}</div>}
                     {selectedForma.detalles.numero_telefono && <div><strong>Teléfono:</strong> {selectedForma.detalles.numero_telefono}</div>}
                     {selectedForma.detalles.documento && <div><strong>Documento:</strong> {selectedForma.detalles.documento}</div>}
-                    {selectedForma.detalles.instrucciones && <div className="mt-1 text-xs text-gray-600">{selectedForma.detalles.instrucciones}</div>}
+                    {selectedForma.detalles.instrucciones && <div className="mt-1 text-muted-foreground">{selectedForma.detalles.instrucciones}</div>}
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium">Monto</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="mt-1 w-full border rounded px-2 py-2"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                  disabled={loading}
-                  placeholder="0.00"
-                />
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.2fr_1fr]">
+              <div>
+                <label className={etiqueta}>Monto{tasa?.simbolo ? ` (${tasa.simbolo})` : ''}</label>
+                <input type="number" step="0.01" className={campo} value={monto} onChange={(e) => setMonto(e.target.value)} disabled={loading} placeholder="0.00" />
               </div>
-
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium">Referencia {(() => {
+              <div>
+                <label className={etiqueta}>Referencia {(() => {
                   const f = availableFormas.find((f) => f.id === selectedFormaId);
                   const nombre = (f?.nombre || '').toLowerCase();
                   const isEf = nombre.includes('efect') || nombre.includes('efectivo');
-                  return isEf ? <span className="text-sm text-gray-500">(opcional para efectivo)</span> : <span className="text-sm text-red-600">(requerida)</span>;
+                  return isEf ? <span className="font-normal text-muted-foreground">(opcional para efectivo)</span> : <span className="font-medium text-red-700">(requerida)</span>;
                 })()}</label>
-                <input
-                  type="text"
-                  className="mt-1 w-full border rounded px-2 py-2"
-                  value={referencia}
-                  onChange={(e) => setReferencia(e.target.value)}
-                  disabled={loading}
-                />
+                <input type="text" className={campo} value={referencia} onChange={(e) => setReferencia(e.target.value)} disabled={loading} placeholder="Nº de la operación" />
               </div>
-
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium">Fecha de transacción</label>
-                <input
-                  type="date"
-                  className="mt-1 w-full border rounded px-2 py-2"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  disabled={loading}
-                />
-
+              <div>
+                <label className={etiqueta}>Fecha</label>
+                <input type="date" className={campo} value={fecha} onChange={(e) => setFecha(e.target.value)} disabled={loading} />
               </div>
             </div>
 
-            <div className="mb-4 p-3 bg-gray-50 rounded text-sm text-gray-700 border shadow-sm transition-all duration-300 ease-out">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-gray-500">Tasa</div>
-                  <div className="text-base font-medium">{tasa?.simbolo ?? resolvedMoneda ?? '—'} — {tasa?.monto ?? '—'}</div>
-                </div>
-                {converted && <div className="text-sm text-gray-600">Aproximado: <strong>{converted}</strong></div>}
-              </div>
-
-
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <div className="text-xs text-gray-500">Equivalencia (monto / tasa)</div>
-                <div className="mt-1 font-bell-mt text-[30px] font-normal text-foreground">
-                  {(() => {
-                    const m = Number(String(monto || '').replace(',', '.'));
-                    const t = tasa && typeof tasa.monto === 'number' ? Number(tasa.monto) : (tasa && tasa.monto ? Number(String(tasa.monto).replace(',', '.')) : NaN);
-                    if (!Number.isFinite(m) || !Number.isFinite(t) || t === 0) return '—';
-                    const eq = m / t;
-                    return `${(eq).toFixed(2)}`;
-                  })()}
-                </div>
-                <div className="mt-1 text-xs text-gray-400">Este valor se usará para validar contra el total del pedido.</div>
-              </div>
-
-
+            {/* Tasa y equivalencia en una línea */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-dashed border-border pt-3 text-[13px] text-muted-foreground">
+              <span>Tasa <b className="text-foreground">{tasa?.simbolo ?? resolvedMoneda ?? '—'} {tasa?.monto ?? '—'}</b></span>
+              <span>→ equivale a <b className="text-foreground">{equivalencia !== null ? `$${equivalencia.toFixed(2)}` : '—'}</b></span>
+              <span className="text-xs">Se usa para revisar que cubra el total.</span>
             </div>
 
-
-          </div>
-
-          {/* Right: resumen / lista de pagos */}
-          <aside className={`${showAside ? 'block' : 'hidden'} lg:block lg:col-span-1`}>
-            {pedidoTotal !== null && (
-              <div className="mb-4 p-4 bg-gray-50 rounded border">
-                <div className="text-sm text-gray-600">Total pedido</div>
-                <div className="flex flex-wrap items-baseline gap-x-4 mt-1">
-                  <div className="text-2xl font-semibold text-gray-900">${pedidoTotal.toFixed(2)}</div>
-                  {(() => {
-                    let rate = 0;
-                    let sym = '';
-                    const bsEntry = Object.entries(symbolTasaMap).find(([s]) => isBsFamily(s));
-                    if (bsEntry) {
-                      sym = bsEntry[0];
-                      rate = bsEntry[1];
-                    } else if (tasa && isBsFamily(tasa.simbolo) && Number.isFinite(Number(tasa.monto))) {
-                      sym = tasa.simbolo;
-                      rate = Number(tasa.monto);
-                    }
-
-                    if (rate > 0) {
-                      return <div className="text-xl text-gray-600 font-medium">{sym} {(pedidoTotal * rate).toFixed(2)}</div>;
-                    }
-                    return null;
-                  })()}
-                </div>
-                {/** Mostrar conversiones para Total */}
-                {renderConversions(pedidoTotal)}
-
-                {pedidoResumen && (
-                  <div className="mt-3 space-y-1 text-xs text-gray-600">
-                    <div className="flex justify-between">
-                      <span>Subtotal</span>
-                      <span>${pedidoResumen.base.toFixed(2)}</span>
-                    </div>
-                    {pedidoResumen.descuentos > 0 && (
-                      <div className="flex justify-between text-red-500">
-                        <span>Descuentos</span>
-                        <span>- ${pedidoResumen.descuentos.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {pedidoResumen.recargos > 0 && (
-                      <div className="flex justify-between text-red-700">
-                        <span>Recargos</span>
-                        <span>+ ${pedidoResumen.recargos.toFixed(2)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {pedidoAjustes.length > 0 && (
-                  <div className="mt-3 space-y-1 text-xs text-gray-500">
-                    {pedidoAjustes.map((ajuste, idx) => (
-                      <div key={ajuste.id ?? `ajuste-${idx}`} className="flex justify-between gap-3">
-                        <span className="flex-1 truncate">
-                          {`${(ajuste.tipo || '').toString().toLowerCase() === 'recargo' ? 'Recargo' : 'Descuento'} · ${ajuste.modo === 'monto' ? '$' : '%'}${roundMoney(Number(ajuste.valor ?? 0)).toFixed(ajuste.modo === 'monto' ? 2 : 0)} — ${ajuste.motivo || 'Sin motivo'}`}
-                        </span>
-                        {Number.isFinite(Number(ajuste.monto_aplicado)) && (
-                          <span>${roundMoney(Number(ajuste.monto_aplicado)).toFixed(2)}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-4 text-sm text-gray-600">Pagado (equiv.)</div>
-                <div className="text-lg font-medium text-foreground mt-1">{paymentsEquivalenciaSum.toFixed(2)}</div>
-                {/** Mostrar conversiones para Pagado (equiv.) */}
-                {renderConversions(paymentsEquivalenciaSum)}
-
-
-
-                <div className="mt-3 text-sm text-gray-600">Restante</div>
-                <div className="flex flex-wrap items-baseline gap-x-4 mt-1">
-                  <div className={`text-lg font-semibold ${remaining !== null && remaining > 0 ? 'text-red-700' : 'text-emerald-600'} ${remaining !== null && remaining > 0.009 ? 'animate-pulse' : ''}`}>
-                    ${remaining !== null ? remaining.toFixed(2) : '—'}
-                  </div>
-                  {(() => {
-                    if (remaining === null) return null;
-                    let rate = 0;
-                    let sym = '';
-                    const bsEntry = Object.entries(symbolTasaMap).find(([s]) => isBsFamily(s));
-                    if (bsEntry) {
-                      sym = bsEntry[0];
-                      rate = bsEntry[1];
-                    } else if (tasa && isBsFamily(tasa.simbolo) && Number.isFinite(Number(tasa.monto))) {
-                      sym = tasa.simbolo;
-                      rate = Number(tasa.monto);
-                    }
-
-                    if (rate > 0) {
-                      return <div className="text-base text-gray-600 font-medium">{sym} {(remaining * rate).toFixed(2)}</div>;
-                    }
-                    return null;
-                  })()}
-                </div>
-                {/** Mostrar conversiones para Restante */}
-                {renderConversions(remaining)}
-
-                {amountToPayInCurrency !== null && (
-                  <div className="mt-3 text-sm text-gray-700">A pagar en <strong>{tasa?.simbolo ?? resolvedMoneda}</strong>: <span className="font-medium">{amountToPayInCurrency.toFixed(2)}</span></div>
-                )}
-                {bankCurrencyAmount !== null && bankTasa && (
-                  <div className="mt-2 text-sm text-gray-600">Referencia en <strong>{bankTasa.simbolo ?? resolvedMoneda ?? ''}</strong>: <span className="font-medium">{bankCurrencyAmount.toFixed(2)}</span></div>
-                )}
-              </div>
-            )}
-
+            {/* Varios pagos: lista de pagos agregados */}
             {(paymentMode === 'multiple' || payments.length > 0) && (
-              <div className="mb-4 p-2 bg-white border rounded shadow-sm max-h-[28vh] lg:max-h-[44vh] overflow-auto">
-                <div className="font-medium">Pagos ({payments.length}):</div>
-                <ul className="mt-2 space-y-2 text-sm">
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pagos agregados ({payments.length})</p>
+                {payments.length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay pagos. Llena el formulario y toca “Añadir pago parcial”.</p>}
+                <ul className="divide-y divide-border">
                   {(showAllPayments ? payments : payments.slice(0, 4)).map((p, i) => (
-                    <li key={i} className="flex items-start justify-between bg-gray-50 p-2 rounded">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium">{p.monto.toFixed ? p.monto.toFixed(2) : Number(p.monto).toFixed(2)}</div>
-                          {p.existing && <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">existente</span>}
-                          {!p.existing && <span className="text-xs border border-border bg-card text-foreground px-2 py-0.5 rounded-full">nuevo</span>}
+                    <li key={i} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+                      <div className="min-w-0">
+                        <div className="font-semibold">
+                          {p.forma_nombre ? `${p.forma_nombre}` : 'Pago'}{p.banco_nombre ? ` · ${p.banco_nombre}` : ''}
+                          {p.existing && <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[11px] font-normal text-muted-foreground">existente</span>}
                         </div>
-                        <div className="text-xs text-gray-500">{p.forma_nombre ? `${p.forma_nombre}` : ''}{p.banco_nombre ? ` — ${p.banco_nombre}` : ''}</div>
-                        <div className="text-xs text-gray-500">Equiv.: {p.equivalencia !== null && p.equivalencia !== undefined ? p.equivalencia.toFixed(2) : '—'} {resolvedMoneda ?? ''}</div>
-                        {p.referencia && <div className="text-xs text-gray-500">ref: {p.referencia}</div>}
+                        <div className="text-xs text-muted-foreground">{p.referencia ? `Ref. ${p.referencia}` : ''}</div>
                       </div>
-                      <div className="ml-3 flex flex-col items-end gap-2">
-                        <button className="text-sm text-red-700 hover:underline" onClick={() => deletePayment(i)}>Eliminar</button>
+                      <div className="shrink-0 text-right">
+                        <div className="font-semibold tabular-nums">{p.equivalencia !== null && p.equivalencia !== undefined ? `$${p.equivalencia.toFixed(2)}` : '—'}</div>
+                        <div className="text-xs text-muted-foreground tabular-nums">{p.monto.toFixed ? p.monto.toFixed(2) : Number(p.monto).toFixed(2)} · <button className="text-red-700 underline-offset-2 hover:underline" onClick={() => deletePayment(i)}>Quitar</button></div>
                       </div>
                     </li>
                   ))}
                 </ul>
                 {payments.length > 4 && (
-                  <div className="mt-2 text-center">
-                    <button className="text-sm text-foreground underline decoration-[#a8874a] underline-offset-[3px]" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
-                  </div>
+                  <button className="mt-1 text-sm text-foreground underline decoration-[#a8874a] underline-offset-[3px]" onClick={() => setShowAllPayments(s => !s)}>{showAllPayments ? 'Ver menos' : `Ver todos (${payments.length})`}</button>
                 )}
               </div>
             )}
+          </div>
 
-
-          </aside>
+          {/* Derecha: resumen */}
+          {pedidoTotal !== null && (
+            <aside className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5 lg:sticky lg:top-0">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total del pedido</p>
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <span className="font-bell-mt text-[38px] leading-none">${pedidoTotal.toFixed(2)}</span>
+                {enBs(pedidoTotal) && <span className="text-[15px] text-muted-foreground">{enBs(pedidoTotal)}</span>}
+              </div>
+              {pedidoResumen && (pedidoResumen.descuentos > 0 || pedidoResumen.recargos > 0) && (
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <div className="flex justify-between"><span>Subtotal</span><span>${pedidoResumen.base.toFixed(2)}</span></div>
+                  {pedidoResumen.descuentos > 0 && <div className="flex justify-between"><span>Descuentos</span><span>- ${pedidoResumen.descuentos.toFixed(2)}</span></div>}
+                  {pedidoResumen.recargos > 0 && <div className="flex justify-between"><span>Recargos</span><span>+ ${pedidoResumen.recargos.toFixed(2)}</span></div>}
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2.5 text-sm">
+                <span>Pagado</span><b className="tabular-nums">${paymentsEquivalenciaSum.toFixed(2)}</b>
+              </div>
+              <div className="flex items-start justify-between border-t border-border pt-2.5 text-sm">
+                <span>Falta pagar{remaining !== null && enBs(remaining) && <small className="block text-[11.5px] text-muted-foreground">{enBs(remaining)}</small>}</span>
+                <b className={`text-lg tabular-nums ${faltaRojo ? 'text-red-700' : 'text-green-700'}`}>${remaining !== null ? remaining.toFixed(2) : '—'}</b>
+              </div>
+              {bankCurrencyAmount !== null && bankTasa && !isBsFamily(bankTasa.simbolo) && (
+                <p className="text-xs text-muted-foreground">En la moneda del banco ({bankTasa.simbolo}): <b className="text-foreground">{bankCurrencyAmount.toFixed(2)}</b></p>
+              )}
+              <div className="mt-1 hidden flex-col gap-2 lg:flex">{botones}</div>
+              <p className="hidden text-center text-[11.5px] text-muted-foreground lg:block">Al pagar, el pedido queda Completado y se descuenta el inventario.</p>
+            </aside>
+          )}
         </div>
-
-
 
         {showSuccess && (
           <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-50">
@@ -2012,56 +1892,25 @@ export default function PaymentByBank({ pedidoId, onSuccess, onClose, embedded =
         {/* Loading Overlay */}
         {loading && (
           <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-500 animate-in fade-in">
-            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center border border-slate-100 scale-100 animate-in zoom-in-95 duration-300">
-              <div className="relative">
-                <div className="absolute inset-0 bg-[#e9d3a8] rounded-full blur-lg opacity-40 animate-pulse"></div>
-                <div className="relative bg-white rounded-full p-4 shadow-sm border border-slate-100">
-                  <Loader2 className="w-10 h-10 text-foreground animate-spin" />
-                </div>
-              </div>
-              <div className="mt-6 text-xl font-semibold text-slate-800">Procesando pago</div>
-              <div className="mt-2 text-sm text-slate-500 flex flex-col items-center gap-1">
+            <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center border border-border scale-100 animate-in zoom-in-95 duration-300">
+              <Loader2 className="w-10 h-10 text-foreground animate-spin" />
+              <div className="mt-6 font-bell-mt text-xl">Procesando pago</div>
+              <div className="mt-2 text-sm text-muted-foreground flex flex-col items-center gap-1">
                 <span>Verificando información y completando el pedido...</span>
-                <span className="text-xs text-slate-400">Esto puede tomar unos segundos</span>
-              </div>
-              {/* Steps indicator simulado para dar feedback visual */}
-              <div className="mt-6 flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-2 h-2 rounded-full bg-foreground animate-bounce"></div>
+                <span className="text-xs">Esto puede tomar unos segundos</span>
               </div>
             </div>
           </div>
         )}
-
       </div>
 
-      <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-2 items-stretch z-20">
-        <div className="flex-1 flex gap-2">
-          {/* Varios pagos: "Añadir" sigue visible mientras haya un monto escrito (aunque complete el total);
-              "Completar" aparece cuando la lista ya cubre el total y no queda nada escrito sin añadir */}
-          {paymentMode === 'multiple' && (hayMontoEscrito || restanteSinEscrito === null || restanteSinEscrito > 0.009) && (
-            <Button
-              onClick={handleAddPayment}
-              disabled={loading}
-              variant="outline"
-              className="flex-1 border-slate-300"
-            >
-              Añadir pago parcial
-            </Button>
-          )}
-
-          {/* Quick flows */}
-          {paymentMode === 'multiple' && pedidoTotal !== null && restanteSinEscrito !== null && restanteSinEscrito <= 0.009 && !hayMontoEscrito ? (
-            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-foreground hover:bg-black text-white">
-              {loading ? 'Procesando...' : 'Completar pedido'}
-            </Button>
-          ) : paymentMode === 'single' ? (
-            <Button onClick={handleAddAndComplete} disabled={loading} className="flex-1 bg-foreground hover:bg-black text-white">
-              {loading ? 'Procesando...' : 'Pagar y completar'}
-            </Button>
-          ) : null}
+      {/* Teléfono y tablet: lo que falta pagar y el botón, fijos abajo */}
+      <div className="sticky bottom-0 z-20 border-t border-border bg-card px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2.5 lg:hidden">
+        <div className="mb-2 flex justify-between text-[13px]">
+          <span>Falta pagar</span>
+          <b className={faltaRojo ? 'text-red-700' : 'text-green-700'}>${remaining !== null ? remaining.toFixed(2) : '—'}{remaining !== null && enBs(remaining) ? ` · ${enBs(remaining)}` : ''}</b>
         </div>
+        <div className="flex flex-col gap-2">{botones}</div>
       </div>
     </div>
   );

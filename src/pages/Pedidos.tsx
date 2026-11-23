@@ -3252,7 +3252,7 @@ export default function Pedidos() {
 
             {/* Formulario de registro de pago embebido en el detalle del pedido (se muestra dentro del dialog) */}
             {selectedPedido && showPaymentInline && (
-              <div className="flex-none sm:flex-1 sm:min-h-0 mt-4 p-0 sm:overflow-y-auto">
+              <div className="flex-none sm:flex-1 sm:min-h-0 p-0 sm:overflow-y-auto">
                 <PaymentByBank
                   embedded={true}
                   pedidoId={selectedPedido?.id ?? 0}
@@ -3305,14 +3305,12 @@ export default function Pedidos() {
                   }}
                   onClose={() => setShowPaymentInline(false)}
                 />
-                <div className="mt-3">
-                  <Button variant="outline" onClick={() => setShowPaymentInline(false)}>Volver al pedido</Button>
-                </div>
               </div>
             )}
 
             {/* Teléfono: fijo abajo y compacto (menos alto) para que se vean los productos; tablet y PC igual que antes */}
-            <DialogFooter className="sticky bottom-0 sm:static p-2.5 sm:p-4 bg-white border-t border-gray-200 shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-1.5 sm:gap-2 shadow-[0_-6px_20px_rgba(15,23,42,0.04)]">
+            {/* Mientras se registra el pago, el pie del pedido se oculta: el pago tiene su propio botón */}
+            <DialogFooter className={`${showPaymentInline ? 'hidden' : ''} sticky bottom-0 sm:static p-2.5 sm:p-4 bg-card border-t border-border shrink-0 z-10 mt-auto w-full flex-col sm:flex-col sm:space-x-0 gap-1.5 sm:gap-2 shadow-[0_-6px_20px_rgba(15,23,42,0.04)]`}>
               {/* Resumen por tamaño, a la vista justo antes de completar (sirve para revisar el paquete) */}
               <ResumenTamanos lineas={selectedPedido?.productos} conTotal className="w-full" />
               <div className="w-full flex flex-col md:flex-row tabletv:flex-wrap items-stretch md:items-center justify-between gap-2">
