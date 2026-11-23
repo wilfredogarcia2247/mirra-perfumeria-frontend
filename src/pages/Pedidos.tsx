@@ -74,7 +74,8 @@ const computeAjustesSummary = (base: number, list: AjusteDraft[]): AjustesSummar
   };
 };
 
-// Método de entrega con su propio color (sólido, para que resalte en la lista y en el detalle).
+// Método de entrega con su propio color: morado tienda, turquesa envío nacional, rosado delivery (versión suave,
+// estilo nuevo del panel 2026-11-22).
 // Colores distintos a los de los estados (ámbar, azul, verde, rojo) y al del cupón.
 type EntregaInfo = { etiqueta: string; Icono: typeof Store; etiquetaClase: string; cajaClase: string };
 const entregaInfo = (pedido: any): EntregaInfo | null => {
@@ -82,16 +83,16 @@ const entregaInfo = (pedido: any): EntregaInfo | null => {
   if (!type) return null;
   const details = pedido?.datos_entrega || {};
   if (type === 'tienda') {
-    return { etiqueta: 'Retiro en tienda', Icono: Store, etiquetaClase: 'bg-violet-600 text-white', cajaClase: 'border-violet-300 bg-violet-50 text-violet-950' };
+    return { etiqueta: 'Retiro en tienda', Icono: Store, etiquetaClase: 'border border-violet-500/25 bg-violet-500/[0.07] text-violet-700', cajaClase: 'border-violet-500/20 bg-violet-500/[0.05] text-foreground' };
   }
   if (type === 'envio_nacional') {
     const carrier = details.transportista === 'OTRA' ? details.transportista_otro || 'Otra' : details.transportista || 'MRW';
-    return { etiqueta: `Envío nacional · ${carrier}`, Icono: Truck, etiquetaClase: 'bg-cyan-600 text-white', cajaClase: 'border-cyan-300 bg-cyan-50 text-cyan-950' };
+    return { etiqueta: `Envío nacional · ${carrier}`, Icono: Truck, etiquetaClase: 'border border-cyan-600/25 bg-cyan-600/[0.07] text-cyan-800', cajaClase: 'border-cyan-600/20 bg-cyan-600/[0.05] text-foreground' };
   }
   if (type === 'delivery') {
-    return { etiqueta: 'Delivery', Icono: Bike, etiquetaClase: 'bg-pink-600 text-white', cajaClase: 'border-pink-300 bg-pink-50 text-pink-950' };
+    return { etiqueta: 'Delivery', Icono: Bike, etiquetaClase: 'border border-pink-600/25 bg-pink-600/[0.06] text-pink-700', cajaClase: 'border-pink-600/20 bg-pink-600/[0.05] text-foreground' };
   }
-  return { etiqueta: type, Icono: Truck, etiquetaClase: 'bg-gray-600 text-white', cajaClase: 'border-gray-300 bg-gray-50 text-gray-900' };
+  return { etiqueta: type, Icono: Truck, etiquetaClase: 'border border-border bg-card text-foreground', cajaClase: 'border-border bg-card text-foreground' };
 };
 
 // Fidelización: cuántos pedidos completados lleva el cliente y cuánto ha comprado (con descuentos, sin delivery)
@@ -118,7 +119,7 @@ function EntregaBadge({ pedido, className = '' }: { pedido: any; className?: str
   if (!info) return null;
   const { Icono } = info;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold shadow-sm ${info.etiquetaClase} ${className}`}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold ${info.etiquetaClase} ${className}`}>
       <Icono className="h-3 w-3 shrink-0" />
       {info.etiqueta}
     </span>
@@ -2124,13 +2125,12 @@ export default function Pedidos() {
   return (
     <Layout>
       <div className="space-y-5 p-4 lg:p-6">
-        <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-white via-white to-rose-50/80 px-5 py-5 shadow-sm sm:px-7 sm:py-6">
-          <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-rose-100/50 blur-3xl" />
+        <div className="relative">
           <div className="relative flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-500">Gestión de ventas</p>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-[28px]">Pedidos</h1>
-              <p className="mt-1 text-sm text-gray-500">Consulta y administra los pedidos recibidos</p>
+              <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.2em] text-[#a8874a]">Gestión de ventas</p>
+              <h1 className="font-bell-mt text-[30px] font-normal leading-tight text-foreground">Pedidos</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Consulta y administra los pedidos recibidos</p>
             </div>
             <form onSubmit={handleSearch} className="relative w-full md:w-96">
               <div className="relative">
@@ -2138,7 +2138,7 @@ export default function Pedidos() {
                 <input
                   type="text"
                   placeholder="Buscar por nombre, cédula o teléfono..."
-                  className="w-full rounded-xl border border-gray-200 bg-white/90 py-2.5 pl-10 pr-11 text-sm shadow-sm outline-none transition placeholder:text-gray-400 focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
+                  className="w-full rounded-xl border border-input bg-card py-2.5 pl-10 pr-11 text-sm outline-none transition placeholder:text-muted-foreground focus:border-foreground"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -2146,7 +2146,7 @@ export default function Pedidos() {
                   type="submit"
                   aria-label="Buscar pedidos"
                   disabled={isSearching}
-                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-foreground transition hover:bg-muted disabled:opacity-50"
                 >
                   {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </button>
@@ -2157,9 +2157,9 @@ export default function Pedidos() {
 
         {/* Filtros rápidos por estado — scroll horizontal en móvil */}
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
-          <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit min-w-max shadow-sm">
+          <div className="flex gap-2 w-fit min-w-max">
             <button
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${selectedStatus === '' ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] transition-colors duration-150 min-h-[36px] ${selectedStatus === '' ? 'border-foreground bg-foreground text-white font-medium' : 'border-input bg-card text-foreground hover:border-foreground/40'}`}
               onClick={() => cambiarPestana('')}
             >
               Todos <span className="text-xs opacity-60">{chipStats.todos}</span>
@@ -2167,7 +2167,7 @@ export default function Pedidos() {
             {allStatuses.map((s) => (
               <button
                 key={s}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${selectedStatus === s ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
+                className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] transition-colors duration-150 min-h-[36px] ${selectedStatus === s ? 'border-foreground bg-foreground text-white font-medium' : 'border-input bg-card text-foreground hover:border-foreground/40'}`}
                 onClick={() => cambiarPestana(selectedStatus === s ? '' : s)}
               >
                 <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass(s)}`} />
@@ -2175,7 +2175,7 @@ export default function Pedidos() {
               </button>
             ))}
             <button
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 min-h-[36px] ${conCupon ? 'bg-rose-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-rose-50 hover:text-rose-700'}`}
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] transition-colors duration-150 min-h-[36px] ${conCupon ? 'border-foreground bg-foreground text-white font-medium' : 'border-input bg-card text-foreground hover:border-foreground/40'}`}
               onClick={() => { setConCupon((prev) => !prev); setPage(1); }}
               title="Mostrar solo pedidos con cupón aplicado"
             >
@@ -2185,35 +2185,7 @@ export default function Pedidos() {
           </div>
         </div>
 
-        {/* Resumen de descuentos aplicados por cupón */}
-        {cuponesTotales.pedidos > 0 && (
-          <div className="rounded-[10px] border border-border bg-card px-4 py-3">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Descuentos por cupón</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  ${roundMoney(cuponesTotales.descuento).toFixed(2)}
-                  <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                    en {cuponesTotales.pedidos} {cuponesTotales.pedidos === 1 ? 'pedido' : 'pedidos'}
-                  </span>
-                </p>
-              </div>
-              {cuponesResumen.map((c: any) => (
-                <div key={`${c.cupon_id ?? 's/c'}-${c.codigo}`} className="text-xs">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                    <TicketPercent className="w-3 h-3" />
-                    {c.codigo}
-                    {c.descuento_porcentaje != null && ` · ${c.descuento_porcentaje}%`}
-                  </span>
-                  <span className="ml-1.5 text-muted-foreground tabular-nums">
-                    {c.pedidos} {c.pedidos === 1 ? 'pedido' : 'pedidos'} · -${roundMoney(c.descuento_total).toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* La barra "Descuentos por cupón" se quitó (pedido del dueño 2026-11-22): está en Marketing → Cupones y en Cómo vamos */}
         {loading ? (
           <TableSkeleton columns={9} rows={10} />
         ) : (
@@ -2296,7 +2268,7 @@ export default function Pedidos() {
                       const totalParts = fmtTotalParts(p);
                       const estado = fmtEstado(p);
                       return (
-                        <TableRow key={p.id || JSON.stringify(p)} className={`${getRowClasses(p)} transition-colors hover:bg-rose-50/40`}>
+                        <TableRow key={p.id || JSON.stringify(p)} className={`${getRowClasses(p)} transition-colors hover:bg-muted/60`}>
                           <TableCell className="text-xs tabular-nums text-muted-foreground pl-6 tabletv:pl-3">#{p.id ?? '-'}</TableCell>
                           <TableCell className="font-medium text-sm">{fmtCliente(p)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtFecha(p)}</TableCell>
@@ -2413,25 +2385,26 @@ export default function Pedidos() {
           {/* En teléfonos (menos de 640 px) todo el detalle se desliza junto y solo los botones quedan fijos abajo;
               antes los datos de arriba y los botones tapaban los productos. Desde sm (tablet y PC) queda como siempre. */}
           <DialogContent className="max-w-6xl h-[100dvh] sm:h-[90vh] w-full sm:w-auto tabletv:w-[calc(100vw-24px)] tablet:h-[96dvh] flex flex-col p-0 gap-0 bg-[#fcfbfa] shadow-2xl overflow-y-auto overscroll-contain sm:overflow-hidden rounded-none sm:rounded-2xl transition-all duration-200">
-            <DialogHeader className="p-5 tableth:px-5 tableth:py-3 border-b border-rose-100 shrink-0 bg-gradient-to-r from-white via-white to-rose-50/60 z-10 space-y-2 tableth:space-y-1.5">
-              <DialogTitle className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <DialogHeader className="p-5 text-left tableth:px-5 tableth:py-3 border-b border-border shrink-0 bg-card z-10 space-y-2 tableth:space-y-1.5">
+              <DialogTitle className="font-bell-mt text-[26px] font-normal tracking-normal text-foreground flex items-center gap-2.5">
                 <span>Pedido #{selectedPedido?.id ?? ''}</span>
                 {selectedPedido && (
-                  <Badge variant={estadoColor(selectedPedido.estado) as any} className="text-xs px-2 py-0.5 pointer-events-none">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-[3px] font-sans text-[11.5px] font-medium pointer-events-none ${statusBadgeClass(String(selectedPedido.estado || ''))}`}>
+                    <span className={`inline-block h-[5px] w-[5px] rounded-full ${statusDotClass(String(selectedPedido.estado || ''))}`} />
                     {selectedPedido.estado}
-                  </Badge>
+                  </span>
                 )}
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-500 mt-1">
                 {selectedPedido ? (
                   <div className="flex flex-wrap gap-2 items-center text-gray-600">
-                    <span className="flex flex-wrap items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">
-                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5 text-rose-500" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
+                    <span className="flex flex-wrap items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1">
+                      <span className="flex items-center gap-1"><User className="w-3.5 h-3.5 text-muted-foreground" /> {selectedPedido.nombre_cliente || selectedPedido.cliente_nombre || 'Anónimo'}</span>
                       <ClienteHistorialBadge historial={selectedPedido.cliente_historial} />
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm"><FileText className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm"><Phone className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.telefono || selectedPedido.cliente_telefono || '-'}</span>
-                    <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">Tasa: {(fmtTasa(selectedPedido) || 0).toFixed(4)}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1"><FileText className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.cedula || selectedPedido.cliente_cedula || '-'}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1"><Phone className="w-3.5 h-3.5 text-gray-400" /> {selectedPedido.telefono || selectedPedido.cliente_telefono || '-'}</span>
+                    <span className="rounded-full border border-border bg-card px-2.5 py-1">Tasa: {(fmtTasa(selectedPedido) || 0).toFixed(4)}</span>
                   </div>
                 ) : (
                   <span>Cargando...</span>
@@ -2447,13 +2420,13 @@ export default function Pedidos() {
                 </div>
               )}
               {selectedPedido?.tipo_entrega && (
-                <div className={`w-fit max-w-full rounded-lg border px-3 py-1.5 text-xs lg:w-full ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">Método de entrega</span>
+                <div className={`w-full max-w-full rounded-xl border px-3 py-2 text-xs ${entregaInfo(selectedPedido)?.cajaClase ?? ''}`}>
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="hidden whitespace-nowrap text-[9px] font-bold uppercase tracking-wider text-muted-foreground [@media(min-width:421px)]:inline">Método de entrega</span>
                     <EntregaBadge pedido={selectedPedido} className="text-xs" />
-                    <Button size="sm" variant="outline" className="ml-auto h-6 bg-white/80 px-2 text-[11px]" onClick={() => setEditandoEntrega(true)}>
-                      <Pencil className="mr-1 h-3 w-3" /> Editar
-                    </Button>
+                    <button type="button" className="ml-auto inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-foreground underline decoration-[#a8874a] underline-offset-[3px] outline-none focus-visible:decoration-2" onClick={() => setEditandoEntrega(true)}>
+                      <Pencil className="h-3 w-3" /> Editar
+                    </button>
                   </div>
                   {(() => {
                     const details = selectedPedido.datos_entrega || {};
@@ -2522,9 +2495,9 @@ export default function Pedidos() {
                 </div>
               )}
               {selectedPedido && !cuponDetalle && !selectedPedido.cupon_codigo && (
-                <div className="flex w-full max-w-full flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 sm:w-fit sm:flex-row sm:items-start lg:justify-self-end">
+                <div className="flex w-full max-w-full flex-col gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left sm:w-fit sm:flex-row sm:items-start lg:justify-self-end">
                   <div className="w-full min-w-0 sm:w-[220px]">
-                    <label htmlFor="cupon-admin-pedido" className="mb-0.5 block text-[11px] font-semibold text-amber-900">Código promocional</label>
+                    <label htmlFor="cupon-admin-pedido" className="mb-1 block text-[12px] font-semibold text-foreground">Código promocional</label>
                     <input
                       id="cupon-admin-pedido"
                       value={codigoCuponAdmin}
@@ -2533,7 +2506,7 @@ export default function Pedidos() {
                       placeholder="Ej. MIRRA10"
                       maxLength={64}
                       disabled={aplicandoCuponAdmin || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
-                      className="h-8 w-full rounded-md border border-amber-300 bg-white px-3 text-xs uppercase outline-none focus:ring-2 focus:ring-amber-400"
+                      className="h-9 w-full rounded-[10px] border border-input bg-background px-3 text-xs font-semibold uppercase outline-none focus:border-foreground"
                     />
                     {(selectedPedido.pagos || []).length > 0 && <p className="mt-1 text-xs text-amber-800">No se puede aplicar un cupón después de registrar un pago.</p>}
                   </div>
@@ -2542,7 +2515,7 @@ export default function Pedidos() {
                     size="sm"
                     onClick={() => void handleAplicarCuponAdmin()}
                     disabled={aplicandoCuponAdmin || !codigoCuponAdmin.trim() || (selectedPedido.pagos || []).length > 0 || ['completado', 'cancelado'].includes(String(selectedPedido.estado || '').toLowerCase())}
-                    className="mt-0 h-7 shrink-0 px-2 text-[11px] sm:mt-5"
+                    className="mt-0 h-9 shrink-0 rounded-[10px] px-3 text-[12px] sm:mt-[22px]"
                   >
                     {aplicandoCuponAdmin ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TicketPercent className="mr-1.5 h-3.5 w-3.5" />}
                     {aplicandoCuponAdmin ? 'Aplicando...' : 'Aplicar cupón'}
@@ -2607,16 +2580,16 @@ export default function Pedidos() {
                         <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                           <th className="px-4 py-3">Producto</th>
                           {/* Títulos abreviados; al pasar el ratón se ve el nombre completo */}
-                          <th className="px-3 py-3 text-right" title="Precio">Precio</th>
-                          <th className="px-3 py-3 text-center" title="Cantidad">Cant.</th>
+                          <th className="hidden px-3 py-3 text-right sm:table-cell" title="Precio">Precio</th>
+                          <th className="hidden px-3 py-3 text-center sm:table-cell" title="Cantidad">Cant.</th>
                           <th className="px-3 py-3 text-right" title="Subtotal">Subtotal</th>
                           <th className="hidden px-3 py-3 text-center md:table-cell" title="Producción">Producción</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Array.isArray(selectedPedido.productos) && ordenarPorTamano(selectedPedido.productos).map((it: any) => (
-                          <tr key={it.id} className="border-t border-gray-100 transition-colors hover:bg-rose-50/30">
-                            <td className="px-4 py-3 align-middle">
+                          <tr key={it.id} className="border-t border-gray-100 transition-colors hover:bg-muted/60">
+                            <td className="px-3 py-3 align-middle sm:px-4">
                               <div className="flex min-w-0 items-center gap-3">
                                 <div className="hidden h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200 md:block">
                                   <img src={getImageUrl(it)} alt={it.producto_nombre || ''} className="h-full w-full object-cover" onError={(e) => {
@@ -2630,7 +2603,12 @@ export default function Pedidos() {
                                   }} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium leading-snug text-gray-900">{it.producto_nombre || it.nombre || '-'}</div>
+                                  <div className="font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{it.producto_nombre || it.nombre || '-'}</div>
+                                  {/* Teléfono: cantidad, precio y producción debajo del nombre */}
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:hidden">
+                                    <span className="tabular-nums">{it.cantidad} × {fmtDinero(it.precio_venta)}</span>
+                                    <span className={`inline-flex items-center rounded-full border px-1.5 py-[1px] text-[10.5px] font-medium ${it.produccion_creada ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{it.produccion_creada ? 'Creada' : 'Pendiente'}</span>
+                                  </div>
                                   {(it.set_etiqueta === 'mujer' || it.set_etiqueta === 'hombre') && (
                                     // Vino del Set toda ocasión de la tienda
                                     <span className="mt-0.5 inline-block rounded-full border border-[#b08a57]/50 px-2 py-0.5 text-[10.5px] font-semibold text-[#7a5c33]">{NOMBRE_SET[it.set_etiqueta as EtiquetaSet]}</span>
@@ -2700,7 +2678,8 @@ export default function Pedidos() {
                                             return (
                                               <Button
                                                 size="sm"
-                                                variant="destructive"
+                                                variant="outline"
+                                                className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                                                 onClick={(e) => { e.stopPropagation(); setDeleteLine(it); setDeleteUnits('1'); setDeleteModalOpen(true); }}
                                                 disabled={!canDelete}
                                                 title={canDelete ? 'Eliminar línea' : 'No se puede eliminar: orden de producción asociada'}
@@ -2714,14 +2693,14 @@ export default function Pedidos() {
                                 </div>
                               </div>
                             </td>
-                            <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{fmtDinero(it.precio_venta)}</td>
-                            <td className="px-3 py-3 text-center tabular-nums">{it.cantidad}</td>
+                            <td className="hidden whitespace-nowrap px-3 py-3 text-right tabular-nums sm:table-cell">{fmtDinero(it.precio_venta)}</td>
+                            <td className="hidden px-3 py-3 text-center tabular-nums sm:table-cell">{it.cantidad}</td>
                             <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums">{fmtDinero(it.subtotal)}</td>
                             <td className="hidden px-3 py-3 text-center md:table-cell">
                               {it.produccion_creada ? (
-                                <Badge variant="default" className="bg-green-500">Creada</Badge>
+                                <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-[3px] text-[11.5px] font-medium text-green-800">Creada</span>
                               ) : (
-                                <Badge variant="destructive">Pendiente</Badge>
+                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-[3px] text-[11.5px] font-medium text-amber-800">Pendiente</span>
                               )}
                             </td>
                           </tr>
@@ -2826,7 +2805,7 @@ export default function Pedidos() {
                     </div>
 
                     <div className="flex justify-end">
-                      <div className="w-full max-w-sm rounded-xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/70 p-4 text-right shadow-sm space-y-1.5">
+                      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-4 text-right space-y-1.5">
                         <div className="text-sm text-gray-500">Subtotal</div>
                         <div className="text-sm font-medium">${persistedTotals.base.toFixed(2)}</div>
                         {cuponDetalle && (
@@ -2843,10 +2822,10 @@ export default function Pedidos() {
                           <div className="text-sm text-red-500">- Descuentos: ${persistedTotals.descuentosAjustes.toFixed(2)}</div>
                         )}
                         {persistedTotals.recargos > 0 && (
-                          <div className="text-sm text-rose-600">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
+                          <div className="text-sm text-foreground">+ Recargos: ${persistedTotals.recargos.toFixed(2)}</div>
                         )}
-                        <div className="mt-2 border-t border-rose-100 pt-2 text-sm font-semibold uppercase tracking-wide text-gray-600">Total final</div>
-                        <div className="text-2xl font-bold tracking-tight text-rose-700">${persistedTotals.final.toFixed(2)}</div>
+                        <div className="mt-2 border-t border-border pt-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total final</div>
+                        <div className="font-bell-mt text-[34px] leading-tight text-foreground">${persistedTotals.final.toFixed(2)}</div>
                         {tasaActual ? (
                           <div className="text-sm text-muted-foreground">
                             Convertido: <strong>{tasaSimbolo} {roundMoney(persistedTotals.final * tasaActual).toFixed(2)}</strong>
@@ -3127,7 +3106,7 @@ export default function Pedidos() {
 
             {/* Modal para agregar producto al pedido */}
             <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-              <DialogContent className="max-w-md bg-gradient-to-br from-white to-rose-50 rounded-lg shadow-lg border border-rose-100 overflow-visible">
+              <DialogContent className="max-w-md rounded-2xl border border-border bg-card shadow-lg overflow-visible">
                 <DialogHeader>
                   <DialogTitle>Agregar producto</DialogTitle>
                   <DialogDescription>Agregar un nuevo producto a este pedido.</DialogDescription>
@@ -3135,14 +3114,14 @@ export default function Pedidos() {
                 <div className="p-2 space-y-3">
                   <div className="relative">
                     <label className="text-sm">Producto</label>
-                    <input type="text" placeholder="Escribe para buscar producto..." className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={productSearchTerm} onChange={(e) => { setProductSearchTerm(e.target.value); setShowProductDropdown(true); setAddProductId(null); setPresentacionesOptions([]); setAddPresentacionId(null); setAddPrecio(null); }} />
+                    <input type="text" placeholder="Escribe para buscar producto..." className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-border" value={productSearchTerm} onChange={(e) => { setProductSearchTerm(e.target.value); setShowProductDropdown(true); setAddProductId(null); setPresentacionesOptions([]); setAddPresentacionId(null); setAddPrecio(null); }} />
                     {showProductDropdown && (
                       <ul className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-auto bg-white border rounded shadow">
                         {productSearchLoading ? (
                           <li className="p-2 text-sm text-gray-500">Buscando...</li>
                         ) : (productosOptions && productosOptions.length > 0) ? (
                           productosOptions.map((pr: any) => (
-                            <li key={pr.id} className="p-2 hover:bg-rose-50 cursor-pointer text-sm" onClick={async () => { setAddProductId(Number(pr.id)); setProductSearchTerm(pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`); setShowProductDropdown(false); await loadPresentacionesForProduct(Number(pr.id)); }}>
+                            <li key={pr.id} className="p-2 hover:bg-muted cursor-pointer text-sm" onClick={async () => { setAddProductId(Number(pr.id)); setProductSearchTerm(pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`); setShowProductDropdown(false); await loadPresentacionesForProduct(Number(pr.id)); }}>
                               {pr.nombre ?? pr.name ?? pr.producto_nombre ?? `#${pr.id}`}
                             </li>
                           ))
@@ -3162,7 +3141,7 @@ export default function Pedidos() {
                           <div className="text-sm text-gray-500">No hay presentaciones disponibles</div>
                         ) : (
                           presentacionesOptions.map((pr: any) => (
-                            <label key={pr.id} className="flex items-center gap-2 p-2 border rounded hover:bg-rose-50 cursor-pointer">
+                            <label key={pr.id} className="flex items-center gap-2 p-2 border rounded hover:bg-muted cursor-pointer">
                               <input type="radio" name="presentacion" className="w-4 h-4" checked={Number(addPresentacionId) === Number(pr.id)} onChange={() => { setAddPresentacionId(Number(pr.id)); setAddPrecio(pr.precio_venta ?? null); }} />
                               <div className="flex-1 text-sm">
                                 <div className="font-medium">{pr.nombre ?? `#${pr.id}`}</div>
@@ -3176,7 +3155,7 @@ export default function Pedidos() {
                   </div>
                   <div>
                     <label className="text-sm">Cantidad</label>
-                    <input type="number" min={1} step={1} className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200" value={addCantidad} onChange={(e) => { const parsed = parseInt(String(e.target.value), 10); setAddCantidad(Number.isFinite(parsed) && parsed >= 1 ? parsed : 1); }} />
+                    <input type="number" min={1} step={1} className="w-full mt-1 border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-border" value={addCantidad} onChange={(e) => { const parsed = parseInt(String(e.target.value), 10); setAddCantidad(Number.isFinite(parsed) && parsed >= 1 ? parsed : 1); }} />
                     <div className="text-xs text-gray-500 mt-1">Ingrese un número entero (unidades)</div>
                   </div>
                   <div>
@@ -3185,7 +3164,7 @@ export default function Pedidos() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setAddModalOpen(false)} disabled={addSubmitting} className="hover:bg-rose-50">Cancelar</Button>
+                  <Button variant="outline" onClick={() => setAddModalOpen(false)} disabled={addSubmitting} className="hover:bg-muted">Cancelar</Button>
                   <Button disabled={addSubmitting} onClick={async () => {
                     if (!selectedPedido?.id) return;
                     if ((selectedPedido?.estado || '').toString().toLowerCase() === 'completado' || (selectedPedido?.estado || '').toString().toLowerCase() === 'cancelado') {
@@ -3261,7 +3240,7 @@ export default function Pedidos() {
                     } finally {
                       setAddSubmitting(false);
                     }
-                  }} className="bg-rose-600 hover:bg-rose-700 text-white">{addSubmitting ? 'Enviando...' : 'Agregar'}</Button>
+                  }} className="bg-foreground text-white hover:bg-black">{addSubmitting ? 'Enviando...' : 'Agregar'}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -3339,7 +3318,7 @@ export default function Pedidos() {
                       return;
                     }
                     setShowPaymentInline(true);
-                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido) || ajustesDirty} className="h-10 sm:h-11 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white">
+                  }} disabled={selectedPedido?.estado === 'Cancelado' || isPedidoPaid(selectedPedido) || hasPendingProductionLines(selectedPedido) || ajustesDirty} className="h-10 sm:h-11 bg-foreground text-white hover:bg-black">
                     Registrar pago y completar
                   </Button>
                   {selectedPedido?.estado === 'Completado' && (
@@ -3363,12 +3342,12 @@ export default function Pedidos() {
                       {showPaymentsView ? 'Ocultar pagos' : 'Ver pagos'}
                     </Button>
                   )}
-                  <Button size="lg" variant="destructive" className="h-10 sm:h-11" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
+                  <Button size="lg" variant="outline" className="h-10 sm:h-11 border-amber-600/40 bg-transparent text-amber-800 hover:bg-amber-50 hover:text-amber-900" onClick={completarSinPago} disabled={completing || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado' || hasPendingProductionLines(selectedPedido) || ajustesDirty}>
                     {completing ? 'Procesando...' : 'Completar sin registrar pago'}
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:flex">
-                  <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="h-9 sm:h-10 hover:bg-slate-50">
+                  <Button variant="outline" onClick={handleCancelarPedido} disabled={canceling || selectedPedido?.estado === 'Completado' || selectedPedido?.estado === 'Cancelado'} className="h-9 sm:h-10 border-red-200 bg-transparent text-red-700 hover:bg-red-50 hover:text-red-800">
                     {canceling ? 'Procesando...' : 'Cancelar pedido'}
                   </Button>
                   <Button variant="ghost" className="h-9 sm:h-10" onClick={closeDetalle}>Cerrar</Button>
@@ -3428,7 +3407,7 @@ export default function Pedidos() {
         </Dialog>
         {/* Modal para producir desde una línea del pedido */}
         <Dialog open={prodModalOpen} onOpenChange={setProdModalOpen}>
-          <DialogContent className="max-w-lg bg-gradient-to-br from-white to-emerald-50 rounded-lg shadow-lg border border-emerald-100">
+          <DialogContent className="max-w-lg rounded-2xl border border-border bg-card shadow-lg">
             <DialogHeader>
               <DialogTitle>Producir</DialogTitle>
               <DialogDescription>Crear producción a partir de la fórmula asociada a la línea.</DialogDescription>
@@ -3499,7 +3478,7 @@ export default function Pedidos() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setProdModalOpen(false)} className="hover:bg-emerald-50">Cancelar</Button>
-              <Button disabled={prodSubmitting} onClick={handleProduceFromLine} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white">{prodSubmitting ? 'Generando...' : 'Producir'}</Button>
+              <Button disabled={prodSubmitting} onClick={handleProduceFromLine} className="bg-foreground text-white hover:bg-black">{prodSubmitting ? 'Generando...' : 'Producir'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
