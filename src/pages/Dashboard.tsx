@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/integrations/api';
 import EsenciasAlertaCard from '@/components/EsenciasAlertaCard';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, Cell } from "recharts";
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -56,20 +56,22 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-5">
+        {/* Estilo nuevo del panel (maqueta maquetas/estilo-nuevo/panel-dashboard.html) */}
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-[#a8874a]">General</p>
+          <h2 className="mt-1 font-bell-mt text-[30px] font-normal leading-tight">Dashboard</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Resumen general del sistema</p>
         </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
           {kpis.map((kpi) => (
-            <Card key={kpi.title} className="overflow-hidden">
+            <Card key={kpi.title} className="overflow-hidden rounded-2xl shadow-none">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-muted-foreground leading-tight">{kpi.title}</p>
-                    <div className="mt-1.5 text-2xl sm:text-3xl font-semibold tabular-nums tracking-tight">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground leading-tight">{kpi.title}</p>
+                    <div className="mt-1.5 font-bell-mt text-[30px] font-normal leading-tight tabular-nums sm:text-[36px]">
                       {loading || kpi.value === null
                         ? <Skeleton className="mt-1 h-7 w-16 sm:h-8 sm:w-20" />
                         : kpi.format(kpi.value)
@@ -77,8 +79,8 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-1 text-[10.5px] sm:text-[11.5px] text-muted-foreground leading-tight hidden sm:block">{kpi.sub}</p>
                   </div>
-                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 self-start">
-                    <kpi.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+                  <div className="hidden shrink-0 self-start sm:block">
+                    <kpi.icon className="h-4 w-4 text-[#a8874a]" strokeWidth={1.7} />
                   </div>
                 </div>
               </CardContent>
@@ -86,51 +88,36 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts */}
-        {/* Esencias por acabarse (con rotación): alerta, va arriba */}
-        <EsenciasAlertaCard />
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2 px-4 sm:px-6">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Ventas por mes</CardTitle>
+        {/* Una sola gráfica de ventas (antes había dos con los mismos datos) y, al lado en PC, las esencias por acabarse */}
+        <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+          <Card className="rounded-2xl shadow-none">
+            <CardHeader className="pb-1 px-4 sm:px-6">
+              <CardTitle className="font-bell-mt text-[21px] font-normal">Ventas por mes</CardTitle>
+              <p className="text-[12.5px] text-muted-foreground">Pedidos completados con pago</p>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={chartData} barGap={2} margin={{ left: -10, right: 4 }}>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={chartData} margin={{ left: -10, right: 4, top: 22 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'hsl(var(--muted))', radius: 4 }} />
-                  <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Ventas $" />
-                  <Bar dataKey="compras" fill="hsl(var(--primary) / 0.25)" radius={[4, 4, 0, 0]} name="Pedidos" />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, fontSize: 12 }} cursor={{ fill: 'hsl(var(--muted))', radius: 4 }} />
+                  <Bar dataKey="ventas" radius={[6, 6, 0, 0]} name="Ventas $" maxBarSize={36}>
+                    {chartData.map((_, i) => <Cell key={i} fill={i === new Date().getMonth() ? 'hsl(var(--primary))' : '#c9b99f'} />)}
+                    <LabelList dataKey="ventas" position="top" formatter={(v: number) => (v ? `$${Math.round(v)}` : '')} style={{ fontSize: 10.5, fontWeight: 600, fill: 'hsl(var(--foreground))' }} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="pb-2 px-4 sm:px-6">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Tendencia de ventas</CardTitle>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6">
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={chartData} margin={{ left: -10, right: 4 }}>
-                  <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '0.5px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} cursor={{ stroke: 'hsl(var(--border))' }} />
-                  <Line type="monotone" dataKey="ventas" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="Ventas $" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {/* Esencias por acabarse (con rotación): alerta */}
+          <EsenciasAlertaCard />
         </div>
 
         {/* Top Products */}
-        <Card>
+        <Card className="rounded-2xl shadow-none">
           <CardHeader className="pb-2 px-4 sm:px-6">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Productos más vendidos — {mesActual}</CardTitle>
+            <CardTitle className="font-bell-mt text-[21px] font-normal">Productos más vendidos — {mesActual}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 px-4 sm:px-6">
             {loading ? (
@@ -146,7 +133,7 @@ export default function Dashboard() {
                 {topProductos.map((p, index) => (
                   <div key={`${p.id}-${index}`} className="flex items-center justify-between py-3 border-b border-border/60 last:border-0 min-h-[52px]">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-semibold text-primary tabular-nums">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border font-bell-mt text-[13px] text-[#a8874a] tabular-nums">
                         {index + 1}
                       </span>
                       <div className="min-w-0">
