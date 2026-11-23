@@ -215,7 +215,7 @@ export function AppSidebar() {
                             <SidebarMenuButton
                               onClick={() => navigate(item.url)}
                               isActive={isActive}
-                              className={`flex items-center gap-3 px-3 py-1.5 min-h-[34px] rounded-md transition-colors duration-150 ${isActive ? item.module === 'influencer' ? 'relative bg-amber-100 pl-[calc(0.75rem+3px)] font-medium text-amber-950 data-[active=true]:bg-amber-100 data-[active=true]:text-amber-950 before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-amber-700' : activeItemClass : inactiveItemClass}`}
+                              className={`flex items-center gap-3 px-3 py-1.5 min-h-[34px] rounded-md transition-colors duration-150 ${isActive ? activeItemClass : inactiveItemClass}`}
                               title={!open ? item.title : undefined}
                             >
                               <span className="flex items-center justify-center w-5 h-5 shrink-0">
