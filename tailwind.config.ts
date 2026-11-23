@@ -40,7 +40,9 @@ export default {
           900: '#1a1a1a',
         },
         primary: {
-          DEFAULT: '#ca9e67',
+          // Sigue la variable --primary: dorado en la tienda (:root) y negro suave en el panel (.panel-mirra)
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
           100: '#f5eee6',
           200: '#e8d9c5',
           300: '#dcc4a4',

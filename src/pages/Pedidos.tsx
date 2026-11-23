@@ -2710,9 +2710,9 @@ export default function Pedidos() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
+                    <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                        <h3 className="text-base font-semibold">Descuentos y recargos</h3>
+                        <h3 className="font-bell-mt text-[19px] font-normal">Descuentos y recargos</h3>
                         {ajustesDirty && (
                           <Badge variant="secondary" className="bg-amber-200 text-amber-900">Cambios sin guardar</Badge>
                         )}
@@ -2724,30 +2724,30 @@ export default function Pedidos() {
                           {ajustesDraft.map((ajuste, index) => {
                             const previewRow = ajustesPreview.ajustes[index];
                             return (
-                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-2 gap-2 items-end rounded-md border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                                <div className="col-span-1 md:col-span-2">
+                              <div key={ajuste.id ?? `ajuste-${index}`} className="grid grid-cols-2 gap-2 items-end rounded-xl border border-border p-2.5 md:grid-cols-[minmax(118px,1.2fr)_minmax(78px,0.8fr)_minmax(84px,0.9fr)_minmax(120px,2fr)_minmax(84px,0.9fr)_auto] md:gap-3 md:border-0 md:p-0">
+                                <div className="col-span-1 md:col-span-1">
                                   <label className="text-xs text-muted-foreground">Tipo</label>
                                   <select
                                     value={ajuste.tipo}
                                     onChange={(e) => handleAjusteChange(index, 'tipo', e.target.value)}
-                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    className="h-9 w-full rounded-[10px] border border-input bg-background px-2.5 text-sm outline-none focus:border-foreground"
                                   >
                                     <option value="descuento">Descuento</option>
                                     <option value="recargo">Recargo</option>
                                   </select>
                                 </div>
-                                <div className="col-span-1 md:col-span-2">
+                                <div className="col-span-1 md:col-span-1">
                                   <label className="text-xs text-muted-foreground">Modo</label>
                                   <select
                                     value={ajuste.modo}
                                     onChange={(e) => handleAjusteChange(index, 'modo', e.target.value)}
-                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    className="h-9 w-full rounded-[10px] border border-input bg-background px-2.5 text-sm outline-none focus:border-foreground"
                                   >
                                     <option value="porcentaje">%</option>
                                     <option value="monto">Monto</option>
                                   </select>
                                 </div>
-                                <div className="col-span-1 md:col-span-2">
+                                <div className="col-span-1 md:col-span-1">
                                   <label className="text-xs text-muted-foreground">{ajuste.modo === 'porcentaje' ? 'Porcentaje' : 'Monto ($)'}</label>
                                   <input
                                     type="number"
@@ -2755,24 +2755,27 @@ export default function Pedidos() {
                                     step="0.01"
                                     value={ajuste.valor}
                                     onChange={(e) => handleAjusteChange(index, 'valor', e.target.value)}
-                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    className="h-9 w-full rounded-[10px] border border-input bg-background px-2.5 text-sm outline-none focus:border-foreground"
                                   />
                                 </div>
-                                <div className="col-span-2 md:col-span-4">
+                                <div className="col-span-2 md:col-span-1">
                                   <label className="text-xs text-muted-foreground">Motivo</label>
                                   <input
                                     type="text"
                                     value={ajuste.motivo}
                                     onChange={(e) => handleAjusteChange(index, 'motivo', e.target.value)}
-                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    className="h-9 w-full rounded-[10px] border border-input bg-background px-2.5 text-sm outline-none focus:border-foreground"
                                     placeholder="Ej. Descuento promocional"
                                   />
                                 </div>
-                                <div className="col-span-1 self-center text-left text-sm font-medium md:text-right">
-                                  {previewRow ? `$${previewRow.monto_aplicado.toFixed(2)}` : '$0.00'}
+                                <div className="col-span-1 md:col-span-1">
+                                  <label className="text-xs text-muted-foreground">Monto</label>
+                                  <div className="flex h-9 items-center justify-end rounded-[10px] bg-muted px-2.5 text-sm font-semibold tabular-nums">
+                                    {previewRow ? `$${previewRow.monto_aplicado.toFixed(2)}` : '$0.00'}
+                                  </div>
                                 </div>
-                                <div className="col-span-1 flex justify-end">
-                                  <Button size="sm" variant="ghost" onClick={() => handleRemoveAjuste(index)} className="text-red-500 hover:text-red-600">
+                                <div className="col-span-1 flex justify-end md:col-span-1">
+                                  <Button size="sm" variant="destructive" onClick={() => handleRemoveAjuste(index)} className="h-9 w-full md:w-auto">
                                     Quitar
                                   </Button>
                                 </div>
