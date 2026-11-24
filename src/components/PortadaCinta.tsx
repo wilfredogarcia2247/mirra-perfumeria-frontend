@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Product } from '@/lib/types';
-import { getImageUrl } from '@/lib/utils';
+import { fichaDe } from '@/lib/fichaTienda';
 import { bajarAlCatalogo } from '@/lib/catalog';
 
 const FILAS = 3;
@@ -40,15 +40,20 @@ function mezclar<T>(lista: T[]): T[] {
   return copia;
 }
 
-// Fotos para la cinta, elegidas en cada visita:
-// 1. Todos los Recomendados.
-// 2. Más pedidos al azar hasta completar la mitad de la cinta.
-// 3. El resto (hasta 45) con perfumes al azar del catálogo.
-// Al final se mezcla todo. No se usan agotados ni fotos repetidas.
+// Cada cuántas fotos va una de ambiente (3 frascos "Huele a" y luego 1 de ambiente)
+const CADA_AMBIENTE = 4;
+
+// Fotos para la cinta, elegidas en cada visita. Solo fotos IA de la ficha (nunca la foto vieja):
+// - Frascos "Huele a" (ficha.fotos.huele), uno por perfume, sin agotados:
+//   1. Todos los Recomendados.  2. Más pedidos al azar hasta la mitad de la cinta.  3. El resto al azar.
+// - Fotos de ambiente (ficha.fotos.estilo e inspirado, compartidas entre perfumes), alternando
+//   personas y escenarios. Van en cada fila en el lugar 4, 8, 12... (cada fila empieza en un
+//   punto distinto), así nunca salen dos de ambiente seguidas ni una encima de otra.
 // Un lugar sin foto (null) se muestra con el logo de Mirra: así se ve mientras cargan los
 // productos y si hay menos de 6 fotos se completa con logos.
-function fotosDe(products: Product[]): (FotoCinta | null)[] {
-  const disponibles = products.filter((p) => p.image_url && !p.agotado);
+function fotosDe(products: Product[]): (FotoCinta | null)[][] {
+  const huele = (p: Product) => fichaDe(p)?.fotos.huele || null;
+  const disponibles = products.filter((p) => huele(p) && !p.agotado);
   const recomendados = disponibles.filter((p) => p.featured);
   const masPedidos = mezclar(disponibles.filter((p) => p.mas_pedido && !p.featured));
   const resto = mezclar(disponibles.filter((p) => !p.featured && !p.mas_pedido));
@@ -63,11 +68,36 @@ function fotosDe(products: Product[]): (FotoCinta | null)[] {
   const urls = new Set<string>();
   for (const p of [...elegidos, ...relleno]) {
     if (urls.size >= TOTAL_FOTOS) break;
-    const url = getImageUrl(p);
-    if (url) urls.add(url);
+    urls.add(huele(p)!);
   }
-  const fotos: FotoCinta[] = mezclar(Array.from(urls)).map((original) => ({ mini: miniaturaDe(original), original }));
-  return fotos.length >= 6 ? fotos : [...fotos, ...Array<null>(6 - fotos.length).fill(null)];
+  const frascos: FotoCinta[] = mezclar(Array.from(urls)).map((original) => ({ mini: miniaturaDe(original), original }));
+
+  // Ambiente: personas (estilo) y escenarios (inspirado) intercalados
+  const estilos = new Set<string>();
+  const inspirados = new Set<string>();
+  for (const p of products) {
+    const f = fichaDe(p)?.fotos;
+    if (f?.estilo) estilos.add(f.estilo);
+    if (f?.inspirado) inspirados.add(f.inspirado);
+  }
+  const est = mezclar(Array.from(estilos));
+  const ins = mezclar(Array.from(inspirados));
+  const ambiente: FotoCinta[] = [];
+  for (let i = 0; i < Math.max(est.length, ins.length); i++) {
+    if (est[i]) ambiente.push({ mini: null, original: est[i] });
+    if (ins[i]) ambiente.push({ mini: null, original: ins[i] });
+  }
+
+  // Sin frascos todavía (cargando): logos de Mirra
+  const base: (FotoCinta | null)[] = frascos.length >= 6 ? frascos : [...frascos, ...Array<null>(6 - frascos.length).fill(null)];
+  let f = 0;
+  let a = 0;
+  return Array.from({ length: FILAS }, (_, fila) =>
+    Array.from({ length: FOTOS_POR_FILA }, (_, i) => {
+      const toca = frascos.length > 0 && ambiente.length > 0 && (i + fila * 2) % CADA_AMBIENTE === CADA_AMBIENTE - 1;
+      return toca ? ambiente[a++ % ambiente.length] : base[f++ % base.length];
+    }),
+  );
 }
 
 // Cada lugar de la cinta muestra el logo de Mirra sobre fondo crema; cuando la foto del
@@ -112,13 +142,8 @@ interface PortadaCintaProps {
 //   (una hacia cada lado) con los bordes desvanecidos.
 // - Teléfono: 2 filas arriba y el mensaje debajo.
 export default function PortadaCinta({ products, selectedCategory }: PortadaCintaProps) {
-  const filas = useMemo(() => {
-    const fotos = fotosDe(products);
-    // Cada fila toma un grupo distinto de fotos, para que no se repitan una encima de otra
-    return Array.from({ length: FILAS }, (_, fila) =>
-      Array.from({ length: FOTOS_POR_FILA }, (_, i) => fotos[(fila * FOTOS_POR_FILA + i) % fotos.length]),
-    );
-  }, [products]);
+  // Cada fila toma un grupo distinto de fotos, para que no se repitan una encima de otra
+  const filas = useMemo(() => fotosDe(products), [products]);
 
   const enCategoria = selectedCategory !== 'all';
   const categoria = selectedCategory.split('-').join(' ');
