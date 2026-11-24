@@ -70,8 +70,10 @@ export function elegirAlAzar(lista: Product[], actualId?: Product['id'] | null):
 // Tamaño con el que arranca: el más barato desde 30 ml (así no choca con el mínimo de
 // 7 ml); si no hay, el primero con precio.
 export function presentacionInicial(pres: Presentacion[]): number {
-  const i = pres.findIndex((x) => (mlDe(x.tamano?.nombre) ?? 0) >= 30);
-  return i >= 0 ? i : 0;
+  const i = pres.findIndex((x) => !x.agotada && (mlDe(x.tamano?.nombre) ?? 0) >= 30);
+  if (i >= 0) return i;
+  const j = pres.findIndex((x) => !x.agotada);
+  return j >= 0 ? j : 0;
 }
 
 // Botón Filtros de la tienda: familias y momentos elegidos

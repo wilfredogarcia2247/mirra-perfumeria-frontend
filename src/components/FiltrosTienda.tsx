@@ -135,7 +135,7 @@ export default function FiltrosTienda({
           type="button"
           onClick={() => setAbierto((a) => !a)}
           aria-expanded={abierto}
-          className={`inline-flex items-center gap-2 rounded-full border-[1.5px] bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition ${elegidos || abierto ? 'border-[#1c1917]' : 'border-[#e8d9c5] hover:border-[#CA9E67]'}`}
+          className={`inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-semibold text-mirra-tinta transition ${elegidos || abierto ? 'border-[#1c1917]' : 'border-mirra-linea hover:border-[#d6cfc5]'}`}
         >
           <SlidersHorizontal className="h-4 w-4" />
           Filtros

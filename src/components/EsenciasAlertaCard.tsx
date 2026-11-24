@@ -59,9 +59,9 @@ export default function EsenciasAlertaCard() {
   const visibles = verTodas ? lista : lista.slice(0, 5);
 
   return (
-    <Card className={altas > 0 ? 'border-red-200' : undefined}>
+    <Card className={`rounded-2xl shadow-none ${altas > 0 ? 'border-red-200' : ''}`}>
       <CardHeader className="px-4 pb-2 sm:px-6">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+        <CardTitle className="flex items-center gap-2 font-bell-mt text-[21px] font-normal">
           <AlertTriangle className={`h-4 w-4 ${altas > 0 ? 'text-red-600' : 'text-amber-600'}`} />
           Esencias por acabarse
           {lista.length > 0 && (
@@ -89,7 +89,7 @@ export default function EsenciasAlertaCard() {
                   {verTodas ? 'Ver menos' : `Ver las ${lista.length}`}
                 </button>
               ) : <span />}
-              <Link to="/productos" className="font-medium text-primary underline underline-offset-2">Ver en Productos</Link>
+              <Link to="/productos" className="font-medium text-foreground underline decoration-[#a8874a] underline-offset-[3px]">Ver en Productos</Link>
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Aviso cuando alcanza para menos de {datos.criterio.umbral_frascos} frascos del tamaño más grande.

@@ -493,7 +493,7 @@ export default function Cupones() {
                         <div className="flex flex-wrap items-center gap-2">
                           <code className="break-all rounded bg-muted px-2 py-1 text-sm font-bold tracking-wide">{coupon.codigo}</code>
                           <span className={`rounded-full px-2 py-1 text-xs font-medium ${coupon.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-muted text-muted-foreground'}`}>{coupon.activo ? 'Activo' : 'Inactivo'}</span>
-                          {coupon.es_global && <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">Global</span>}
+                          {coupon.es_global && <span className="rounded-full border border-border bg-card px-2 py-1 text-xs font-medium text-foreground">Global</span>}
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">{coupon.descripcion || coupon.colaborador_nombre || 'Sin descripción'}</p>
                       </div>

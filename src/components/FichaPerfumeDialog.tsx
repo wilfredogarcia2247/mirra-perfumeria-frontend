@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link2, Loader2 } from 'lucide-react';
+import { Link2, Loader2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { guardarFichaProducto } from '@/integrations/api';
 import { copiarEnlacePerfume } from '@/lib/compartir';
+import ImageUpload from '@/components/ImageUpload';
+import { colorSugerido, fotosCompartidas } from '@/lib/fotosCompartidas';
 import {
-  DURACION, FAMILIAS, FICHA_VACIA, MOMENTO, PARA, TEMPORADAS,
+  COLORES_LIQUIDO, DURACION, FAMILIAS, FICHA_VACIA, MOMENTO, PARA, TEMPORADAS,
   normalizarFicha, type FichaPerfume,
 } from '@/lib/fichaPerfume';
 
@@ -64,12 +66,36 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
 
   const cambiar = (campo: keyof FichaPerfume) => (v: any) => setF((prev) => ({ ...prev, [campo]: v }));
 
+  // Color sugerido y fotos compartidas ("Inspirado en" y "Estilo"), con la misma regla de los 305 perfumes.
+  // Solo cambia lo que está vacío (no pisa una foto o un color que el personal ya eligió); se puede cambiar después.
+  const asignarColorYFotos = () => {
+    if (!producto) return;
+    if (!f.para || !f.momento || f.familias.length === 0) {
+      toast.error('Primero elige "Para", "Momento" y al menos una familia: con eso se eligen las fotos.');
+      return;
+    }
+    const notasActuales = { salida: aLista(notas.salida), corazon: aLista(notas.corazon), fondo: aLista(notas.fondo) };
+    const color = f.color_liquido || colorSugerido(producto.id, { familias: f.familias, notas: notasActuales });
+    const compartidas = fotosCompartidas(producto.id, f, color);
+    const cambios: string[] = [];
+    if (!f.color_liquido) cambios.push('color del líquido');
+    if (!f.fotos.inspirado) cambios.push('"Inspirado en"');
+    if (!f.fotos.estilo) cambios.push('"Estilo"');
+    setF((p) => ({
+      ...p,
+      color_liquido: color,
+      fotos: { ...p.fotos, inspirado: p.fotos.inspirado || compartidas.inspirado, estilo: p.fotos.estilo || compartidas.estilo },
+    }));
+    toast.success(cambios.length ? `Listo: ${cambios.join(', ')}. Revisa y guarda.` : 'Ya tenía color y fotos; no se cambió nada. Usa "Quitar" en una foto para volver a asignarla.');
+  };
+
   const guardar = async () => {
     if (!producto) return;
     setGuardando(true);
     const ficha: FichaPerfume = {
       ...f,
       inspirado_en: (f.inspirado_en || '').trim() || null,
+      nombre_mirra: (f.nombre_mirra || '').trim() || null,
       casa: (f.casa || '').trim() || null,
       anio: f.anio && Number.isInteger(f.anio) ? f.anio : null,
       notas: { salida: aLista(notas.salida), corazon: aLista(notas.corazon), fondo: aLista(notas.fondo) },
@@ -129,6 +155,61 @@ export default function FichaPerfumeDialog({ producto, onCerrar, onGuardado }: P
           <div className="space-y-1"><p className="font-medium">Familia <span className="font-normal text-muted-foreground">(puedes marcar varias)</span></p><Opciones lista={FAMILIAS} valor={f.familias} onCambio={cambiar('familias')} varias /></div>
           <div className="space-y-1"><p className="font-medium">Duración</p><Opciones lista={DURACION} valor={f.duracion} onCambio={cambiar('duracion')} /></div>
           <div className="space-y-1"><p className="font-medium">Temporada</p><Opciones lista={TEMPORADAS} valor={f.temporadas} onCambio={cambiar('temporadas')} varias /></div>
+
+          {/* Estilo nuevo de la tienda: nombre propio, color del líquido y fotos extra de la galería */}
+          <div className="space-y-3 rounded-xl border border-[#ece6de] bg-[#faf8f5] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a6a3e]">En la tienda</p>
+              <button type="button" onClick={asignarColorYFotos} className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-foreground/20 bg-card px-3 text-[13px] font-semibold text-foreground hover:border-foreground/50">
+                <Wand2 className="h-4 w-4 text-[#a8874a]" /> Asignar color y fotos
+              </button>
+            </div>
+            <p className="-mt-1 text-xs text-muted-foreground">Elige solo el color del líquido y las fotos "Inspirado en" y "Estilo" según para quién es, el momento y la familia. Solo llena lo que esté vacío.</p>
+            <label className="block space-y-1">
+              <span className="font-medium">Nombre Mirra</span>
+              <input id="ficha-nombre-mirra" value={f.nombre_mirra || ''} maxLength={60} onChange={(e) => cambiar('nombre_mirra')(e.target.value)} placeholder="Ej. Café de Medianoche" className="h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm" />
+              <span className="block text-xs text-muted-foreground">Se muestra con el número del perfume (230. Café de Medianoche). Pedidos, inventario y WhatsApp siguen con el nombre de siempre.</span>
+            </label>
+            <div className="space-y-1">
+              <p className="font-medium">Color del líquido</p>
+              <div className="flex flex-wrap gap-1.5">
+                {COLORES_LIQUIDO.map((c) => (
+                  <button key={c.v} type="button" aria-pressed={f.color_liquido === c.v}
+                    onClick={() => cambiar('color_liquido')(f.color_liquido === c.v ? null : c.v)}
+                    className={`flex min-h-[36px] items-center gap-2 rounded-lg border px-3 text-sm transition ${f.color_liquido === c.v ? 'border-[#1c1917] bg-white font-semibold' : 'bg-background'}`}>
+                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ background: c.c }} />{c.t}
+                  </button>
+                ))}
+              </div>
+              <span className="block text-xs text-muted-foreground">La tienda muestra el frasco Mirra con este color. Sin color, se ve la foto de siempre.</span>
+            </div>
+            {([['huele', 'Foto "Huele a"', 'El frasco con sus ingredientes'], ['inspirado', 'Foto "Inspirado en"', 'El frasco con luz y ambiente'], ['estilo', 'Foto "Estilo"', 'Una persona usándolo']] as const).map(([k, titulo, ayuda]) => (
+              <div key={k} className="space-y-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-medium">{titulo} <span className="font-normal text-muted-foreground">· {ayuda}</span></p>
+                  {f.fotos[k] && <button type="button" onClick={() => setF((p) => ({ ...p, fotos: { ...p.fotos, [k]: null } }))} className="text-xs text-muted-foreground underline">Quitar</button>}
+                </div>
+                {k === 'huele' && (
+                  <details className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer font-semibold text-foreground">Cómo hacer esta foto</summary>
+                    <ul className="mt-1.5 list-disc space-y-1 pl-4">
+                      <li>El <b>frasco Mirra</b> con el líquido de su color{f.color_liquido ? ` (${COLORES_LIQUIDO.find((c) => c.v === f.color_liquido)?.t.toLowerCase()})` : ''}, <b>uno solo</b>.</li>
+                      <li>Alrededor, los <b>ingredientes reales</b> de sus notas{aLista(`${notas.salida},${notas.corazon}`).length ? <>: <b>{aLista(`${notas.salida},${notas.corazon},${notas.fondo}`).slice(0, 5).join(', ').toLowerCase()}</b></> : ''} (fruta, flores, especias, madera…).</li>
+                      <li>Foto <b>vertical</b> (más alta que ancha, como 4:5), de al menos <b>1000 px</b> de ancho, bien iluminada.</li>
+                      <li>Deja espacio limpio <b>arriba</b>: la tienda escribe ahí "Huele a …".</li>
+                      <li>Sin textos, sin logos de otras marcas y sin marcas de agua. Formato JPG o WebP.</li>
+                      <li>Para inspirarte, mira la foto "Huele a" de otros perfumes en la tienda.</li>
+                    </ul>
+                  </details>
+                )}
+                <ImageUpload
+                  key={`${producto?.id}-${k}-${f.fotos[k] || 'sin'}`}
+                  existingImageUrl={f.fotos[k] || undefined}
+                  onImageUpload={(url) => setF((p) => ({ ...p, fotos: { ...p.fotos, [k]: url || null } }))}
+                />
+              </div>
+            ))}
+          </div>
 
           <label className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${f.revisada ? 'border-green-300 bg-green-50' : 'bg-muted/40'}`}>
             <span>

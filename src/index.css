@@ -104,6 +104,44 @@
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* Panel de administración con el estilo de la tienda (2026-11-22, maqueta maquetas/estilo-nuevo/panel*.html):
+     crema, negro suave y dorado de acento. Solo aplica mientras se ve el panel (Layout pone la clase en <html>),
+     así también lo toman las ventanas y menús que se abren fuera del contenido. La tienda no cambia. */
+  .panel-mirra {
+    --background: 37 48% 94%;
+    --foreground: 26 11% 15%;
+    --card: 40 100% 99%;
+    --card-foreground: 26 11% 15%;
+    --popover: 40 100% 99%;
+    --popover-foreground: 26 11% 15%;
+    --primary: 26 11% 15%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 37 40% 91%;
+    --secondary-foreground: 26 11% 15%;
+    --muted: 37 40% 91%;
+    --muted-foreground: 28 10% 38%;
+    --accent: 37 40% 91%;
+    --accent-foreground: 26 11% 15%;
+    --destructive: 3 71% 41%;
+    --border: 36 30% 85%;
+    --input: 35 24% 80%;
+    --ring: 26 11% 15%;
+    --sidebar-background: 22 13% 12%;
+    --sidebar-foreground: 35 24% 85%;
+    --sidebar-primary: 39 39% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 26 15% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 26 13% 20%;
+    --sidebar-ring: 39 39% 47%;
+    --chart-1: 26 11% 15%;
+    --chart-2: 39 39% 47%;
+    /* Más colores para gráficas del panel: cálidos, a juego con la tienda */
+    --chart-3: 28 30% 62%;
+    --chart-4: 15 45% 45%;
+    --chart-5: 95 18% 42%;
+  }
+
   .dark {
     --background: 20 18% 8%;
     --foreground: 35 25% 93%;
@@ -418,5 +456,36 @@
   .admin-main table button:not([role="switch"]):not([role="checkbox"]) {
     min-width: 40px;
     min-height: 40px;
+  }
+}
+
+/* Panel en teléfono y tablet: los campos con letra de 16 px para que el iPhone no acerque la pantalla al
+   tocarlos (lo hace con letra más pequeña). En PC siguen con su tamaño. La tienda ya lo tenía resuelto. */
+@media (max-width: 1023px) {
+  .panel-mirra input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .panel-mirra select,
+  .panel-mirra textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iPhone/iPad: el campo de fecha tiene un ancho mínimo propio y se sale del cuadro. Lo obligamos a quedarse dentro
+   (solo en Safari de iPhone/iPad, que es donde pasa; Android y PC quedan igual). */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
   }
 }

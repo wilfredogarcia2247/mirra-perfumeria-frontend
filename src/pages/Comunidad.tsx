@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, MapPin, Navigation, PenLine } from 'lucide-react';
+import { Bike, ChevronLeft, ChevronRight, Clock, MapPin, Navigation, Package, PenLine, Store } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
@@ -14,7 +14,7 @@ const VER_RESENAS = 'https://www.google.com/maps/place/Mirra+Perfumeria/@10.6599
 // Abre Maps directo en modo ruta, desde donde esté el cliente (sin punto de salida fijo)
 const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Mirra+Perfumeria,+Local+%234,+Diagonal+al+Restaurant+Yangtze,+Centro+Comercial+Aviur,+Maracaibo+4001,+Zulia';
 
-const SOMBRA = 'shadow-[0_8px_22px_rgba(90,59,34,0.13),0_2px_5px_rgba(90,59,34,0.08)]';
+const SOMBRA = ''; // estilo nuevo: bordes finos en lugar de sombras
 
 const REDES = [
   {
@@ -23,10 +23,10 @@ const REDES = [
     url: 'https://www.instagram.com/mirraperfumeria.ve',
     fondo: 'linear-gradient(45deg,#f9a03f,#d6266d 55%,#7b3fbf)',
     icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} className="h-[23px] w-[23px]" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-[23px] w-[23px]" aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="5" />
         <circle cx="12" cy="12" r="4" />
-        <circle cx="17.5" cy="6.5" r="1" fill="#fff" />
+        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" />
       </svg>
     ),
   },
@@ -36,7 +36,7 @@ const REDES = [
     url: 'https://www.tiktok.com/@mirraperfumeria',
     fondo: 'linear-gradient(135deg,#25f4ee -40%,#111 45%,#111 60%,#fe2c55 160%)',
     icono: (
-      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-[23px] w-[23px]" aria-hidden="true">
         <path d="M12.5 0h3.9c.1 1.2.6 2.3 1.5 3.1.9.8 2.1 1.3 3.4 1.3v4.1c-1.4 0-2.9-.4-4.2-1v8.4c-.1 1.4-.5 2.8-1.3 3.9-1.3 1.9-3.6 3.2-5.9 3.2-1.4.1-2.9-.3-4.1-1C3.8 20.9 2.4 18.7 2.2 16.4c0-.5 0-1 0-1.5.2-1.9 1.1-3.7 2.6-5 1.7-1.4 4-2.1 6.2-1.7v4.4c-1-.3-2.2-.2-3 .4-.6.4-1.1 1-1.4 1.7-.2.5-.1 1.1-.1 1.6.2 1.6 1.8 3 3.5 2.9 1.1 0 2.2-.7 2.8-1.6.2-.3.4-.7.4-1.1.1-1.8.1-3.6.1-5.4V0z" />
       </svg>
     ),
@@ -47,7 +47,7 @@ const REDES = [
     url: 'https://www.facebook.com/mirraperfumeriave',
     fondo: 'linear-gradient(180deg,#3b8bff,#1466d8)',
     icono: (
-      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-[23px] w-[23px]" aria-hidden="true">
         <path d="M14 8V6.3c0-.8.2-1.3 1.4-1.3H17V2.1C16.7 2 15.8 2 14.7 2 12.4 2 11 3.4 11 5.9V8H8.5v3H11v11h3V11h2.6l.4-3H14z" />
       </svg>
     ),
@@ -58,7 +58,7 @@ const REDES = [
     url: WHATSAPP,
     fondo: 'linear-gradient(180deg,#3ccf74,#1a9e50)',
     icono: (
-      <svg viewBox="0 0 24 24" fill="#fff" className="h-[23px] w-[23px]" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-[23px] w-[23px]" aria-hidden="true">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
       </svg>
     ),
@@ -98,7 +98,7 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
     r: (
       <>
         Si lo enviamos por MRW, síguelo con tu número de guía en{' '}
-        <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.
+        <Link to="/rastreo" className="font-semibold text-[#1c1917] underline underline-offset-2">Rastrear pedido</Link>.
         Si es delivery, te avisamos por WhatsApp.
       </>
     ),
@@ -120,7 +120,7 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
     r: (
       <>
         Sí, si tu perfume llegó con el frasco partido o derramado, te lo cambiamos.{' '}
-        <Link to="/terminos#cambios" className="font-semibold text-[#8b6439] underline underline-offset-2">Ver condiciones</Link>.
+        <Link to="/terminos#cambios" className="font-semibold text-[#1c1917] underline underline-offset-2">Ver condiciones</Link>.
       </>
     ),
   },
@@ -129,9 +129,9 @@ const PREGUNTAS: { p: string; r: React.ReactNode }[] = [
 function Titulo({ children, sub }: { children: React.ReactNode; sub: string }) {
   return (
     <>
-      <h2 className="font-bell-mt text-[23px] font-semibold text-gray-900 sm:text-3xl">{children}</h2>
-      <div className="mt-2 h-[3px] w-9 rounded-full bg-gradient-to-r from-[#CA9E67] to-[#e7c793]" />
-      <p className="mb-4 mt-2.5 text-[13px] leading-relaxed text-gray-500 sm:text-sm">{sub}</p>
+      <h2 className="font-bell-mt text-[27px] font-normal leading-tight text-mirra-tinta lg:text-[34px]">{children}</h2>
+      <div className="mt-2.5 h-px w-[42px] bg-mirra-oro" />
+      <p className="mb-5 mt-2.5 text-[14px] leading-relaxed text-mirra-suave">{sub}</p>
     </>
   );
 }
@@ -142,8 +142,8 @@ function Estrellas({ valor, className = '' }: { valor: number; className?: strin
   const llenas = Math.round(valor);
   return (
     <span className={`tracking-[1px] ${className}`} aria-label={`${formatoNota(valor)} de 5 estrellas`}>
-      <span className="text-[#f5b301]">{'★'.repeat(llenas)}</span>
-      <span className="text-gray-300">{'★'.repeat(Math.max(0, 5 - llenas))}</span>
+      <span className="text-[#b08a57]">{'★'.repeat(llenas)}</span>
+      <span className="text-[#e2d8ca]">{'★'.repeat(Math.max(0, 5 - llenas))}</span>
     </span>
   );
 }
@@ -164,13 +164,13 @@ const ACERCA_RESUMEN = 'https://support.google.com/local-listings/answer/9851099
 // el aviso debajo del texto, "Acerca de este resumen", "Reportar" y un enlace a las reseñas ("Ver todas").
 function TarjetaResumen({ resumen }: { resumen: ResumenGoogle }) {
   return (
-    <div className={`mt-3 rounded-[18px] border border-[#f1e6d6] bg-white px-4 pb-3.5 pt-4 ${SOMBRA}`}>
+    <div className={`mt-3 rounded-[18px] border border-[#ece6de] bg-white px-4 pb-3.5 pt-4 ${SOMBRA}`}>
       <div className="flex items-center gap-2">
-        <span className="h-5 font-[Georgia,serif] text-[44px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a97c45]">Resumen de reseñas</p>
+        <span className="h-5 font-[Georgia,serif] text-[44px] leading-[0.6] text-[#b08a57]" aria-hidden="true">“</span>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3e]">Resumen de reseñas</p>
       </div>
-      <p className="mt-2.5 text-[13.5px] leading-relaxed text-gray-700">{resumen.texto}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-gray-400">
+      <p className="mt-2.5 text-[13.5px] leading-relaxed text-[#44403c]">{resumen.texto}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[#a8a29e]">
         <span className="w-full sm:w-auto">✦ {resumen.aviso}</span>
         <span aria-hidden="true" className="hidden sm:inline">·</span>
         <a href={ACERCA_RESUMEN} target="_blank" rel="noopener noreferrer" className="underline">Acerca de este resumen</a>
@@ -209,17 +209,17 @@ function DiapositivaResena({ r, alAbrir }: { r: ResenaGoogle; alAbrir: (abierta:
   }, [r.texto, abierta]);
 
   const nombre = r.perfil ? (
-    <a href={r.perfil} target="_blank" rel="noopener noreferrer" className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</a>
+    <a href={r.perfil} target="_blank" rel="noopener noreferrer" className="block truncate text-[13px] font-bold text-[#1c1917]">{r.autor}</a>
   ) : (
-    <span className="block truncate text-[13px] font-bold text-[#2b1d10]">{r.autor}</span>
+    <span className="block truncate text-[13px] font-bold text-[#1c1917]">{r.autor}</span>
   );
 
   return (
     <div className="flex w-full shrink-0 snap-center flex-col items-center justify-center px-7 pt-4 text-center">
-      <span className="h-[26px] font-[Georgia,serif] text-[58px] leading-[0.6] text-[#CA9E67]" aria-hidden="true">“</span>
+      <span className="h-[26px] font-[Georgia,serif] text-[58px] leading-[0.6] text-[#b08a57]" aria-hidden="true">“</span>
       <p
         ref={textoRef}
-        className={`mt-2 font-[Georgia,serif] text-base italic leading-[1.55] text-[#3b2a1a] ${abierta ? '' : 'line-clamp-5'}`}
+        className={`mt-2 font-[Georgia,serif] text-base italic leading-[1.55] text-[#1c1917] ${abierta ? '' : 'line-clamp-5'}`}
       >
         {r.texto}
       </p>
@@ -230,12 +230,12 @@ function DiapositivaResena({ r, alAbrir }: { r: ResenaGoogle; alAbrir: (abierta:
             setAbierta(!abierta);
             alAbrir(!abierta);
           }}
-          className="pt-1 text-[12.5px] font-semibold text-[#8b6439]">
+          className="pt-1 text-[12.5px] font-semibold text-[#1c1917]">
           {abierta ? 'Ver menos' : 'Ver más'}
         </button>
       )}
       <div className="mt-3.5 flex max-w-full items-center gap-2.5 text-left">
-        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[1.5px] border-[#CA9E67] bg-[#f5eee6] text-sm font-bold text-[#8b6439]">
+        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center overflow-hidden rounded-full border-[1.5px] border-[#b08a57] bg-[#f3eee8] text-sm font-bold text-[#1c1917]">
           {sinFoto ? (
             r.autor.charAt(0).toUpperCase()
           ) : (
@@ -244,14 +244,14 @@ function DiapositivaResena({ r, alAbrir }: { r: ResenaGoogle; alAbrir: (abierta:
         </span>
         <div className="min-w-0">
           {nombre}
-          <span className="text-[11px] text-[#8a7560]">
-            <span className="tracking-[1px] text-[#f5b301]" aria-label={`${r.estrellas} de 5 estrellas`}>{'★'.repeat(Math.round(r.estrellas))}</span>
+          <span className="text-[11px] text-[#78716c]">
+            <span className="tracking-[1px] text-[#b08a57]" aria-label={`${r.estrellas} de 5 estrellas`}>{'★'.repeat(Math.round(r.estrellas))}</span>
             {r.hace && ` · ${r.hace}`}
           </span>
         </div>
       </div>
       {(r.enlace || r.reportar) && (
-        <p className="mt-2 text-[11px] text-[#8a7560]">
+        <p className="mt-2 text-[11px] text-[#78716c]">
           {r.enlace && (
             <a href={r.enlace} target="_blank" rel="noopener noreferrer" className="underline">
               Ver en <span className="font-[Arial,sans-serif] font-bold">Google</span>
@@ -329,13 +329,13 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corriendo, actual, resenas.length]);
 
-  const flecha = 'flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#e2cfb4] bg-white text-[#8b6439] transition active:scale-95 disabled:opacity-40';
+  const flecha = 'flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#ece6de] bg-white text-[#1c1917] transition active:scale-95 disabled:opacity-40';
 
   return (
     <div
       ref={cajaRef}
-      className="-mx-4 mt-3 pb-5 pt-2 sm:mx-0 sm:rounded-[18px]"
-      style={{ background: 'linear-gradient(180deg,#faf4ea,#f1e4d0)' }}
+      className="-mx-4 mt-4 pb-5 pt-2 sm:mx-0 sm:rounded-[18px] lg:mt-0"
+      style={{ background: '#f3eee8' }}
       aria-roledescription="carrusel"
       aria-label="Reseñas de Google"
     >
@@ -363,7 +363,7 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
                 type="button"
                 onClick={() => { alTocar(); irA(i); }}
                 aria-label={`Ver reseña ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${i === actual ? 'w-[18px] bg-[#CA9E67]' : 'w-1.5 bg-[#e2d3bf]'}`}
+                className={`h-1.5 rounded-full transition-all ${i === actual ? 'w-[18px] bg-[#b08a57]' : 'w-1.5 bg-[#e2d8ca]'}`}
               />
             ))}
           </div>
@@ -374,13 +374,13 @@ function CarruselResenas({ resenas }: { resenas: ResenaGoogle[] }) {
       )}
       {resenas.length > 1 && !sinMovimiento && (
         // Rayita que se llena hasta que pasa a la siguiente (vacía mientras está en pausa)
-        <div className="mx-auto mt-2.5 h-[3px] w-20 overflow-hidden rounded-full bg-[#eadfce]" aria-hidden="true">
+        <div className="mx-auto mt-2.5 h-[3px] w-20 overflow-hidden rounded-full bg-[#e2d8ca]" aria-hidden="true">
           {corriendo && (
-            <span key={actual} className="block h-full rounded-full bg-[#CA9E67]" style={{ animation: `llenar-barra ${AVANCE_MS}ms linear forwards` }} />
+            <span key={actual} className="block h-full rounded-full bg-[#b08a57]" style={{ animation: `llenar-barra ${AVANCE_MS}ms linear forwards` }} />
           )}
         </div>
       )}
-      <p className="mt-2.5 text-center text-[11px] text-[#8a7560]">
+      <p className="mt-2.5 text-center text-[11px] text-[#78716c]">
         Reseñas de <span className="font-[Arial,sans-serif] font-bold">Google</span>
       </p>
     </div>
@@ -421,152 +421,154 @@ export default function Comunidad() {
   }, []);
 
   const margenSalto = { scrollMarginTop: `${(altoMenu ?? 80) + 8}px` };
-  const seccion = 'px-4 py-7 sm:py-10';
-  const ancho = 'mx-auto max-w-2xl';
-  const btnBase = 'flex items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-center text-sm font-bold transition active:scale-[0.98]';
-  const btnBorde = `${btnBase} border-[1.5px] border-[#e8d9c5] bg-white text-[#8b6439] hover:border-[#CA9E67]`;
+  // Estilo nuevo (2026-11-22, maqueta aprobada maquetas/estilo-nuevo/comunidad.html): crema, líneas finas,
+  // botón principal negro y dorado solo de acento. Mismas secciones, textos y enlaces que antes.
+  const seccion = 'px-4 py-10 sm:py-14 lg:py-[72px]';
+  const ancho = 'mx-auto max-w-2xl lg:max-w-6xl';
+  const btnBase = 'flex items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-center text-sm font-semibold transition active:scale-[0.98]';
+  const btnNegro = `${btnBase} bg-mirra-tinta text-white hover:bg-black`;
+  const btnBorde = `${btnBase} border border-[#d9cfc1] bg-transparent text-mirra-tinta hover:border-mirra-tinta`;
+  const ENVIOS = [
+    { Ico: Bike, t: 'Delivery en Maracaibo y San Francisco', d: <>Te lo llevamos a tu casa o trabajo. El costo depende de la zona; te lo confirmamos por WhatsApp.</> },
+    { Ico: Package, t: 'Envíos nacionales por MRW', d: <>A cualquier ciudad de Venezuela. Sigue tu paquete en <Link to="/rastreo" className="font-semibold text-mirra-tinta underline decoration-mirra-oro underline-offset-[3px]">Rastrear pedido</Link>.</> },
+    { Ico: Store, t: 'Retiro en tienda', d: <>Retira tu pedido en nuestro local, de lunes a sábado, de 9:00 AM a 6:00 PM.</> },
+  ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-mirra-fondo">
       <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
 
-      {/* Portada oscura */}
-      <div
-        className="relative overflow-hidden px-5 pb-14 text-center text-[#f6ead9]"
-        style={{
-          background: 'radial-gradient(circle at 85% -10%, #8a5e39 0%, #3a2515 65%)',
-          paddingTop: altoMenu != null ? `${altoMenu + 34}px` : '9rem',
-        }}
-      >
-        <span className="pointer-events-none absolute -left-[120px] -top-[90px] h-[260px] w-[260px] rounded-full border border-[#e7c793]/20" />
-        <span className="pointer-events-none absolute -bottom-10 -right-[70px] h-[180px] w-[180px] rounded-full border border-[#e7c793]/20" />
-        <p className="text-[11px] uppercase tracking-[0.28em] text-[#e7c793]">Mirra Perfumería</p>
-        <h1 className="mt-1.5 font-bell-mt text-[34px] font-semibold text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.35)] sm:text-5xl">
-          Nuestra comunidad
-        </h1>
-        <p className="relative mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#e6d5bf] sm:text-base">
-          Lo que dicen nuestros clientes, dónde encontrarnos y lo que necesitas saber antes de comprar.
-        </p>
-        <a
-          href="#resenas"
-          className="relative mt-5 inline-flex items-center gap-2.5 rounded-full border border-[#e7c793]/55 px-[18px] py-2.5 text-sm text-[#f6ead9] shadow-[0_6px_18px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]"
-          style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.05))' }}
-        >
-          {nota != null ? (
-            <>
-              <strong className="text-base font-bold text-white">{formatoNota(nota)}</strong>
-              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
-              <span className="whitespace-nowrap">{google!.total} reseñas en Google</span>
-            </>
-          ) : (
-            <>
-              <span className="tracking-[1px] text-[#f5b301]">★★★★★</span>
-              <span className="whitespace-nowrap">Ver reseñas en Google</span>
-            </>
-          )}
-        </a>
+      {/* Portada: texto y tres fotos (en PC, una al lado del otro) */}
+      <div className="px-4 pb-4" style={{ paddingTop: altoMenu != null ? `${altoMenu + 30}px` : '8rem' }}>
+        <div className={`${ancho} lg:grid lg:grid-cols-2 lg:items-center lg:gap-16 lg:py-8`}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-mirra-oro">Mirra Perfumería</p>
+            <h1 className="mt-2 font-bell-mt text-[34px] font-normal leading-[1.1] text-mirra-tinta lg:text-[54px]">Nuestra comunidad</h1>
+            <p className="mt-2.5 max-w-md text-sm leading-relaxed text-mirra-suave lg:text-[15.5px]">
+              Lo que dicen nuestros clientes, dónde encontrarnos y lo que necesitas saber antes de comprar.
+            </p>
+            <a href="#resenas" className="mt-4 inline-flex items-center gap-2.5 rounded-full border border-[#d9cfc1] px-4 py-2 text-[13px] font-semibold text-mirra-tinta transition hover:border-mirra-tinta">
+              {nota != null ? (
+                <>
+                  <strong className="font-bold">{formatoNota(nota)}</strong>
+                  <span className="tracking-[2px] text-mirra-oro">★★★★★</span>
+                  <span className="whitespace-nowrap font-medium">{google!.total} reseñas en Google</span>
+                </>
+              ) : (
+                <>
+                  <span className="tracking-[2px] text-mirra-oro">★★★★★</span>
+                  <span className="whitespace-nowrap">Ver reseñas en Google</span>
+                </>
+              )}
+            </a>
+          </div>
+          <div className="mt-6 grid grid-cols-[1.2fr_1fr] gap-2.5 lg:mt-0" aria-hidden="true">
+            <img src="/paginas/comunidad-1.webp" alt="" className="row-span-2 aspect-[3/4] h-full w-full rounded-2xl object-cover" />
+            <img src="/paginas/comunidad-2.webp" alt="" className="aspect-square h-full w-full rounded-2xl object-cover" />
+            <img src="/paginas/comunidad-3.webp" alt="" className="aspect-square h-full w-full rounded-2xl object-cover" />
+          </div>
+        </div>
       </div>
-      <svg className="relative -mt-[27px] block h-7 w-full" viewBox="0 0 375 28" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 28 C120 0 255 0 375 28 Z" fill="#f9fafb" />
-      </svg>
 
       {/* Reseñas */}
-      <section id="resenas" className={`${seccion} bg-gray-50`} style={margenSalto}>
+      <section id="resenas" className={seccion} style={margenSalto}>
         <div className={ancho}>
           <Titulo sub="Tu opinión nos ayuda a crecer y a que más personas encuentren su aroma.">Lo que dicen de nosotros</Titulo>
-          <div className={`flex items-center gap-3.5 rounded-[18px] border border-[#f1e6d6] bg-white p-4 ${SOMBRA}`}>
-            {nota != null ? (
-              <div className="shrink-0 text-center">
-                <p className="text-[34px] font-bold leading-none text-gray-900">{formatoNota(nota)}</p>
-                <Estrellas valor={nota} className="text-sm" />
-              </div>
-            ) : (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-2xl" aria-hidden="true">⭐</div>
-            )}
-            <div className="min-w-0">
-              <p className="text-[15px]">
-                <LogoGoogle />
-                <span className="font-[Arial,sans-serif] font-semibold text-gray-600"> Maps</span>
-              </p>
-              <p className="mt-0.5 text-[13px] leading-snug text-gray-600">
-                {nota != null
-                  ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
-                  : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
-              </p>
+          {/* Mismo orden que antes en teléfono: nota de Google, carrusel, resumen y botones.
+              PC: nota, resumen y botones a la izquierda; el carrusel a la derecha. */}
+          <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start lg:gap-x-6">
+            <div className="lg:col-start-1 lg:row-start-1">
+                <div className="flex items-center gap-3.5 rounded-2xl border border-mirra-linea bg-white p-4">
+                  {nota != null ? (
+                    <div className="shrink-0 text-center">
+                      <p className="font-bell-mt text-[40px] leading-none text-mirra-tinta">{formatoNota(nota)}</p>
+                      <Estrellas valor={nota} className="text-sm" />
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-lg tracking-[2px] text-mirra-oro" aria-hidden="true">★★★★★</span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[15px]">
+                      <LogoGoogle />
+                      <span className="font-[Arial,sans-serif] font-semibold text-mirra-suave"> Maps</span>
+                    </p>
+                    <p className="mt-0.5 text-[13px] leading-snug text-mirra-suave">
+                      {nota != null
+                        ? `${google!.total} reseñas de nuestros clientes. Cuéntanos cómo te fue.`
+                        : 'Lee lo que dicen nuestros clientes o cuéntanos cómo te fue.'}
+                    </p>
+                  </div>
+                </div>
             </div>
-          </div>
-          {resenas.length > 0 && <CarruselResenas resenas={resenas} />}
-          {resumen && <TarjetaResumen resumen={resumen} />}
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
-            <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
-              <PenLine className="h-4 w-4" /> Dejar mi reseña
-            </a>
-            <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
-              Ver todas
-            </a>
+            {resenas.length > 0 && (
+              <div className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1"><CarruselResenas resenas={resenas} /></div>
+            )}
+            {resumen && <div className="lg:col-start-1"><TarjetaResumen resumen={resumen} /></div>}
+            <div className="lg:col-start-1">
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <a href={RESENA_ESCRIBIR} target="_blank" rel="noopener noreferrer" className={btnNegro}>
+                    <PenLine className="h-4 w-4" /> Dejar mi reseña
+                  </a>
+                  <a href={VER_RESENAS} target="_blank" rel="noopener noreferrer" className={btnBorde}>
+                    Ver todas
+                  </a>
+                </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Redes */}
-      <section id="redes" className={`${seccion} bg-white`} style={margenSalto}>
+      <section id="redes" className={`${seccion} pt-0 sm:pt-0 lg:pt-0`} style={margenSalto}>
         <div className={ancho}>
           <Titulo sub="Promociones, lanzamientos y recomendaciones todas las semanas.">Síguenos</Titulo>
-          <div className={`overflow-hidden rounded-[18px] bg-white ${SOMBRA}`}>
-            {REDES.map((red, i) => (
+          <div className="grid gap-2.5 lg:grid-cols-4 lg:gap-4">
+            {REDES.map((red) => (
               <a
                 key={red.nombre}
                 href={red.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center gap-3 px-3.5 py-3 transition hover:bg-[#fbf8f4] ${i > 0 ? 'border-t border-[#f3ebe0]' : ''}`}
+                className="flex items-center gap-3.5 rounded-2xl border border-mirra-linea bg-white px-4 py-3.5 transition hover:border-[#d9cfc1] lg:flex-col lg:px-4 lg:py-6 lg:text-center"
               >
-                <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] shadow-[0_4px_10px_rgba(0,0,0,0.18)]"
-                  style={{ background: red.fondo }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-mirra-linea bg-mirra-fondo text-mirra-tinta [&_svg]:h-[19px] [&_svg]:w-[19px]">
                   {red.icono}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-bold text-gray-900">{red.nombre}</span>
-                  <span className="block truncate text-xs text-gray-500">{red.detalle}</span>
+                  <span className="block text-[14px] font-semibold text-mirra-tinta">{red.nombre}</span>
+                  <span className="block truncate text-[12.5px] text-mirra-suave">{red.detalle}</span>
                 </span>
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-[#8b6439]">
-                  <ChevronRight className="h-4 w-4" />
-                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-mirra-oro lg:hidden" />
               </a>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Preguntas frecuentes */}
-      <section id="preguntas" className={`${seccion} bg-gray-50`} style={margenSalto}>
-        <div className={ancho}>
-          <Titulo sub="Toca una pregunta para ver la respuesta.">Preguntas frecuentes</Titulo>
-          <div className="space-y-2.5">
+      {/* Preguntas frecuentes: en PC el título a la izquierda y la lista a la derecha */}
+      <section id="preguntas" className={`${seccion} bg-mirra-crema`} style={margenSalto}>
+        <div className={`${ancho} lg:grid lg:grid-cols-[0.8fr_1.2fr] lg:gap-16`}>
+          <div><Titulo sub="Toca una pregunta para ver la respuesta.">Preguntas frecuentes</Titulo></div>
+          <div className="border-t border-[#e2d8ca]">
             {/* Solo una abierta a la vez: al abrir otra, la anterior se cierra; tocar la abierta la cierra */}
             {PREGUNTAS.map((q, i) => {
               const abierta = preguntaAbierta === i;
               return (
-                <div
-                  key={q.p}
-                  className={`rounded-[14px] border bg-white shadow-[0_4px_12px_rgba(90,59,34,0.09)] ${abierta ? 'border-[#e7c793]' : 'border-[#f1e6d6]'}`}
-                >
+                <div key={q.p} className="border-b border-[#e2d8ca]">
                   <button
                     type="button"
                     aria-expanded={abierta}
                     aria-controls={`respuesta-${i}`}
                     onClick={() => setPreguntaAbierta(abierta ? null : i)}
-                    className="flex w-full items-center justify-between gap-2.5 p-3.5 text-left text-sm font-semibold text-gray-900"
+                    className="flex w-full items-center justify-between gap-3 px-0.5 py-4 text-left text-[15px] font-medium text-mirra-tinta"
                   >
                     {q.p}
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base leading-none ${abierta ? 'bg-[#CA9E67] text-white' : 'bg-[#f5eee6] text-[#8b6439]'}`} aria-hidden="true">
+                    <span className="shrink-0 text-[22px] font-light leading-none text-mirra-oro" aria-hidden="true">
                       {abierta ? '−' : '+'}
                     </span>
                   </button>
                   {abierta && (
-                    <div id={`respuesta-${i}`} className="px-3.5 pb-3.5 text-[13px] leading-relaxed text-gray-600">{q.r}</div>
+                    <div id={`respuesta-${i}`} className="px-0.5 pb-4 text-[14px] leading-relaxed text-mirra-suave">{q.r}</div>
                   )}
                 </div>
               );
@@ -576,26 +578,18 @@ export default function Comunidad() {
       </section>
 
       {/* Envíos */}
-      <section id="envios" className={`${seccion} bg-white`} style={margenSalto}>
+      <section id="envios" className={seccion} style={margenSalto}>
         <div className={ancho}>
           <Titulo sub="Te lo llevamos donde estés.">Envíos</Titulo>
-          <div className="grid gap-3">
-            {[
-              { ico: '🛵', t: 'Delivery en Maracaibo y San Francisco', d: <>Te lo llevamos a tu casa o trabajo. El costo depende de la zona; te lo confirmamos por WhatsApp.</> },
-              { ico: '📦', t: 'Envíos nacionales por MRW', d: <>A cualquier ciudad de Venezuela. Sigue tu paquete en <Link to="/rastreo" className="font-semibold text-[#8b6439] underline underline-offset-2">Rastrear pedido</Link>.</> },
-              { ico: '🏬', t: 'Retiro en tienda', d: <>Retira tu pedido en nuestro local, de lunes a sábado, de 9:00 AM a 6:00 PM.</> },
-            ].map((e) => (
-              <div key={e.t} className={`flex items-center gap-3 rounded-2xl bg-white p-3.5 ${SOMBRA}`}>
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[23px] shadow-[inset_0_-2px_0_rgba(139,100,57,0.15)]"
-                  style={{ background: 'linear-gradient(180deg,#f7ead6,#ecd6b5)' }}
-                  aria-hidden="true"
-                >
-                  {e.ico}
+          <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+            {ENVIOS.map(({ Ico, t, d }) => (
+              <div key={t} className="flex gap-3.5 rounded-2xl border border-mirra-linea bg-white p-5 lg:flex-col lg:p-6">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-mirra-crema" aria-hidden="true">
+                  <Ico className="h-[21px] w-[21px] text-mirra-tinta" strokeWidth={1.6} />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-900">{e.t}</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-gray-600">{e.d}</p>
+                  <p className="text-[15px] font-semibold text-mirra-tinta">{t}</p>
+                  <p className="mt-1 text-[13.5px] leading-snug text-mirra-suave">{d}</p>
                 </div>
               </div>
             ))}
@@ -603,28 +597,31 @@ export default function Comunidad() {
         </div>
       </section>
 
-      {/* La tienda */}
-      <section id="tienda" className={`${seccion} bg-gray-50`} style={margenSalto}>
+      {/* La tienda: tarjeta oscura con foto */}
+      <section id="tienda" className={`${seccion} pt-0 sm:pt-0 lg:pt-0`} style={margenSalto}>
         <div className={ancho}>
           <Titulo sub="Ven a probar las fragancias en persona.">Visítanos</Titulo>
-          <div className={`rounded-[18px] bg-white p-4 text-[13px] leading-relaxed text-gray-600 ${SOMBRA}`}>
-            <p className="mb-2 font-bell-mt text-base font-semibold text-gray-900">Mirra Perfumería</p>
-            <p className="flex gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#CA9E67]" />
-              <span>Urb. Raúl Leoni, C.C. Aviur, local #4. Diagonal al Restaurant Yangtze. Maracaibo.</span>
-            </p>
-            <p className="mt-1.5 flex gap-2">
-              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#CA9E67]" />
-              <span>Lunes a sábado, 9:00 AM a 6:00 PM</span>
-            </p>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
-            <a href={COMO_LLEGAR} target="_blank" rel="noopener noreferrer" className={`${btnBase} btn-dorado`}>
-              <Navigation className="h-4 w-4" /> Cómo llegar
-            </a>
-            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className={btnBorde}>
-              Escribirnos
-            </a>
+          <div className="grid overflow-hidden rounded-[20px] bg-[#221d1a] text-[#f3e7d0] lg:grid-cols-2">
+            <img src="/paginas/visitanos.webp" alt="" className="h-[220px] w-full object-cover lg:h-full lg:min-h-[340px]" />
+            <div className="p-6 lg:p-12">
+              <p className="font-bell-mt text-[26px] leading-tight">Mirra Perfumería</p>
+              <p className="mt-3 flex gap-2 text-[14px] text-[#c9bcaa]">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#c9a96e]" />
+                <span>Urb. Raúl Leoni, C.C. Aviur, local #4. Diagonal al Restaurant Yangtze. Maracaibo.</span>
+              </p>
+              <p className="mt-1.5 flex gap-2 text-[14px] text-[#c9bcaa]">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#c9a96e]" />
+                <span>Lunes a sábado, 9:00 AM a 6:00 PM</span>
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2.5">
+                <a href={COMO_LLEGAR} target="_blank" rel="noopener noreferrer" className={`${btnBase} bg-[#f3e7d0] text-mirra-tinta hover:bg-white`}>
+                  <Navigation className="h-4 w-4" /> Cómo llegar
+                </a>
+                <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className={`${btnBase} border border-[#6d6257] text-[#f3e7d0] hover:border-[#f3e7d0]`}>
+                  Escribirnos
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

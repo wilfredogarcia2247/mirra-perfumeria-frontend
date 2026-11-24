@@ -253,6 +253,14 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
   const selectedReport = getReportSlug(location.pathname);
   // Al tocar un reporte de la lista, bajar hasta donde empieza (en el teléfono la lista es larga)
   const reporteRef = useRef<HTMLDivElement>(null);
+  // Teléfono: el menú de reportes es una fila que se desliza; la opción elegida queda a la vista
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const menu = menuRef.current;
+    const el = menu?.querySelector<HTMLElement>("[data-activo]");
+    if (!menu || !el || menu.scrollWidth <= menu.clientWidth) return;
+    menu.scrollTo({ left: el.offsetLeft - menu.clientWidth / 2 + el.offsetWidth / 2, behavior: "smooth" });
+  }, [selectedReport]);
   useEffect(() => {
     if (!(location.state as { irAlReporte?: boolean } | null)?.irAlReporte) return;
     const id = window.setTimeout(() => {
@@ -1040,8 +1048,8 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                   </Card>
 
                   {close.regalias?.cantidad_pedidos > 0 && (
-                    <Card className="border-violet-200 bg-violet-50/40">
-                      <CardHeader className="border-b border-violet-200/70 pb-3">
+                    <Card className="border-amber-200 bg-amber-50/40">
+                      <CardHeader className="border-b border-amber-200/70 pb-3">
                         <CardTitle className="text-base font-medium">🎁 Regalías (completados sin pago)</CardTitle>
                         <p className="text-xs text-muted-foreground">
                           No suman a las ventas del día. Salieron {close.regalias.unidades} perfume(s) en {close.regalias.cantidad_pedidos} pedido(s);
@@ -1052,7 +1060,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                       <CardContent className="space-y-3 pt-4">
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                           {(close.regalias.presentaciones || []).map((item: any) => (
-                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border border-violet-200 bg-white px-3 py-2">
+                            <div key={item.presentacion} className="flex items-center justify-between rounded-md border border-amber-200 bg-white px-3 py-2">
                               <span className="font-medium">{item.presentacion}</span>
                               <span className="tabular-nums">{item.unidades} uds</span>
                             </div>
@@ -1060,7 +1068,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                         </div>
                         <div className="space-y-2">
                           {(close.regalias.pedidos || []).map((pedido: any) => (
-                            <div key={pedido.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-200 bg-white px-3 py-2 text-sm">
+                            <div key={pedido.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm">
                               <span className="font-medium">Pedido #{pedido.id} · {pedido.cliente}</span>
                               <span className="tabular-nums text-muted-foreground">{pedido.unidades} perfume(s) · {formatCloseUsd(pedido.valor_usd)}</span>
                             </div>
@@ -1101,7 +1109,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                               </div>
                             )}
                             {(pedido.ajustes || []).map((ajuste: any) => (
-                              <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-rose-700'}`}>
+                              <div key={ajuste.id} className={`flex flex-wrap justify-between gap-2 ${ajuste.tipo === 'descuento' ? 'text-amber-800' : 'text-red-700'}`}>
                                 <span>
                                   {ajuste.tipo === 'descuento' ? 'Descuento' : 'Recargo'}
                                   {' '}{ajuste.modo === 'porcentaje' ? `${ajuste.valor}%` : formatCloseUsd(ajuste.valor)}
@@ -1831,11 +1839,13 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Reportes de análisis</h2>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-[#a8874a]">General</p>
+          <h2 className="mt-1 font-bell-mt text-[30px] font-normal leading-tight">Reportes de análisis</h2>
           <p className="text-sm text-muted-foreground">Panel informativo para evaluar ventas, clientes, productos y reposicion.</p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {/* Teléfono: fila de botones que se desliza de lado (el reporte queda justo debajo). Tablet y PC: tarjetas como antes */}
+        <div ref={menuRef} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
           {REPORT_OPTIONS.filter((report) => permitidos.has(report.slug)).map((report) => {
             const route = report.slug === 'resumen-general' ? '/reportes' : `/reportes/${report.slug}`;
             const active = selectedReport === report.slug;
@@ -1844,10 +1854,11 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
                 key={report.slug}
                 to={route}
                 state={{ keepScroll: true, irAlReporte: true }}
-                className={`rounded-lg border p-4 transition-colors ${active ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                data-activo={active ? '1' : undefined}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] transition-colors md:whitespace-normal md:rounded-xl md:p-4 md:text-sm ${active ? 'border-foreground bg-foreground text-white md:bg-foreground/5 md:text-foreground' : 'border-border bg-card hover:bg-muted/50'}`}
               >
                 <p className="font-medium">{report.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{report.description}</p>
+                <p className="mt-1 hidden text-xs text-muted-foreground md:block">{report.description}</p>
               </Link>
             );
           })}
@@ -1897,7 +1908,7 @@ function ReportesContenido({ permitidos }: { permitidos: Set<ReportSlug> }) {
         )}
 
         {REPORTES_CON_REGALIAS.has(selectedReport) && metrics.regalias?.pedidos > 0 && (
-          <p role="status" className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+          <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             🎁 {metrics.regalias.pedidos} pedido(s) completado(s) sin pago ({metrics.regalias.unidades} perfume(s), ${metrics.regalias.valor.toFixed(2)} a precio de venta) son regalías y no cuentan como venta en este reporte.
           </p>
         )}

@@ -5,7 +5,8 @@ import Footer from '@/components/Footer';
 import useCart from '@/hooks/use-cart';
 
 // Páginas legales de la tienda: Términos y condiciones (/terminos) y Política de privacidad (/privacidad).
-// Mismo estilo que Comunidad: portada oscura cobre y recuadros numerados.
+// Estilo nuevo (2026-11-22, maqueta aprobada maquetas/estilo-nuevo/terminos.html): portada crema, secciones numeradas
+// con líneas finas; en PC el índice "En esta página" queda fijo a la izquierda.
 // Al cambiar un texto, actualizar ACTUALIZADO.
 
 const ACTUALIZADO = '13 de noviembre de 2026';
@@ -14,13 +15,12 @@ const RIF = 'J-508277660';
 const CORREO = 'mirraperfumeriave@gmail.com';
 const WHATSAPP = 'https://wa.me/584141454086';
 
-const SOMBRA = 'shadow-[0_6px_18px_rgba(139,100,57,0.08)]';
-const enlace = 'font-semibold text-[#8b6439] underline underline-offset-2';
+const enlace = 'font-semibold text-mirra-tinta underline decoration-mirra-oro underline-offset-[3px]';
 
 type Seccion = { id: string; titulo: string; enIndice?: boolean; contenido: React.ReactNode };
 
 const Lista = ({ children }: { children: React.ReactNode }) => (
-  <ul className="mt-1 list-disc space-y-1 pl-[18px] marker:text-[#CA9E67]">{children}</ul>
+  <ul className="mt-1 list-disc space-y-1 pl-[18px] marker:text-mirra-oro">{children}</ul>
 );
 
 const TERMINOS: Seccion[] = [
@@ -278,64 +278,64 @@ function PaginaLegal({ titulo, bajada, secciones, otra }: {
   }, [titulo]);
 
   const indice = secciones.filter((s) => s.enIndice);
+  // Sin índice (Política de privacidad): título y texto en una sola columna centrada
+  const conIndice = indice.length > 0;
   const margenSalto = { scrollMarginTop: `${(altoMenu ?? 80) + 12}px` };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-mirra-fondo">
       <Header cartItemsCount={count} cartPulseKey={0} onCartClick={() => navigate('/', { state: { abrirCarrito: true } })} />
 
-      <div
-        className="px-5 pb-10 text-center text-[#f6ead9]"
-        style={{
-          background: 'radial-gradient(circle at 85% -10%, #8a5e39 0%, #3a2515 65%)',
-          paddingTop: altoMenu != null ? `${altoMenu + 28}px` : '8rem',
-        }}
-      >
-        <p className="text-[11px] uppercase tracking-[0.28em] text-[#e7c793]">Mirra Perfumería</p>
-        <h1 className="mt-1.5 font-bell-mt text-[30px] font-semibold leading-tight text-white sm:text-5xl">{titulo}</h1>
-        <p className="mx-auto mt-2 max-w-md text-[13px] text-[#e6d5bf] sm:text-base">{bajada}</p>
+      {/* Portada crema con línea fina abajo */}
+      <div className="border-b border-mirra-linea px-4 pb-6 lg:px-10 lg:pb-9" style={{ paddingTop: altoMenu != null ? `${altoMenu + 30}px` : '8rem' }}>
+        <div className={`mx-auto ${conIndice ? "max-w-[1100px]" : "max-w-[720px]"}`}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-mirra-oro">Mirra Perfumería</p>
+          <h1 className="mt-2 font-bell-mt text-[34px] font-normal leading-tight text-mirra-tinta lg:text-[52px]">{titulo}</h1>
+          <p className="mt-2 text-[14px] text-mirra-suave lg:text-[15.5px]">{bajada}</p>
+        </div>
       </div>
 
-      <main className="mx-auto max-w-2xl px-4 pb-10 pt-5">
-        {indice.length > 0 && (
-          <nav className={`mb-3.5 rounded-2xl border border-[#f1e6d6] bg-white px-3.5 py-3 ${SOMBRA}`} aria-label="En esta página">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a97c45]">En esta página</p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[13px]">
+      <main className={`mx-auto grid grid-cols-[minmax(0,1fr)] gap-5 px-4 pb-14 pt-6 lg:px-10 lg:pt-10 ${conIndice ? "max-w-[1100px] lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-16" : "max-w-[800px]"}`}>
+        {indice.length > 0 ? (
+          // Teléfono: botones que se deslizan de lado; PC: lista fija a la izquierda mientras se lee
+          <nav className="lg:sticky lg:self-start" style={{ top: `${(altoMenu ?? 80) + 24}px` }} aria-label="En esta página">
+            <p className="mb-2 hidden text-[11px] font-semibold uppercase tracking-[0.2em] text-mirra-oro lg:block">En esta página</p>
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
               {indice.map((s) => (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
                   onClick={(e) => { e.preventDefault(); irA(s.id); }}
-                  className="text-[#8b6439] underline underline-offset-2"
+                  className="shrink-0 rounded-full border border-[#d9cfc1] px-3.5 py-1.5 text-[12.5px] text-mirra-suave transition hover:text-mirra-tinta lg:rounded-none lg:border-0 lg:border-l lg:border-mirra-linea lg:px-3.5 lg:py-1.5 lg:hover:border-mirra-tinta"
                 >
                   {s.titulo}
                 </a>
               ))}
             </div>
           </nav>
-        )}
+        ) : null}
 
-        <div className="space-y-2.5">
+        <div className="min-w-0">
           {secciones.map((s, i) => (
             <section
               key={s.id}
               id={s.id}
               style={margenSalto}
-              className={`rounded-2xl border border-[#f1e6d6] bg-white p-3.5 text-[13.5px] leading-relaxed text-gray-700 sm:p-5 sm:text-sm ${SOMBRA}`}
+              className="max-w-[720px] border-b border-mirra-linea py-5 text-[14.5px] leading-[1.7] text-[#57534e] first:pt-0 lg:py-6"
             >
-              <h2 className="mb-1.5 flex items-center gap-2 text-[14.5px] font-semibold text-gray-900 sm:text-base">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#f5eee6] text-[11px] text-[#8b6439]">{i + 1}</span>
+              <h2 className="mb-2 flex items-baseline gap-3 font-bell-mt text-[23px] font-normal leading-tight text-mirra-tinta">
+                <span className="text-[15px] text-mirra-oro">{i + 1}</span>
                 {s.titulo}
               </h2>
               {s.contenido}
             </section>
           ))}
-        </div>
 
-        <p className="mt-4 text-center text-xs text-gray-400">Última actualización: {ACTUALIZADO}</p>
-        <p className="mt-2 text-center text-[13px]">
-          <Link to={otra.ruta} className={enlace}>{otra.texto}</Link>
-        </p>
+          <p className="mt-6 text-xs text-[#a8a29e]">Última actualización: {ACTUALIZADO}</p>
+          <p className="mt-2 text-[13px]">
+            <Link to={otra.ruta} className={enlace}>{otra.texto}</Link>
+          </p>
+        </div>
       </main>
 
       <Footer />

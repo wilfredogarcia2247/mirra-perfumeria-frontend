@@ -121,7 +121,9 @@ export function getPrecioMostrar(p: any, tamano?: any): { precio: number | null;
 
   // Si el producto tiene tamanos, buscar el menor precio disponible entre variantes
   if (Array.isArray(p?.tamanos) && p.tamanos.length > 0) {
-    const precios = p.tamanos.map((t: any) => ({ p: precioFromTamano(t), t }));
+    // Si hay tamaños sin esencia, el "Desde" sale de los que sí se pueden preparar
+    const preparables = p.tamanos.filter((t: any) => !t?.agotada);
+    const precios = (preparables.length > 0 ? preparables : p.tamanos).map((t: any) => ({ p: precioFromTamano(t), t }));
     // Filtrar nulls
     const disponibles = precios.filter((x: any) => x.p != null).map((x: any) => ({ precio: Number(x.p), tamano: x.t }));
     if (disponibles.length > 0) {

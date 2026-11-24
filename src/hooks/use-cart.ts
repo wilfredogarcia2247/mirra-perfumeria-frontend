@@ -16,6 +16,29 @@ const CADUCA_MS = 7 * 24 * 60 * 60 * 1000;
 // Cambios encontrados al comparar el carrito guardado con el catálogo actual
 export interface CambiosCarrito { precios: string[]; agotados: string[] }
 
+// ── Esencia: no sumar más frascos de los que se pueden preparar ──────────
+// Los tamaños de un mismo perfume usan la misma esencia: se suman todos los del carrito.
+// Devuelve el aviso para el cliente, o null si alcanza (o si no hay datos: entonces decide
+// el servidor al confirmar el pedido).
+const gramosDe = (p: Product) => {
+  const g = Number((p as any)?.tamano?.esencia_g ?? (p as any)?.formula?.esencia_g);
+  return Number.isFinite(g) && g > 0 ? g : null;
+};
+export function avisoSinEsencia(items: CartItem[], product: Product, extra: number, sinContarKey?: string): string | null {
+  if (extra <= 0) return null;
+  const disponible = product?.esencia_disponible_g;
+  const gramos = gramosDe(product);
+  if (disponible == null || gramos == null) return null;
+  const usado = items
+    .filter((it) => String(it.product?.id) === String(product.id) && it.key !== sinContarKey)
+    .reduce((s, it) => s + (gramosDe(it.product) ?? 0) * it.qty, 0);
+  if (usado + gramos * extra <= Number(disponible) + 1e-9) return null;
+  const caben = Math.max(0, Math.floor((Number(disponible) - usado) / gramos + 1e-9));
+  const tamano = String((product as any)?.tamano?.nombre ?? '').match(/(\d+(?:[.,]\d+)?)\s*ml/i)?.[0]?.replace(/\s*ml/i, ' ml') ?? 'este tamaño';
+  if (caben === 0) return `Ya no queda esencia para preparar otro de ${tamano} de este perfume.`;
+  return `Solo queda esencia para ${caben} más de ${tamano} de este perfume.`;
+}
+
 function makeKey(product: Product) {
   const pid = product?.id ?? '';
   // Preferir formula id (nueva) luego tamano id (legacy)
@@ -107,8 +130,10 @@ if (typeof window !== 'undefined') {
 export function useCart() {
   const cartItems = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const addItem = useCallback((product: Product, qty = 1) => {
+  const addItem = useCallback((product: Product, qty = 1): string | null => {
     const key = makeKey(product);
+    const aviso = avisoSinEsencia(getSnapshot(), product, qty);
+    if (aviso) return aviso;
     updateItems((prev) => {
       const idx = prev.findIndex((p) => p.key === key);
       if (idx === -1) return [...prev, { key, product, qty }];
@@ -116,14 +141,21 @@ export function useCart() {
       copy[idx] = { ...copy[idx], qty: copy[idx].qty + qty, product };
       return copy;
     });
+    return null;
   }, []);
 
   const removeItem = useCallback((keyOrProductId: string) => {
     updateItems((prev) => prev.filter((p) => p.key !== String(keyOrProductId)));
   }, []);
 
-  const updateQty = useCallback((keyOrProductId: string, qty: number) => {
+  const updateQty = useCallback((keyOrProductId: string, qty: number): string | null => {
+    const actual = getSnapshot().find((p) => p.key === String(keyOrProductId));
+    if (actual && qty > actual.qty) {
+      const aviso = avisoSinEsencia(getSnapshot(), actual.product, qty - actual.qty);
+      if (aviso) return aviso;
+    }
     updateItems((prev) => prev.map((p) => p.key === String(keyOrProductId) ? { ...p, qty } : p));
+    return null;
   }, []);
 
   const clear = useCallback(() => {
@@ -155,13 +187,15 @@ export function useCart() {
         return { ...it, product: { ...viejo, agotado: true } as Product };
       }
       const cambioPrecio = viejo.precio_snapshot != null && Number(viejo.precio_snapshot) !== presentacion.precio;
-      const seAgoto = Boolean(actual.agotado) && !viejo.agotado;
-      if (!cambioPrecio && Boolean(viejo.agotado) === Boolean(actual.agotado) && viejo.precio_snapshot != null) return it;
+      const agotadoAhora = Boolean(actual.agotado) || presentacion.agotada;
+      const seAgoto = agotadoAhora && !viejo.agotado;
+      const esenciaCambio = viejo.esencia_disponible_g !== actual.esencia_disponible_g || viejo?.tamano?.esencia_g !== presentacion.tamano?.esencia_g;
+      if (!cambioPrecio && Boolean(viejo.agotado) === agotadoAhora && viejo.precio_snapshot != null && !esenciaCambio) return it;
       if (cambioPrecio) cambios.precios.push(nombre);
       if (seAgoto) cambios.agotados.push(nombre);
       cambio = true;
       // (se conserva la etiqueta del set, si la tiene)
-      return { ...it, product: { ...actual, tamano: presentacion.tamano, precio_snapshot: presentacion.precio, set_etiqueta: viejo.set_etiqueta, set_total: viejo.set_total } as Product };
+      return { ...it, product: { ...actual, agotado: agotadoAhora, tamano: presentacion.tamano, precio_snapshot: presentacion.precio, set_etiqueta: viejo.set_etiqueta, set_total: viejo.set_total } as Product };
     });
     if (cambio) setItems(next);
     return cambios;

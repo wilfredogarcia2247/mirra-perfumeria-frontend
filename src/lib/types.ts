@@ -7,6 +7,10 @@ export interface Product {
   agotado?: boolean;
   // Entre los más pedidos recientemente: etiqueta "🔥 Más pedido"
   mas_pedido?: boolean;
+  // Esencia para 3 o menos frascos de 100 ml (y no agotado): etiqueta "Quedan pocos"
+  quedan_pocos?: boolean;
+  // Gramos que quedan de la esencia del perfume (para no sumar más frascos de los que se pueden preparar)
+  esencia_disponible_g?: number | null;
   brand?: string;
   category?: string;
   // Todas las categorías del perfume (Hombre y Mujer a la vez = unisex)

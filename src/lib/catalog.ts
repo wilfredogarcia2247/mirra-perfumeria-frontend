@@ -24,9 +24,11 @@ export function formatPrecio(precio: number | null | undefined, tasa: Tasa) {
 }
 
 // Presentación (fórmula) tal como llega del catálogo
-export type Tamano = { id?: number; nombre?: string | null; precio_venta?: number | null; precio_calculado?: number | null };
+// agotada: no queda esencia para preparar esta presentación (la marca el catálogo)
+// esencia_g: gramos de esencia que pide un frasco de esta presentación
+export type Tamano = { id?: number; nombre?: string | null; precio_venta?: number | null; precio_calculado?: number | null; agotada?: boolean; esencia_g?: number | null };
 
-export type Presentacion = { tamano: Tamano; label: string; precio: number | null };
+export type Presentacion = { tamano: Tamano; label: string; precio: number | null; agotada: boolean };
 
 // Presentaciones del producto (30 / 60 / 100 ml…) ordenadas de menor a mayor precio
 export function presentacionesDe(product: Product): Presentacion[] {
@@ -34,7 +36,7 @@ export function presentacionesDe(product: Product): Presentacion[] {
     ? product.tamanos
     : (Array.isArray(product.formulas) ? product.formulas : []);
   return list
-    .map((t) => ({ tamano: t, label: presentationLabel(String(t?.nombre ?? '')) || 'Presentación', precio: getPrecioMostrar(product, t).precio }))
+    .map((t) => ({ tamano: t, label: presentationLabel(String(t?.nombre ?? '')) || 'Presentación', precio: getPrecioMostrar(product, t).precio, agotada: Boolean(t?.agotada) }))
     .sort((a, b) => (a.precio ?? Number.POSITIVE_INFINITY) - (b.precio ?? Number.POSITIVE_INFINITY));
 }
 

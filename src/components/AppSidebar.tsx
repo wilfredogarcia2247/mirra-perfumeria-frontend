@@ -89,11 +89,18 @@ const menuGroups: MenuGroup[] = [
 ];
 
 
+// Nombre de la pantalla para la barra de arriba (el de su opción del menú)
+export function tituloDeRuta(ruta: string): string {
+  for (const g of menuGroups) for (const it of g.items) if (ruta === it.url || ruta.startsWith(it.url + "/")) return it.title;
+  return "Mirra Perfumería";
+}
+
+// Opción elegida: fondo un poco más claro y raya dorada a la izquierda
 const activeItemClass = [
   "relative pl-[calc(0.75rem+3px)]",
   "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
-  "before:w-[3px] before:h-[18px] before:rounded-r-full before:bg-primary",
-  "bg-primary/10 text-primary font-medium",
+  "before:w-[3px] before:h-[18px] before:rounded-r-full before:bg-[#a8874a]",
+  "bg-white/10 text-white font-medium data-[active=true]:bg-white/10 data-[active=true]:text-white [&_svg]:text-[#c9a96e]",
 ].join(" ");
 
 const inactiveItemClass = "text-sidebar-foreground/60 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/90";
@@ -170,12 +177,10 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 ring-1 ring-primary/30">
-            <img src="/logo.png" alt="Mirra" className="h-5 w-5 object-contain" />
-          </div>
+          <img src="/isotipo.png" alt="Mirra" className="h-9 w-9 shrink-0 rounded-full bg-[#fffdf9] p-[3px]" />
           {open && (
             <div className="min-w-0">
-              <h2 className="text-[15px] font-semibold leading-tight text-sidebar-foreground tracking-tight">Mirra</h2>
+              <h2 className="font-bell-mt text-[17px] font-normal leading-tight text-[#f3e7d0]">Mirra</h2>
               <p className="text-[10.5px] text-sidebar-foreground/40 leading-tight mt-0.5">Gestión de Perfumería</p>
             </div>
           )}
@@ -196,7 +201,7 @@ export function AppSidebar() {
               )}
               <SidebarGroup className="py-0">
                 {open && (
-                  <SidebarGroupLabel className="px-3 py-0.5 text-[9.5px] font-medium tracking-widest text-sidebar-foreground/30 uppercase">
+                  <SidebarGroupLabel className="px-3 py-0.5 text-[9.5px] font-medium tracking-[0.2em] text-sidebar-foreground/45 uppercase">
                     {group.label}
                   </SidebarGroupLabel>
                 )}
@@ -210,7 +215,7 @@ export function AppSidebar() {
                             <SidebarMenuButton
                               onClick={() => navigate(item.url)}
                               isActive={isActive}
-                              className={`flex items-center gap-3 px-3 py-1.5 min-h-[34px] rounded-md transition-colors duration-150 ${isActive ? item.module === 'influencer' ? 'relative bg-amber-100 pl-[calc(0.75rem+3px)] font-medium text-amber-950 data-[active=true]:bg-amber-100 data-[active=true]:text-amber-950 before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-amber-700' : activeItemClass : inactiveItemClass}`}
+                              className={`flex items-center gap-3 px-3 py-1.5 min-h-[34px] rounded-md transition-colors duration-150 ${isActive ? activeItemClass : inactiveItemClass}`}
                               title={!open ? item.title : undefined}
                             >
                               <span className="flex items-center justify-center w-5 h-5 shrink-0">

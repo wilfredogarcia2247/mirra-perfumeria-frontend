@@ -10,13 +10,14 @@ import { ESTADOS_VENEZUELA, OTRA_CIUDAD, ciudadesDe } from '@/lib/venezuela';
 
 type Tipo = EntregaPedidoInput['tipo'];
 
-const TIPOS: { v: Tipo; t: string; Icono: typeof Store }[] = [
-  { v: 'tienda', t: 'Retiro en tienda', Icono: Store },
-  { v: 'envio_nacional', t: 'Envío nacional', Icono: Truck },
-  { v: 'delivery', t: 'Delivery', Icono: Bike },
+// Cada entrega con su color suave (igual que en la lista de pedidos): morado, turquesa y rosado
+const TIPOS: { v: Tipo; t: string; Icono: typeof Store; on: string }[] = [
+  { v: 'tienda', t: 'Retiro en tienda', Icono: Store, on: 'border-violet-500/40 bg-violet-500/[0.07] text-violet-700' },
+  { v: 'envio_nacional', t: 'Envío nacional', Icono: Truck, on: 'border-cyan-600/40 bg-cyan-600/[0.07] text-cyan-800' },
+  { v: 'delivery', t: 'Delivery', Icono: Bike, on: 'border-pink-600/40 bg-pink-600/[0.06] text-pink-700' },
 ];
 
-const campo = 'h-11 w-full rounded-lg border bg-background px-3 text-base sm:h-10 sm:text-sm';
+const campo = 'h-11 w-full rounded-[10px] border border-input bg-background px-3 text-base outline-none focus:border-foreground sm:h-10 sm:text-sm';
 
 export default function EditarEntregaDialog({
   pedido,
@@ -123,22 +124,22 @@ export default function EditarEntregaDialog({
 
   return (
     <Dialog open={abierto} onOpenChange={(a) => { if (!a) onCerrar(); }}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-md overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle>Editar entrega</DialogTitle>
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-md overflow-y-auto rounded-2xl border-border bg-card p-4 sm:p-6">
+        <DialogHeader className="text-left">
+          <DialogTitle className="font-bell-mt text-[24px] font-normal">Editar entrega</DialogTitle>
           <DialogDescription>Pedido #{pedido?.id} · no cambia el total del pedido</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Método de entrega">
-            {TIPOS.map(({ v, t, Icono }) => (
+            {TIPOS.map(({ v, t, Icono, on }) => (
               <button
                 key={v}
                 type="button"
                 role="radio"
                 aria-checked={tipo === v}
                 onClick={() => setTipo(v)}
-                className={`flex flex-col items-center gap-1 rounded-lg border-2 px-1 py-2 text-xs font-semibold transition ${tipo === v ? 'border-[#8b6439] bg-[#fbf4ea] text-[#8b6439]' : 'border-border text-muted-foreground'}`}
+                className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 text-xs font-semibold outline-none transition focus-visible:ring-1 focus-visible:ring-foreground ${tipo === v ? on : 'border-border bg-card text-muted-foreground hover:border-foreground/30'}`}
               >
                 <Icono className="h-4 w-4" />
                 {t}
@@ -201,7 +202,7 @@ export default function EditarEntregaDialog({
               </label>
               <label className="block space-y-1">
                 <span className="font-medium">Dirección de la agencia <span className="font-normal text-muted-foreground">(opcional)</span></span>
-                <textarea id="entrega-direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} maxLength={500} rows={2} className="w-full rounded-lg border bg-background px-3 py-2 text-base sm:text-sm" />
+                <textarea id="entrega-direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} maxLength={500} rows={2} className="w-full rounded-[10px] border border-input bg-background px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm" />
               </label>
             </>
           )}
@@ -222,7 +223,7 @@ export default function EditarEntregaDialog({
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" onClick={onCerrar} disabled={guardando}>Cancelar</Button>
-            <Button onClick={() => void guardar()} disabled={guardando} className="bg-[#8b6439] hover:bg-[#74522e]">
+            <Button onClick={() => void guardar()} disabled={guardando} className="bg-foreground text-white hover:bg-black">
               {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando…</> : 'Guardar'}
             </Button>
           </div>

@@ -1,6 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
@@ -14,40 +13,31 @@ const NotFound = () => {
     navigate("/");
   };
 
+  // Estilo nuevo de la tienda (2026-11-22): fondo crema, línea fina y botón negro. Mismos textos.
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-cream-50 to-cream-100 p-4">
-      <div className="max-w-md w-full text-center space-y-8">
-        {/* Logo */}
+    <div className="flex min-h-screen flex-col items-center justify-center bg-mirra-fondo p-4">
+      <div className="w-full max-w-md space-y-7 text-center">
         <div className="flex justify-center">
-          <div className="relative w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full border-4 border-[#ca9e67] animate-pulse"></div>
-            <img 
-              src="/logoColor.png" 
-              alt="Mirra Perfumería" 
-              className="w-24 h-24 sm:w-32 sm:h-32 object-contain z-10"
-            />
+          <div className="flex h-32 w-32 items-center justify-center rounded-full border border-mirra-linea bg-white sm:h-36 sm:w-36">
+            <img src="/logoColor.png" alt="Mirra Perfumería" className="h-20 w-20 object-contain sm:h-24 sm:w-24" />
           </div>
         </div>
-        
-        {/* Mensaje */}
-        <div className="space-y-4">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">404</h1>
-          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-700">¡Ups!</h2>
-          <p className="text-gray-600 text-lg">
-            Esta esencia no existe en nuestra colección...
-          </p>
-          <p className="text-gray-500">
-            La página que buscas no ha podido ser encontrada.
-          </p>
+
+        <div className="space-y-3">
+          <h1 className="font-bell-mt text-[56px] font-normal leading-none text-mirra-tinta sm:text-[72px]">404</h1>
+          <div className="mx-auto h-px w-[42px] bg-mirra-oro" />
+          <h2 className="font-bell-mt text-2xl font-normal text-mirra-tinta sm:text-3xl">¡Ups!</h2>
+          <p className="text-[17px] text-mirra-suave">Esta esencia no existe en nuestra colección...</p>
+          <p className="text-sm text-mirra-suave">La página que buscas no ha podido ser encontrada.</p>
         </div>
-        
-        {/* Botón para volver al inicio */}
-        <Button 
+
+        <button
+          type="button"
           onClick={handleGoHome}
-          className="mt-6 bg-[#ca9e67] hover:bg-[#b88c55] text-white font-semibold py-3 px-8 rounded-full transition-colors duration-300"
+          className="mt-2 rounded-xl bg-mirra-tinta px-8 py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.98]"
         >
           Volver al Inicio
-        </Button>
+        </button>
       </div>
     </div>
   );

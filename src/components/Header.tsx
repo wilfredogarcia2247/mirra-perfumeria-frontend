@@ -135,11 +135,11 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
 
   return (
     <header
-      className={`fixed w-full top-0 left-0 z-50 bg-gradient-to-r from-[#707070]/90 via-[#878787]/90 to-[#a0a0a0]/90 backdrop-blur-sm shadow-lg transition-all duration-300 ${scrolled ? 'py-1' : 'py-0'
+      className={`fixed w-full top-0 left-0 z-50 bg-mirra-fondo/95 backdrop-blur-md border-b border-mirra-linea transition-all duration-300 ${scrolled ? 'py-1 shadow-[0_6px_20px_rgba(40,30,20,0.06)]' : 'py-0'
         }`}
     >
       {announcementMessages.length > 0 && <div
-        className="h-8 overflow-hidden border-b border-primary-700 bg-primary-600 text-white"
+        className="h-8 overflow-hidden bg-mirra-tinta text-[#efe6d8]"
         role="region"
         aria-label="Novedades de Mirra Perfumería"
       >
@@ -172,7 +172,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           {/* Logo y nombre */}
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3" aria-label="Mirra Perfumería · Inicio">
-              <div className="tablet:shrink-0 bg-white/80 rounded-full shadow-lg ring-2 ring-[#ca9e67] ring-offset-2 backdrop-blur-sm overflow-hidden">
+              <div className="tablet:shrink-0 bg-white rounded-full border border-[#e3d3bb] overflow-hidden">
                 {/* isotipo.png: el emblema recortado y centrado de logoColor.png (que trae mucho margen blanco) */}
                 <img
                   src="/isotipo.png"
@@ -185,8 +185,8 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
                 />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bell-mt font-bold text-white tracking-tight">Mirra Perfumería</h1>
-                <p className="hidden sm:block text-xs md:text-sm text-white/90 font-montserrat font-medium">Fragancias selectas</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bell-mt font-normal text-mirra-tinta">Mirra Perfumería</h1>
+                <p className="hidden sm:block text-xs md:text-sm text-mirra-suave font-montserrat">Fragancias selectas</p>
               </div>
             </Link>
           </div>
@@ -195,19 +195,19 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           <nav className="hidden md:flex tabletv:hidden items-center space-x-1">
             <Link
               to="/"
-              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 text-mirra-tinta/80 hover:text-mirra-tinta font-medium rounded-lg transition-colors"
             >
               Inicio
             </Link>
             <Link
               to="/about"
-              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 text-mirra-tinta/80 hover:text-mirra-tinta font-medium rounded-lg transition-colors"
             >
               Nosotros
             </Link>
             <Link
               to="/comunidad"
-              className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 text-mirra-tinta/80 hover:text-mirra-tinta font-medium rounded-lg transition-colors"
             >
               Comunidad
             </Link>
@@ -218,26 +218,26 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
                 aria-expanded={productosAbierto}
                 // Solo en pantallas táctiles; con mouse sigue abriéndose al pasar por encima
                 onClick={() => { if (!window.matchMedia('(hover: hover)').matches) setProductosAbierto((v) => !v); }}
-                className="px-4 py-2 text-white/90 hover:text-white font-medium rounded-lg transition-colors flex items-center">
+                className="px-4 py-2 text-mirra-tinta/80 hover:text-mirra-tinta font-medium rounded-lg transition-colors flex items-center">
                 Productos
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className={`absolute left-0 mt-2 w-56 bg-white rounded-md shadow-lg py-2 z-50 transition-all duration-200 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:visible ${productosAbierto ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+              <div className={`absolute left-0 mt-2 w-56 bg-white rounded-xl border border-mirra-linea shadow-[0_12px_30px_rgba(40,30,20,0.1)] py-2 z-50 transition-all duration-200 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:visible ${productosAbierto ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 {catsLoading ? (
                   <div className="px-4 py-2 text-gray-600">Cargando...</div>
                 ) : (
                   <div className="px-2 py-1 max-h-64 overflow-auto">
                     {/* Opción Todos */}
-                    <Link to="/" className="block px-4 py-1 text-gray-700 hover:bg-gray-100 rounded">
+                    <Link to="/" className="block px-4 py-1.5 text-mirra-tinta/80 hover:bg-mirra-crema hover:text-mirra-tinta rounded-lg">
                       Todos
                     </Link>
                     {categoriesList.map((c: any) => {
                       const name = c.nombre ?? c.name ?? '';
                       const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');
                       return (
-                        <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-4 py-1 text-gray-700 hover:bg-gray-100 rounded">
+                        <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-4 py-1.5 text-mirra-tinta/80 hover:bg-mirra-crema hover:text-mirra-tinta rounded-lg">
                           {name}
                         </Link>
                       );
@@ -253,7 +253,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           <div className="flex items-center space-x-2 md:space-x-4">
             <Link
               to="/rastreo"
-              className="hidden sm:inline-flex items-center gap-1.5 justify-center border border-white/60 hover:bg-white/20 text-white px-3 py-2 rounded-lg font-medium transition-all duration-300 whitespace-nowrap text-sm"
+              className="hidden sm:inline-flex items-center gap-1.5 justify-center border border-mirra-linea bg-white hover:border-[#d6cfc5] text-mirra-tinta px-3 py-2 rounded-[10px] font-medium transition-colors whitespace-nowrap text-sm"
             >
               <Truck className="w-4 h-4" />
               Rastrear
@@ -261,7 +261,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             <Link
               to="/"
               onClick={irAComprar}
-              className="hidden sm:inline-flex items-center justify-center bg-white/90 hover:bg-white text-[#CA9E67] px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 whitespace-nowrap text-sm md:text-base"
+              className="hidden sm:inline-flex items-center justify-center bg-mirra-tinta hover:bg-black text-white px-4 py-2 rounded-[10px] font-semibold transition-colors whitespace-nowrap text-sm md:text-base"
             >
               Comprar Ahora
             </Link>
@@ -269,12 +269,12 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             <button
               key={cartPulseKey}
               onClick={onCartClick}
-              className="relative p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-all duration-300 cart-button-pop"
+              className="relative p-2 text-mirra-tinta rounded-full hover:bg-mirra-crema transition-colors cart-button-pop"
               aria-label="Carrito de compras"
             >
               <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
               {cartItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#CA9E67] text-white text-[10px] md:text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center cart-badge-pop">
+                <span className="absolute -top-1 -right-1 bg-mirra-oro text-white text-[10px] md:text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center cart-badge-pop">
                   {cartItemsCount > 9 ? '9+' : cartItemsCount}
                 </span>
               )}
@@ -283,7 +283,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             {/* Botón de menú móvil */}
             <button
               onClick={toggleMenu}
-              className="md:hidden tabletv:block p-2 text-white/90 hover:text-white rounded-full hover:bg-white/20 transition-colors"
+              className="md:hidden tabletv:block p-2 text-mirra-tinta rounded-full hover:bg-mirra-crema transition-colors"
               aria-label="Menú"
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -294,45 +294,45 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
 
       {/* Menú móvil */}
       <div
-        className={`md:hidden tabletv:block bg-white shadow-lg transition-all duration-300 ease-in-out overflow-y-auto overscroll-contain ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-gray-200' : 'max-h-0 overflow-hidden'
+        className={`md:hidden tabletv:block bg-white transition-all duration-300 ease-in-out overflow-y-auto overscroll-contain ${isMenuOpen ? 'max-h-[calc(100svh-5rem)] border-t border-mirra-linea' : 'max-h-0 overflow-hidden'
           }`}
       >
         <div className="px-4 py-3 space-y-1">
           <Link
             to="/"
-            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            className="block px-3 py-2.5 text-mirra-tinta hover:bg-mirra-crema rounded-lg font-medium transition-colors"
           >
             Inicio
           </Link>
           <Link
             to="/about"
-            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            className="block px-3 py-2.5 text-mirra-tinta hover:bg-mirra-crema rounded-lg font-medium transition-colors"
           >
             Sobre Nosotros
           </Link>
           <Link
             to="/comunidad"
-            className="block px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            className="block px-3 py-2.5 text-mirra-tinta hover:bg-mirra-crema rounded-lg font-medium transition-colors"
           >
             Comunidad y reseñas
           </Link>
           {/* Sección Productos */}
           <div>
-            <p className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-mirra-oro">
               Productos
             </p>
             {catsLoading ? (
               <div className="px-3 py-2 text-sm text-gray-500">Cargando...</div>
             ) : (
               <>
-                <Link to="/" className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                <Link to="/" className="block px-3 py-2 text-mirra-tinta/80 hover:bg-mirra-crema rounded-lg text-sm transition-colors">
                   Todos
                 </Link>
                 {categoriesList.map((c: any) => {
                   const name = c.nombre ?? c.name ?? '';
                   const slug = (c.slug ?? (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/(^-|-$)/g, '');
                   return (
-                    <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                    <Link key={c.__key ?? c.id ?? slug} to={`/categoria/${slug}`} className="block px-3 py-2 text-mirra-tinta/80 hover:bg-mirra-crema rounded-lg text-sm transition-colors">
                       {name}
                     </Link>
                   );
@@ -341,11 +341,11 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
             )}
           </div>
 
-          <div className="h-px bg-gray-100 my-1" />
+          <div className="h-px bg-mirra-linea my-1" />
 
           <Link
             to="/rastreo"
-            className="flex items-center gap-2 px-3 py-2.5 text-gray-800 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-3 py-2.5 text-mirra-tinta hover:bg-mirra-crema rounded-lg font-medium transition-colors"
           >
             <Truck className="w-4 h-4" />
             Rastrear Pedido
@@ -353,7 +353,7 @@ export function Header({ cartItemsCount, cartPulseKey, onCartClick }: HeaderProp
           <Link
             to="/"
             onClick={irAComprar}
-            className="block px-3 py-2.5 text-center bg-[#CA9E67] text-white rounded-lg font-medium hover:bg-[#b58a53] transition-colors"
+            className="block px-3 py-2.5 text-center bg-mirra-tinta text-white rounded-[10px] font-semibold hover:bg-black transition-colors"
           >
             Comprar Ahora
           </Link>

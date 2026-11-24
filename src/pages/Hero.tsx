@@ -3,13 +3,15 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import Header from '@/components/Header';
 import CatalogProductCard from '@/components/CatalogProductCard';
 import ProductQuickSheet from '@/components/ProductQuickSheet';
+import FotoProducto from '@/components/FotoProducto';
+import { mlDeNombre, nombreTienda } from '@/lib/fichaTienda';
 import { volarAlCarrito, bajarAlCatalogo, presentationLabel } from '@/lib/catalog';
 import { agruparPorSet, etiquetasParaEnviar, NOMBRE_SET } from '@/lib/setsPedido';
 import { getCatalogoPaginated, getCachedTasaActiva, createPedidoVentaPublic, lookupClienteByCedula, validarCuponPublic, getDescuentoMayorPublic, type ConfigDescuentoMayor } from '@/integrations/api';
 import { calcularDescuentoMayor, elegirDescuento, mlDe } from '@/lib/descuentoMayor';
 import { faltanSieteMl, avisoSieteMl } from '@/lib/minimoSieteMl';
 import { BarraDescuentoMayor, SugerenciasDescuentoMayor } from '@/components/CarritoMayor';
-import useCart, { CartItem } from '@/hooks/use-cart';
+import useCart, { CartItem, avisoSinEsencia } from '@/hooks/use-cart';
 import { Product } from '@/lib/types';
 import { getImageUrl } from '@/lib/utils';
 import { trackCatalogPageView } from '@/lib/google-ads';
@@ -243,15 +245,18 @@ export default function Hero() {
   }, []);
 
   useEffect(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? catalogProducts.filter((product) => (
-        (product.name || '').toLowerCase().includes(q) ||
-        (product.brand || '').toLowerCase().includes(q) ||
-        (product.description || '').toLowerCase().includes(q) ||
-        (product.category || '').toLowerCase().includes(q) ||
-        (product.categories || []).join(' ').toLowerCase().includes(q)
-      ))
+    // Busca en el nombre, la marca, la descripción, la categoría y el perfume original (ficha);
+    // sin importar acentos ni mayúsculas, y cada palabra por separado ("black opium" = "opium black")
+    const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const palabras = sinAcentos(search.trim()).split(/\s+/).filter(Boolean);
+    const filtered = palabras.length
+      ? catalogProducts.filter((product) => {
+        const texto = sinAcentos([
+          product.name, product.ficha?.nombre_mirra, product.brand, product.description, product.category,
+          (product.categories || []).join(' '), product.ficha?.inspirado_en, product.ficha?.casa,
+        ].filter(Boolean).join(' '));
+        return palabras.every((p) => texto.includes(p));
+      })
       : catalogProducts;
 
     const categoryFiltered = selectedCategory === 'all'
@@ -365,12 +370,16 @@ export default function Hero() {
 
   // Agregar desde la ventana: la foto vuela al carrito y luego se suma
   function handleAddFromSheet(item: Product, foto: HTMLImageElement | null) {
+    // Si ya no alcanza la esencia, se avisa antes de que la foto "vuele" al carrito
+    const aviso = avisoSinEsencia(cartItems, item, 1);
+    if (aviso) { toast.error(aviso); return; }
     const espera = volarAlCarrito(foto?.currentSrc || getImageUrl(item), foto ? foto.getBoundingClientRect() : null);
     window.setTimeout(() => handleAddToCart(item), espera);
   }
 
   function handleAddToCart(product: Product) {
-    addItem(product, 1);
+    const aviso = addItem(product, 1);
+    if (aviso) { toast.error(aviso); return; }
     setCartPulseKey((prev) => prev + 1);
     toast.success(`${product.name} agregado al carrito`);
   }
@@ -489,13 +498,7 @@ export default function Hero() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 relative overflow-x-clip">
-      {/* Decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -right-20 -top-20 w-96 h-96 bg-primary-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-gradient-radial from-primary-100 to-transparent rounded-full opacity-10"></div>
-      </div>
+    <div className="min-h-screen bg-mirra-fondo relative overflow-x-clip">
 
       <Header cartItemsCount={count} cartPulseKey={cartPulseKey} onCartClick={() => setIsCartOpen(true)} />
 
@@ -511,24 +514,24 @@ export default function Hero() {
 
       <div id="catalog" className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10">
         <div className="text-center mb-8 sm:mb-12 px-2">
-          <h2 className="text-2xl sm:text-3xl font-bell-mt font-bold text-gray-800 mb-2 sm:mb-3 capitalize">
+          <h2 className="text-[26px] sm:text-4xl font-bell-mt font-normal text-mirra-tinta mb-2 sm:mb-3 capitalize">
             {selectedCategory === 'all' ? 'Nuestros Productos' : `Nuestros Productos - ${selectedCategory.split('-').join(' ')}`}
           </h2>
-          <div className="w-20 sm:w-24 h-0.5 sm:h-1 bg-gradient-to-r from-primary-500 to-amber-500 mx-auto rounded-full mb-4 sm:mb-6"></div>
-          <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto">
+          <div className="w-11 h-px bg-mirra-oro mx-auto mb-4 sm:mb-5"></div>
+          <p className="text-mirra-suave text-[13px] sm:text-base leading-relaxed max-w-2xl mx-auto">
             {categorySlug ? `Explora nuestra selección de ${categorySlug.replace(/-/g, ' ')}` : 'Descubre nuestra exclusiva colección de fragancias que capturan la esencia de la elegancia y el lujo.'}
           </p>
         </div>
-        <div className="mb-8 sm:mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm border border-gray-100">
+        <div className="mb-5 sm:mb-8 flex flex-col md:flex-row md:items-center md:justify-center">
           <div className="w-full md:w-2/3">
             <div className="relative">
-              <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-[18px] sm:h-[18px] text-[#a8a29e]" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Buscar por nombre, marca o descripción..."
-                className="w-full pl-9 sm:pl-12 pr-4 sm:pr-6 py-2.5 sm:py-3.5 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-base text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
+                placeholder="Busca por nombre o perfume original"
+                className="w-full pl-10 sm:pl-12 pr-4 sm:pr-6 py-3 sm:py-3.5 rounded-xl bg-white border border-mirra-linea text-base text-mirra-tinta placeholder:text-[#a8a29e] focus:outline-none focus:border-[#cdbfae] focus:ring-2 focus:ring-mirra-crema focus:border-transparent transition-all duration-300 shadow-sm hover:shadow-md"
               />
             </div>
           </div>
@@ -554,7 +557,7 @@ export default function Hero() {
                       key={f.slug}
                       type="button"
                       onClick={() => navigate(RUTA_SET)}
-                      className="shrink-0 rounded-full border-[1.5px] border-[#b08a57] bg-white px-4 py-2 text-sm font-semibold text-[#7a5c33] transition hover:bg-[#fbf7f1]"
+                      className="shrink-0 rounded-full border border-mirra-oro bg-white px-4 py-2 text-sm font-semibold text-mirra-oro-osc transition hover:bg-mirra-fondo"
                     >
                       {f.label}
                     </button>
@@ -568,7 +571,7 @@ export default function Hero() {
                     role="tab"
                     aria-selected={activo}
                     onClick={() => elegirFiltro(f.slug)}
-                    className={`shrink-0 rounded-full border-[1.5px] px-4 py-2 text-sm font-semibold transition ${activo ? 'border-gray-900 bg-gray-900 text-white' : 'border-[#e8d9c5] bg-white text-gray-800 hover:border-[#CA9E67]'}`}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activo ? 'border-mirra-tinta bg-mirra-tinta text-white' : 'border-mirra-linea bg-white text-mirra-tinta hover:border-[#d6cfc5]'}`}
                   >
                     {f.label}
                   </button>
@@ -580,7 +583,7 @@ export default function Hero() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-copper-600 animate-spin" /></div>
+          <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-mirra-oro animate-spin" /></div>
         ) : (
           <div ref={listaRef} className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {products.map((p, i) => (
@@ -601,17 +604,20 @@ export default function Hero() {
 
         {sheetProduct && (
           <ProductQuickSheet
+            key={sheetProduct.product.id}
             product={sheetProduct.product}
             origen={sheetProduct.foto}
             tasa={tasaPublic}
             onClose={() => setSheetProduct(null)}
             onAdd={handleAddFromSheet}
+            catalogo={catalogProducts}
+            onAbrir={(product) => setSheetProduct({ product, foto: null })}
           />
         )}
 
         <div className="flex flex-col items-center justify-center mt-6 sm:mt-8 gap-4">
           {/* Info text */}
-          <div className="text-xs sm:text-sm text-copper-600 text-center">
+          <div className="text-xs sm:text-sm text-mirra-suave text-center">
             {total !== null ? `Mostrando página ${page} de ${Math.max(1, Math.ceil((total || 0) / perPage))} — ${total} productos` : ''}
           </div>
 
@@ -619,7 +625,7 @@ export default function Hero() {
           <div className="flex flex-wrap items-center justify-center gap-2">
             {/* Jump to first page */}
             <button
-              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(1)}
               disabled={page === 1}
               title="Ir a la primera página"
@@ -629,7 +635,7 @@ export default function Hero() {
 
             {/* Previous page */}
             <button
-              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(Math.max(1, page - 1))}
               disabled={page === 1}
             >
@@ -656,14 +662,14 @@ export default function Hero() {
                   <button
                     key={1}
                     onClick={() => irAPagina(1)}
-                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
+                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors font-medium"
                   >
                     1
                   </button>
                 );
                 if (startPage > 2) {
                   pageNumbers.push(
-                    <span key="ellipsis-start" className="hidden sm:inline px-2 text-gray-400">...</span>
+                    <span key="ellipsis-start" className="hidden sm:inline px-2 text-[#a8a29e]">...</span>
                   );
                 }
               }
@@ -674,9 +680,9 @@ export default function Hero() {
                   <button
                     key={i}
                     onClick={() => irAPagina(i)}
-                    className={`w-8 h-8 flex items-center justify-center text-xs sm:text-sm rounded-md border transition-all font-medium ${i === page
-                      ? 'bg-gradient-to-r from-primary-500 to-amber-600 text-white border-primary-600 shadow-md scale-110'
-                      : 'border-gray-300 bg-white hover:bg-gray-50 hover:border-primary-300'
+                    className={`w-8 h-8 flex items-center justify-center text-xs sm:text-sm rounded-lg border transition-all font-medium ${i === page
+                      ? 'bg-mirra-tinta text-white border-mirra-tinta'
+                      : 'border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5]'
                       }`}
                   >
                     {i}
@@ -688,14 +694,14 @@ export default function Hero() {
               if (endPage < totalPages) {
                 if (endPage < totalPages - 1) {
                   pageNumbers.push(
-                    <span key="ellipsis-end" className="hidden sm:inline px-2 text-gray-400">...</span>
+                    <span key="ellipsis-end" className="hidden sm:inline px-2 text-[#a8a29e]">...</span>
                   );
                 }
                 pageNumbers.push(
                   <button
                     key={totalPages}
                     onClick={() => irAPagina(totalPages)}
-                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors font-medium"
+                    className="hidden sm:flex w-8 h-8 items-center justify-center text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors font-medium"
                   >
                     {totalPages}
                   </button>
@@ -707,7 +713,7 @@ export default function Hero() {
 
             {/* Next page */}
             <button
-              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => irAPagina(page + 1)}
               disabled={total !== null && page >= Math.max(1, Math.ceil((total || 0) / perPage))}
             >
@@ -716,7 +722,7 @@ export default function Hero() {
 
             {/* Jump to last page */}
             <button
-              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+              className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-mirra-linea bg-white text-mirra-tinta/80 hover:border-[#d6cfc5] transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
               onClick={() => {
                 const totalPages = Math.max(1, Math.ceil((total || 0) / perPage));
                 irAPagina(totalPages);
@@ -735,7 +741,7 @@ export default function Hero() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Hablar con Mirra Perfumería por WhatsApp"
-        className="catalog-whatsapp group fixed bottom-5 right-4 sm:bottom-7 sm:right-7 z-40 inline-flex items-center gap-2 rounded-full border border-white/70 bg-gradient-to-r from-primary-500 to-amber-600 px-3 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(158,108,57,0.28)] transition-all duration-300 hover:-translate-y-1 hover:from-primary-600 hover:to-amber-700 hover:shadow-[0_14px_32px_rgba(158,108,57,0.36)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-primary-300/40"
+        className="catalog-whatsapp group fixed bottom-5 right-4 sm:bottom-7 sm:right-7 z-40 inline-flex items-center gap-2 rounded-full border border-white/20 bg-mirra-tinta px-3 py-3 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-1 hover:from-primary-600 hover:to-amber-700 hover:shadow-[0_14px_32px_rgba(158,108,57,0.36)] active:translate-y-0 focus:outline-none focus:ring-4 focus:ring-primary-300/40"
       >
         <MessageCircle className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
         <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-40 group-hover:opacity-100 group-focus-visible:max-w-40 group-focus-visible:opacity-100">
@@ -755,27 +761,37 @@ export default function Hero() {
           <div className={`relative w-full bg-white shadow-2xl flex flex-col h-full transform transition-all duration-300 ease-out animate-in slide-in-from-right ${isCheckoutOpen ? 'max-w-lg bg-site' : 'max-w-md'}`}>
 
             {/* Header fixed */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b z-10 sticky top-0 ${isCheckoutOpen ? 'border-primary-900 bg-primary-800 text-white' : 'border-gray-100 bg-gradient-to-r from-white to-gray-50'}`}>
-              <h2 className={`text-xl font-bold font-bell-mt flex items-center gap-2 ${isCheckoutOpen ? 'text-white' : 'text-gray-800'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b z-10 sticky top-0 ${isCheckoutOpen ? 'border-mirra-linea bg-white text-mirra-tinta' : 'border-mirra-linea bg-white'}`}>
+              <h2 className={`text-xl font-normal font-bell-mt flex items-center gap-2 text-mirra-tinta`}>
                 {isCheckoutOpen ? (
                   <span>
                     Finalizar Compra
-                    <span className="mt-1 block font-sans text-xs font-normal text-primary-100">
+                    <span className="mt-1 block font-sans text-xs font-normal text-mirra-suave">
                       {isCheckoutOpen ? 'Indica cómo deseas recibir tu pedido.' : deliveryReview ? 'Revisa los productos y confirma tu método de entrega.' : ''}
                     </span>
                   </span>
                 ) : 'Tu Carrito'}
                 {!isCheckoutOpen && (
-                  <span className="text-sm font-sans font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-sm font-sans font-normal text-mirra-suave bg-mirra-crema px-2 py-0.5 rounded-full">
                     {cartItems.reduce((acc, item) => acc + item.qty, 0)} items
                   </span>
                 )}
               </h2>
               <div className="flex items-center gap-1">
+                {/* Teléfono: "Vaciar" arriba (abajo solo quedan el total y el botón) */}
+                {!isCheckoutOpen && cartItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={vaciarCarrito}
+                    className="mr-1 rounded-md px-1.5 py-1 text-[12.5px] text-mirra-suave underline underline-offset-[3px] transition-colors hover:text-red-600 sm:hidden"
+                  >
+                    Vaciar
+                  </button>
+                )}
                 {isCheckoutOpen && (
                   <button
                     onClick={() => setIsCheckoutOpen(false)}
-                    className="rounded-full p-2 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                    className="rounded-full p-2 text-mirra-suave transition-colors hover:bg-mirra-crema hover:text-mirra-tinta"
                     aria-label="Volver al carrito"
                   >
                     <ArrowLeft className="h-5 w-5" />
@@ -783,7 +799,7 @@ export default function Hero() {
                 )}
                 <button
                   onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}
-                  className={`rounded-full p-2 transition-colors ${isCheckoutOpen ? 'text-gray-300 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                  className={`rounded-full p-2 transition-colors text-mirra-suave hover:bg-mirra-crema hover:text-mirra-tinta`}
                   aria-label="Cerrar carrito"
                 >
                   <X className="w-6 h-6" />
@@ -792,7 +808,7 @@ export default function Hero() {
             </div>
 
             {/* Content Area - Scrollable */}
-            <div             className={`flex-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-gray-300 ${isCheckoutOpen ? 'bg-site px-3 py-4' : 'px-6 py-6'}`}>
+            <div             className={`flex-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-[#d6cfc5] ${isCheckoutOpen ? 'bg-site px-3 py-4' : 'px-6 py-6'}`}>
               <CheckoutModal
                 open
                 visible={isCheckoutOpen}
@@ -832,16 +848,16 @@ export default function Hero() {
               <div className={isCheckoutOpen ? 'hidden' : ''}>
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-60">
-                  <div className="bg-gray-100 p-6 rounded-full">
-                    <Search className="w-12 h-12 text-gray-400" />
+                  <div className="bg-mirra-crema p-6 rounded-full">
+                    <Search className="w-12 h-12 text-[#a8a29e]" />
                   </div>
                   <div>
-                    <p className="text-lg font-medium text-gray-900">Tu carrito está vacío</p>
-                    <p className="text-sm text-gray-500 max-w-xs mx-auto mt-1">¡Explora nuestra colección y encuentra tu fragancia ideal!</p>
+                    <p className="text-lg font-medium text-mirra-tinta">Tu carrito está vacío</p>
+                    <p className="text-sm text-mirra-suave max-w-xs mx-auto mt-1">¡Explora nuestra colección y encuentra tu fragancia ideal!</p>
                   </div>
                   <button
                     onClick={() => setIsCartOpen(false)}
-                    className="mt-4 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                    className="mt-4 px-6 py-2 bg-mirra-tinta text-white rounded-lg hover:bg-black transition-colors text-sm font-medium"
                   >
                     Ver Productos
                   </button>
@@ -850,18 +866,18 @@ export default function Hero() {
                 <div className="space-y-4 pb-20"> {/* pb-20 for extra scroll space */}
                   {deliveryReview && (
                     <>
-                    <section className="rounded-xl border border-[#eadfce] bg-white px-3 py-2" aria-label="Paso 2 de 2">
+                    <section className="rounded-xl border border-mirra-linea bg-white px-3 py-2" aria-label="Paso 2 de 2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#806747]">Paso 2 de 2 · Revisión</p>
-                      <p className="mt-0.5 text-xs text-gray-600">Verifica productos y entrega antes de confirmar.</p>
+                      <p className="mt-0.5 text-xs text-[#57534e]">Verifica productos y entrega antes de confirmar.</p>
                     </section>
-                    <section className="rounded-xl border border-[#eadfce] bg-[#fbf7f2] px-3 py-2.5" aria-label="Método de entrega seleccionado">
+                    <section className="rounded-xl border border-mirra-linea bg-mirra-fondo px-3 py-2.5" aria-label="Método de entrega seleccionado">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#806747]">Entrega elegida</p>
-                          <p className="mt-0.5 text-sm font-semibold leading-tight text-gray-900">{deliveryReview.method}</p>
+                          <p className="mt-0.5 text-sm font-semibold leading-tight text-mirra-tinta">{deliveryReview.method}</p>
                           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                             {deliveryReview.details.map((detail, index) => (
-                              <p key={`${index}-${detail}`} className="break-words text-xs leading-snug text-gray-600">{detail}</p>
+                              <p key={`${index}-${detail}`} className="break-words text-xs leading-snug text-[#57534e]">{detail}</p>
                             ))}
                           </div>
                         </div>
@@ -903,22 +919,13 @@ export default function Hero() {
                       const displayTamano = nombreTamano ? presentationLabel(String(nombreTamano)) : null;
 
                       return (
-                        <div key={it.key} className="group relative flex gap-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div key={it.key} className="group relative flex gap-4 bg-white p-3 rounded-xl border border-mirra-linea shadow-sm hover:shadow-md transition-shadow">
                           {/* Product Image */}
-                          <div className="relative w-20 h-20 bg-gray-50 rounded-lg overflow-hidden shrink-0 border border-gray-100">
-                            <img
-                              src={getImageUrl(it.product)}
-                              alt={it.product.name}
-                              className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
-                              onError={(e) => {
-                                const t = e.currentTarget as HTMLImageElement;
-                                t.onerror = null;
-                                // Usar una imagen aleatoria del asset folder como fallback
-                                const fallbackImages = ['/asset/muestra1.jpeg', '/asset/muestra2.jpeg', '/asset/muestra3.jpeg', '/asset/muestra4.jpeg'];
-                                const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                                t.src = randomFallback;
-                                console.error('[Hero Cart] image load failed, using fallback:', t.src);
-                              }}
+                          <div className="relative w-20 h-20 bg-mirra-fondo rounded-lg overflow-hidden shrink-0 border border-mirra-linea">
+                            <FotoProducto
+                              product={it.product}
+                              ml={mlDeNombre((it.product as any)?.tamano?.nombre)}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                           </div>
 
@@ -932,43 +939,43 @@ export default function Hero() {
                                     <span className="mr-1 font-bell-mt text-xs normal-case tracking-normal text-[#b08a57]">{momento.num}</span>{momento.texto}
                                   </p>
                                 )}
-                                <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
-                                  {it.product.name}
+                                <h3 className="text-sm font-semibold text-mirra-tinta line-clamp-2 leading-tight">
+                                  {nombreTienda(it.product)}
                                 </h3>
                                 </div>
                                 <button
                                   onClick={() => removeItem(it.key)}
-                                  className="text-gray-300 hover:text-red-500 p-1 -mt-1 -mr-1 rounded-md hover:bg-red-50 transition-colors"
+                                  className="text-[#d6cfc5] hover:text-red-500 p-1 -mt-1 -mr-1 rounded-md hover:bg-red-50 transition-colors"
                                   title="Eliminar producto"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
-                              {displayTamano && <p className="text-xs text-gray-500 mt-0.5">{displayTamano}</p>}
+                              {displayTamano && <p className="text-xs text-mirra-suave mt-0.5">{displayTamano}</p>}
                               {(it.product as any)?.agotado && (
-                                <p className="mt-1 inline-block rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado · quítalo</p>
+                                <p className="mt-1 inline-block rounded-full bg-mirra-tinta px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Agotado · quítalo</p>
                               )}
                             </div>
 
                             <div className="flex items-end justify-between mt-2">
-                              <p className="text-sm font-bold text-copper-700">{priceDisplay}</p>
+                              <p className="text-sm font-bold text-mirra-tinta">{priceDisplay}</p>
 
                               {/* Quantity Controls */}
-                              <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50 h-8">
+                              <div className="flex items-center border border-mirra-linea rounded-lg bg-mirra-fondo h-8">
                                 <button
-                                  className="px-2 h-full hover:bg-gray-200 text-gray-600 rounded-l-lg transition-colors flex items-center justify-center active:bg-gray-300"
+                                  className="px-2 h-full hover:bg-mirra-crema text-[#57534e] rounded-l-lg transition-colors flex items-center justify-center active:bg-[#e7ded2]"
                                   onClick={() => updateQty(it.key, Math.max(1, (it.qty || 1) - 1))}
                                 >-</button>
                                 <input
                                   type="number"
                                   min={1}
                                   value={it.qty}
-                                  onChange={(e) => updateQty(it.key, Math.max(1, Number(e.target.value || 1)))}
+                                  onChange={(e) => { const aviso = updateQty(it.key, Math.max(1, Number(e.target.value || 1))); if (aviso) toast.error(aviso); }}
                                   className="w-8 text-center bg-transparent text-base md:text-sm font-medium focus:outline-none appearance-none m-0 p-0"
                                 />
                                 <button
-                                  className="px-2 h-full hover:bg-gray-200 text-gray-600 rounded-r-lg transition-colors flex items-center justify-center active:bg-gray-300"
-                                  onClick={() => updateQty(it.key, (it.qty || 1) + 1)}
+                                  className="px-2 h-full hover:bg-mirra-crema text-[#57534e] rounded-r-lg transition-colors flex items-center justify-center active:bg-[#e7ded2]"
+                                  onClick={() => { const aviso = updateQty(it.key, (it.qty || 1) + 1); if (aviso) toast.error(aviso); }}
                                 >+</button>
                               </div>
                             </div>
@@ -1032,8 +1039,8 @@ export default function Hero() {
 
                   {/* Checkout Form */}
                   {false && isCheckoutOpen && (
-                    <div className="mt-8 pt-6 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <div className="mt-8 pt-6 border-t border-mirra-linea animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <h3 className="text-sm font-bold text-mirra-tinta uppercase tracking-wider mb-4 flex items-center gap-2">
                         <User className="w-4 h-4" /> Datos de Envío
                       </h3>
                       <form onSubmit={async (e) => {
@@ -1153,7 +1160,7 @@ export default function Hero() {
                       }} className="space-y-4">
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Documento de identificación</label>
+                            <label className="block text-xs font-semibold text-[#44403c] mb-1 ml-1">Documento de identificación</label>
                             <div className="flex gap-2">
                               <select
                                 aria-label="Tipo de documento"
@@ -1166,7 +1173,7 @@ export default function Hero() {
                                   setNombreCliente('');
                                   setTelefonoCliente('');
                                 }}
-                                className="w-20 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                className="w-20 px-2 py-2 bg-mirra-fondo border border-mirra-linea rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#e9dccb] focus:bg-white transition-all"
                               >
                                 <option value="V">V</option>
                                 <option value="J">J</option>
@@ -1174,7 +1181,7 @@ export default function Hero() {
                                 <option value="E">E</option>
                               </select>
                               <div className="relative flex-1">
-                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a29e]" />
                                 <input
                                   type="text"
                                   inputMode="numeric"
@@ -1189,52 +1196,52 @@ export default function Hero() {
                                     setTelefonoCliente('');
                                   }}
                                   onBlur={() => void buscarClientePorCedula(`${tipoDocumento}-${cedulaCliente}`)}
-                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                  className="w-full pl-9 pr-4 py-2 bg-mirra-fondo border border-mirra-linea rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#e9dccb] focus:bg-white transition-all"
                                 />
                               </div>
                             </div>
-                            {buscandoCliente && <p className="mt-1 ml-1 text-xs text-gray-500">Consultando cliente...</p>}
+                            {buscandoCliente && <p className="mt-1 ml-1 text-xs text-mirra-suave">Consultando cliente...</p>}
                             {clienteExistente && <p className="mt-1 ml-1 text-xs text-green-600">¡Bienvenido de vuelta! Tu lealtad hace crecer la familia Mirra. Disfruta tu compra de hoy.</p>}
                           </div>
 
                           {documentoConsultado && !clienteExistente && <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Nombre Completo</label>
+                            <label className="block text-xs font-semibold text-[#44403c] mb-1 ml-1">Nombre Completo</label>
                             <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a29e]" />
                               <input
                                 type="text"
                                 placeholder="Tu nombre"
                                 value={nombreCliente}
                                 onChange={(e) => setNombreCliente(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                className="w-full pl-9 pr-4 py-2 bg-mirra-fondo border border-mirra-linea rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#e9dccb] focus:bg-white transition-all"
                               />
                             </div>
                           </div>}
 
                           {clienteExistente && <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Nombre Completo</label>
+                            <label className="block text-xs font-semibold text-[#44403c] mb-1 ml-1">Nombre Completo</label>
                             <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a29e]" />
                               <input
                                 type="text"
                                 value={nombreCliente}
                                 readOnly
-                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-base md:text-sm text-gray-700"
+                                className="w-full pl-9 pr-4 py-2 bg-mirra-crema border border-mirra-linea rounded-lg text-base md:text-sm text-[#44403c]"
                               />
                             </div>
                           </div>}
 
                           {documentoConsultado && !clienteExistente && <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-semibold text-gray-700 mb-1 ml-1">Teléfono</label>
+                              <label className="block text-xs font-semibold text-[#44403c] mb-1 ml-1">Teléfono</label>
                               <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a29e]" />
                                 <input
                                   type="tel"
                                   placeholder="04129465465"
                                   value={telefonoCliente}
                                   onChange={(e) => setTelefonoCliente(e.target.value)}
-                                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-copper-500 focus:bg-white transition-all"
+                                  className="w-full pl-9 pr-4 py-2 bg-mirra-fondo border border-mirra-linea rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#e9dccb] focus:bg-white transition-all"
                                 />
                               </div>
                             </div>
@@ -1245,14 +1252,14 @@ export default function Hero() {
                           <button
                             type="button"
                             onClick={() => setIsCheckoutOpen(false)}
-                            className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
+                            className="flex-1 py-2.5 bg-white border border-mirra-linea text-[#44403c] rounded-lg hover:bg-mirra-fondo font-medium text-sm transition-colors"
                           >
                             Cancelar
                           </button>
                           <button
                             type="submit"
                             disabled={checkoutLoading || checkoutSuccess}
-                            className={`flex-[2] py-2.5 rounded-lg text-gray-700 font-medium text-sm shadow-md flex items-center justify-center gap-2 transition-all ${checkoutSuccess
+                            className={`flex-[2] py-2.5 rounded-lg text-[#44403c] font-medium text-sm shadow-md flex items-center justify-center gap-2 transition-all ${checkoutSuccess
                               ? 'bg-green-600 hover:bg-green-700'
                               : 'bg-gradient-to-r from-copper-600 to-amber-600 hover:from-copper-700 hover:to-amber-700'
                               }`}
@@ -1270,9 +1277,10 @@ export default function Hero() {
 
             {/* Footer with Total and Actions (Fixed at bottom) */}
             {cartItems.length > 0 && !isCheckoutOpen && (
-              <div className="border-t border-gray-100 bg-white p-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 sticky bottom-0">
+              <div className="border-t border-mirra-linea bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_16px_rgba(40,30,20,0.05)] z-20 sticky bottom-0 sm:p-6">
+                {/* Teléfonos muy pequeños (menos de 360 px): menos relleno para que se vean más los perfumes del carrito */}
                 {/* Cupón: una sola línea; el campo se abre solo si el cliente lo toca */}
-                <div className="mb-3">
+                <div className="mb-2 sm:mb-3">
                   {cuponAplicado ? (
                     <div>
                       <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2.5 py-1.5">
@@ -1302,24 +1310,24 @@ export default function Hero() {
                     <button
                       type="button"
                       onClick={() => setCuponAbierto(true)}
-                      className="flex w-full items-center justify-between gap-2 py-1 text-sm text-gray-600 transition-colors hover:text-gray-900"
+                      className="flex w-full items-center justify-between gap-2 py-1 text-sm text-[#57534e] transition-colors hover:text-mirra-tinta"
                       aria-expanded={false}
                     >
                       <span className="flex items-center gap-1.5">
                         <TicketPercent className="h-4 w-4" /> ¿Tienes un cupón?
                       </span>
-                      <span className="font-semibold text-gray-900">Aplicar ›</span>
+                      <span className="font-semibold text-mirra-tinta">Aplicar ›</span>
                     </button>
                   ) : (
                     <>
                       <div className="mb-1.5 flex items-center justify-between">
-                        <label htmlFor="cupon-carrito" className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                        <label htmlFor="cupon-carrito" className="flex items-center gap-1.5 text-xs font-semibold text-[#44403c]">
                           <TicketPercent className="w-4 h-4" /> Código de cupón
                         </label>
                         <button
                           type="button"
                           onClick={() => { setCuponAbierto(false); setCuponCodigo(''); setCuponError(''); }}
-                          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                          className="rounded-md p-1 text-[#a8a29e] transition-colors hover:bg-mirra-crema hover:text-[#57534e]"
                           aria-label="Cerrar cupón"
                         >
                           <X className="h-4 w-4" />
@@ -1334,13 +1342,13 @@ export default function Hero() {
                           onChange={(e) => { setCuponCodigo(e.target.value.toUpperCase()); setCuponError(''); }}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicarCupon(); } }}
                           placeholder="Ingresa tu código"
-                          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-base md:text-sm uppercase focus:border-copper-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-copper-500/30 transition-all"
+                          className="min-w-0 flex-1 rounded-lg border border-mirra-linea bg-mirra-fondo px-3 py-2 text-base md:text-sm uppercase focus:border-[#cdbfae] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#e9dccb] transition-all"
                         />
                         <button
                           type="button"
                           onClick={() => void aplicarCupon()}
                           disabled={cuponCargando}
-                          className="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors disabled:opacity-60 flex items-center gap-2"
+                          className="shrink-0 rounded-lg bg-mirra-tinta px-4 py-2 text-sm font-semibold text-white hover:bg-black transition-colors disabled:opacity-60 flex items-center gap-2"
                         >
                           {cuponCargando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                           Aplicar
@@ -1351,23 +1359,9 @@ export default function Hero() {
                   )}
                 </div>
 
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-none mt-1">
-                      {formatMonto(totalCarrito)}
-                    </p>
-                  </div>
-                  {!isCheckoutOpen && (
-                    <p className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-md">
-                      {deliveryReview?.method || 'Envío por coordinar'}
-                    </p>
-                  )}
-                </div>
-
                 {(descuentoCupon > 0 || descuentoMayor > 0) && (
-                  <div className="mb-4 space-y-1 rounded-xl bg-emerald-50/70 px-3 py-2 text-sm">
-                    <div className="flex justify-between text-gray-600">
+                  <div className="mb-2.5 space-y-1 sm:mb-4 rounded-xl bg-emerald-50/70 px-3 py-2 text-sm">
+                    <div className="flex justify-between text-[#57534e]">
                       <span>Subtotal</span>
                       <span>{formatMonto(subtotalCarrito)}</span>
                     </div>
@@ -1383,17 +1377,37 @@ export default function Hero() {
                 )}
 
                 {!isCheckoutOpen && faltan7ml > 0 && (
-                  <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p role="status" className="mb-2.5 rounded-lg sm:mb-3 border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     {avisoSieteMl(faltan7ml)}
                   </p>
                 )}
 
+                {/* Teléfono (opción B): total a la izquierda y el botón a la derecha, en una fila.
+                    Tablet y PC: el total arriba con la entrega al lado, y abajo vaciar + botón (como antes). */}
+                <div className="flex items-center gap-3 sm:block">
+                  <div className="shrink-0 sm:mb-4 sm:flex sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[12px] text-mirra-suave sm:text-sm">{descuentoElegido ? 'Total con descuento' : 'Total estimado'}</p>
+                      <p className="mt-0.5 text-xl font-bold leading-none text-mirra-tinta sm:mt-1 sm:text-2xl">
+                        {formatMonto(totalCarrito)}
+                      </p>
+                      {!isCheckoutOpen && (
+                        <p className="mt-1 text-[11px] font-medium text-green-700 sm:hidden">{deliveryReview?.method || 'Envío por coordinar'}</p>
+                      )}
+                    </div>
+                    {!isCheckoutOpen && (
+                      <p className="hidden rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-600 sm:block">
+                        {deliveryReview?.method || 'Envío por coordinar'}
+                      </p>
+                    )}
+                  </div>
+
                 {!isCheckoutOpen ? (
                   <>
-                  <div className="flex gap-3">
+                  <div className="flex min-w-0 flex-1 gap-3">
                     <button
                       onClick={vaciarCarrito}
-                      className="px-4 py-3 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                      className="hidden px-4 py-3 border border-mirra-linea rounded-xl text-[#57534e] hover:bg-mirra-fondo hover:text-red-500 hover:border-red-200 transition-colors sm:block"
                       title="Vaciar carrito"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -1409,23 +1423,28 @@ export default function Hero() {
                         }
                       }}
                       disabled={checkoutSubmitting || faltan7ml > 0}
-                      className={`flex-1 bg-gray-900 text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
+                      className={`flex-1 bg-mirra-tinta text-white font-semibold py-3 px-4 text-[14px] sm:px-6 sm:text-base rounded-xl hover:bg-black transition-transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-60 ${checkoutSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'}`}
                     >
                       <span>{checkoutSubmitting ? 'Confirmando...' : deliveryReview ? 'Confirmar pedido' : 'Finalizar compra'}</span>
                       {deliveryReview ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
+                  </>
+                ) : null}
+                </div>
+                {!isCheckoutOpen && (
+                  <>
                   {/* Debajo de "Confirmar pedido", antes de tocarlo (enlaces en otra pestaña para no perder el pedido) */}
                   {deliveryReview && (
-                    <p className="mt-2.5 text-center text-[11px] leading-relaxed text-gray-500">
+                    <p className="mt-2.5 text-center text-[11px] leading-relaxed text-mirra-suave">
                       Al enviar tu pedido aceptas los{' '}
-                      <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Términos y condiciones</a>
+                      <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-mirra-tinta underline underline-offset-2">Términos y condiciones</a>
                       {' '}y la{' '}
-                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#8b6439] underline underline-offset-2">Política de privacidad</a>.
+                      <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-mirra-tinta underline underline-offset-2">Política de privacidad</a>.
                     </p>
                   )}
                   </>
-                ) : null}
+                )}
               </div>
             )}
           </div>
@@ -1439,10 +1458,10 @@ export default function Hero() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
               <Check className="h-7 w-7 text-green-600" />
             </div>
-            <h2 id="pedido-recibido-titulo" className="mt-4 font-bell-mt text-2xl font-bold text-gray-900">
+            <h2 id="pedido-recibido-titulo" className="mt-4 font-bell-mt text-2xl font-normal text-mirra-tinta">
               ¡Pedido{pedidoRecibido.pedidoId ? ` #${pedidoRecibido.pedidoId}` : ''} recibido!
             </h2>
-            <p className="mt-2 text-[15px] leading-relaxed text-gray-600">
+            <p className="mt-2 text-[15px] leading-relaxed text-[#57534e]">
               Último paso: envíanos tu pedido por WhatsApp para confirmarlo. Solo toca <strong>Enviar</strong>.
             </p>
             <a
@@ -1455,7 +1474,7 @@ export default function Hero() {
             <button
               type="button"
               onClick={() => setPedidoRecibido(null)}
-              className="mt-3 w-full rounded-xl px-5 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-50"
+              className="mt-3 w-full rounded-xl px-5 py-2.5 text-sm font-medium text-mirra-suave transition hover:bg-mirra-fondo"
             >
               Volver a la tienda
             </button>

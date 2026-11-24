@@ -46,11 +46,11 @@ export default function AvisameForm({ productoId, productoNombre }: Props) {
   if (!abierto) {
     return (
       <>
-        <p className="mb-2.5 text-center text-sm text-gray-600">Este perfume está agotado por el momento.</p>
+        <p className="mb-2.5 text-center text-sm text-mirra-suave">Este perfume está agotado por el momento.</p>
         <button
           type="button"
           onClick={() => setAbierto(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f1a16] py-3.5 text-[15px] font-bold text-white transition active:scale-[0.98]"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-mirra-tinta py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.98]"
         >
           <Bell className="h-4 w-4" /> Avísame cuando llegue
         </button>
@@ -78,14 +78,14 @@ export default function AvisameForm({ productoId, productoNombre }: Props) {
 
   return (
     <form onSubmit={enviar} className="space-y-2.5">
-      <p className="text-sm text-gray-700">Te avisamos por WhatsApp apenas vuelva <b>{productoNombre}</b>.</p>
+      <p className="text-sm text-mirra-suave">Te avisamos por WhatsApp apenas vuelva <b>{productoNombre}</b>.</p>
       <input
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         placeholder="Tu nombre"
         autoComplete="given-name"
         maxLength={60}
-        className="h-12 w-full rounded-xl border border-[#e8d9c5] px-3 text-base outline-none focus:border-[#CA9E67]"
+        className="h-12 w-full rounded-xl border border-[#d9cfc1] bg-mirra-fondo px-3 text-base text-mirra-tinta outline-none transition-colors placeholder:text-[#a8a29e] focus:border-mirra-tinta focus:bg-white"
       />
       <input
         value={telefono}
@@ -94,13 +94,13 @@ export default function AvisameForm({ productoId, productoNombre }: Props) {
         inputMode="tel"
         autoComplete="tel"
         maxLength={20}
-        className="h-12 w-full rounded-xl border border-[#e8d9c5] px-3 text-base outline-none focus:border-[#CA9E67]"
+        className="h-12 w-full rounded-xl border border-[#d9cfc1] bg-mirra-fondo px-3 text-base text-mirra-tinta outline-none transition-colors placeholder:text-[#a8a29e] focus:border-mirra-tinta focus:bg-white"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={enviando}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#CA9E67] py-3.5 text-[15px] font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-mirra-tinta py-3.5 text-[15px] font-semibold text-white transition hover:bg-black active:scale-[0.98] disabled:opacity-60"
       >
         {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
         Avísame

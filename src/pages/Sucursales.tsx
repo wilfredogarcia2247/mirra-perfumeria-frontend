@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Layout } from '@/components/Layout';
 import {
   createSucursal,
   deleteSucursal,
@@ -97,10 +98,12 @@ export default function Sucursales() {
     setDireccion(sucursal.direccion);
   };
 
+  // Dentro del marco del panel (menú lateral y barra de arriba), como las demás pantallas
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6">
+    <Layout>
+    <main className="mx-auto w-full max-w-5xl space-y-6">
       <header>
-        <h1 className="font-serif text-3xl font-semibold">Sucursales</h1>
+        <h1 className="font-bell-mt text-[30px] font-normal">Sucursales</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Administra las tiendas que los clientes pueden elegir para retirar sus pedidos.
         </p>
@@ -204,5 +207,6 @@ export default function Sucursales() {
         )}
       </section>
     </main>
+    </Layout>
   );
 }
